@@ -1243,10 +1243,29 @@ impl Driver for Gles3Driver {
                     }
                 },
                 None => {
-                    // let draw_buffer : [GLenum; 4] = [ GL_COLOR_ATTACHMENT0, GL_NONE, GL_NONE, GL_NONE ];
-                    // glDrawBuffers(4, &draw_buffer as *const GLenum);
-                    // Self::check_gl_error();
-                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                    // TODO: does glClearBufferfv works here?
+                    let mut bits    = 0;
+                    for idx in 0..4 {
+                        match pass.color_actions[idx] {
+                            ColorPassAction::Clear(col) => {
+                                let float_col = color4b_to_color4f(col);
+                                let f_cols : [GLfloat; 4] = [float_col.x, float_col.y, float_col.z, float_col.w];
+                                glClearColor(f_cols[0], f_cols[1], f_cols[2], f_cols[3]);
+
+                                bits |= GL_COLOR_BUFFER_BIT;
+                            },
+                            _ => ()
+                        }
+                    }
+
+                    match pass.depth_action {
+                        DepthPassAction::Clear(depth) => {
+                            glClearDepthf(depth);
+                            bits   |= GL_DEPTH_BUFFER_BIT;
+                        },
+                        _ => ()
+                    }
+                    glClear(bits);
                     Self::check_gl_error();
                 }
             }
