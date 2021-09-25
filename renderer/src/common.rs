@@ -426,7 +426,7 @@ macro_rules! render_data {
             $($field_name: $field_type,)*
         }
 
-        impl $crate::renderer::UniformBlockTrait for $name {
+        impl $crate::UniformBlockTrait for $name {
             // This is purely an example—not a good one.
             fn get_uniform_descriptors() -> Vec<UniformDataDesc> {
                 vec![$(UniformDataDesc::new(stringify!($field_name).to_string(), <$field_type>::get_uniform_type(), 1, $crate::offset_of!($name, $field_name))),*]
@@ -841,13 +841,13 @@ impl SamplerDesc {
 
 }
 pub struct TextureDesc {
-    pub(crate) sampler_desc    : SamplerDesc,
-    pub(crate) payload         : Option<Box<dyn Payload>>
+    pub sampler_desc    : SamplerDesc,
+    pub payload         : Option<Box<dyn Payload>>
 }
 
 pub struct RenderTargetDesc {
-    pub(crate) sampler_desc    : SamplerDesc,
-    pub(crate) sample_count    : usize
+    pub sampler_desc    : SamplerDesc,
+    pub sample_count    : usize
 }
 
 pub type Texture    = Resource<TextureDesc>;
