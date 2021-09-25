@@ -55,9 +55,9 @@ impl<T: IntrusiveCounter> IntrusivePtr<T> {
 
 impl<T: IntrusiveCounter + ?Sized> IntrusivePtr<T> {
     pub fn as_ref(&self) -> *const T { self.object }
-    pub fn into_raw(self) -> *mut T { let obj = self.object; std::mem::forget(self); obj }
-    pub fn from_raw_no_increment(raw: *mut T) -> Self { Self { object: raw } }
-    pub fn from_raw_increment(raw: *mut T) -> Self { unsafe { (*raw).increment() }; Self { object: raw } }
+    pub(crate) unsafe fn into_raw_mut(self) -> *mut T { let obj = self.object; std::mem::forget(self); obj }
+    pub(crate) unsafe fn from_raw_no_increment(raw: *mut T) -> Self { Self { object: raw } }
+    pub(crate) unsafe fn from_raw_increment(raw: *mut T) -> Self { (*raw).increment(); Self { object: raw } }
 }
 
 impl<T: IntrusiveCounter + ?Sized> Drop for IntrusivePtr<T> {

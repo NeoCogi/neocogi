@@ -544,8 +544,8 @@ impl Gles3Driver {
         self.read_back_state    = Some(ReadbackState::new(&mut self));
         unsafe {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            IntrusivePtr::from_raw_no_increment(IntrusivePtr::new(self).into_raw_mut() as *mut dyn Driver)
         }
-        IntrusivePtr::from_raw_no_increment(IntrusivePtr::new(self).into_raw() as *mut dyn Driver)
     }
 
     fn buffer_type_to_gl(bt: &DeviceBufferDesc) -> GLenum {
@@ -810,7 +810,7 @@ impl Driver for Gles3Driver {
         let img = GLTexture { gl_id: idx };
         let idx = self.textures.add(img);
 
-        let iptr : IntrusivePtr<dyn Driver>= IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver);
+        let iptr : IntrusivePtr<dyn Driver>= unsafe { IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver) };
 
         Some(TexturePtr::new(Texture::new(ResourceType::Texture, idx, new_desc, Some(iptr))))
     }
@@ -820,7 +820,7 @@ impl Driver for Gles3Driver {
         let img = GLRenderTarget { gl_id: idx };
         let idx = self.render_targets.add(img);
 
-        let iptr : IntrusivePtr<dyn Driver>= IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver);
+        let iptr : IntrusivePtr<dyn Driver>= unsafe { IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver) };
 
         Some(RenderTargetPtr::new(RenderTarget::new(ResourceType::RenderTarget, idx, desc, Some(iptr))))
     }
@@ -971,7 +971,7 @@ impl Driver for Gles3Driver {
     fn create_pipeline(&mut self, desc: PipelineDesc) -> Option<PipelinePtr> {
         let idx = self.pipelines.add(GLPipeline { desc: desc.clone() });
 
-        let iptr : IntrusivePtr<dyn Driver>= IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver);
+        let iptr : IntrusivePtr<dyn Driver>= unsafe { IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver) };
 
         Some(PipelinePtr::new(Pipeline::new(ResourceType::Pipeline, idx, desc, Some(iptr))))
     }
