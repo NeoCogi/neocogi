@@ -8,4 +8,4 @@ edition = "2018"
 [dependencies]
 rs-math3d = "0.9.15"
 rs-ctypes = "0.1.1"
-rs-gles3 = "0.1.0"
+gl = "0.14.0"

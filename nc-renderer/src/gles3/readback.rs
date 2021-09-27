@@ -29,7 +29,7 @@
 //
 use rs_math3d::*;
 use rs_ctypes::*;
-use rs_gles3::*;
+use gl::types::*;
 
 use crate::*;
 use super::renderer::*;
@@ -37,7 +37,7 @@ use super::renderer::*;
 ////////////////////////////////////////////////////////////////////////////////
 // Readback surface
 //
-// ES 3.0 & WebGL 2 do not provide GL_TEXTURE buffer objects, we have no choice
+// ES 3.0 & WebGL 2 do not provide gl::TEXTURE buffer objects, we have no choice
 // but to simulate reading back using this mechanism :P
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -259,50 +259,50 @@ impl ReadbackState {
 
     fn gl_format(pf: &PixelFormat) -> GLenum {
         match pf {
-            PixelFormat::RGB8U      => GL_RGB_INTEGER,
-            PixelFormat::RGBA8U     => GL_RGBA_INTEGER,
-            PixelFormat::R8U        => GL_RED_INTEGER,
-            PixelFormat::RGB32U     => GL_RGB_INTEGER,
-            PixelFormat::RGBA32U    => GL_RGBA_INTEGER,
-            PixelFormat::R32U       => GL_RED_INTEGER,
+            PixelFormat::RGB8U      => gl::RGB_INTEGER,
+            PixelFormat::RGBA8U     => gl::RGBA_INTEGER,
+            PixelFormat::R8U        => gl::RED_INTEGER,
+            PixelFormat::RGB32U     => gl::RGB_INTEGER,
+            PixelFormat::RGBA32U    => gl::RGBA_INTEGER,
+            PixelFormat::R32U       => gl::RED_INTEGER,
 
-            PixelFormat::RGB32F     => GL_RGB,
-            PixelFormat::RGBA32F    => GL_RGBA,
-            PixelFormat::R32F       => GL_RED,
+            PixelFormat::RGB32F     => gl::RGB,
+            PixelFormat::RGBA32F    => gl::RGBA,
+            PixelFormat::R32F       => gl::RED,
 
-            PixelFormat::D16        => GL_RED,
-            PixelFormat::D32        => GL_RED,
-            PixelFormat::D24S8      => GL_RED,
-            PixelFormat::D32S8      => GL_RED,
+            PixelFormat::D16        => gl::RED,
+            PixelFormat::D32        => gl::RED,
+            PixelFormat::D24S8      => gl::RED,
+            PixelFormat::D32S8      => gl::RED,
 
-            PixelFormat::RGB8(_)    => GL_RGB,
-            PixelFormat::RGBA8(_)   => GL_RGBA,
-            PixelFormat::R8(_)      => GL_RED,
+            PixelFormat::RGB8(_)    => gl::RGB,
+            PixelFormat::RGBA8(_)   => gl::RGBA,
+            PixelFormat::R8(_)      => gl::RED,
         }
     }
 
 
     fn gl_elem_type(pf: &PixelFormat) -> GLenum {
         match &pf {
-            PixelFormat::RGB8U      => GL_UNSIGNED_INT,
-            PixelFormat::RGBA8U     => GL_UNSIGNED_INT,
-            PixelFormat::R8U        => GL_UNSIGNED_INT,
-            PixelFormat::RGB32U     => GL_UNSIGNED_INT,
-            PixelFormat::RGBA32U    => GL_UNSIGNED_INT,
-            PixelFormat::R32U       => GL_UNSIGNED_INT,
+            PixelFormat::RGB8U      => gl::UNSIGNED_INT,
+            PixelFormat::RGBA8U     => gl::UNSIGNED_INT,
+            PixelFormat::R8U        => gl::UNSIGNED_INT,
+            PixelFormat::RGB32U     => gl::UNSIGNED_INT,
+            PixelFormat::RGBA32U    => gl::UNSIGNED_INT,
+            PixelFormat::R32U       => gl::UNSIGNED_INT,
 
-            PixelFormat::RGB32F     => GL_FLOAT,
-            PixelFormat::RGBA32F    => GL_FLOAT,
-            PixelFormat::R32F       => GL_FLOAT,
+            PixelFormat::RGB32F     => gl::FLOAT,
+            PixelFormat::RGBA32F    => gl::FLOAT,
+            PixelFormat::R32F       => gl::FLOAT,
 
-            PixelFormat::D16        => GL_FLOAT,
-            PixelFormat::D32        => GL_FLOAT,
-            PixelFormat::D24S8      => GL_FLOAT,
-            PixelFormat::D32S8      => GL_FLOAT,
+            PixelFormat::D16        => gl::FLOAT,
+            PixelFormat::D32        => gl::FLOAT,
+            PixelFormat::D24S8      => gl::FLOAT,
+            PixelFormat::D32S8      => gl::FLOAT,
 
-            PixelFormat::RGB8(_)    => GL_FLOAT,
-            PixelFormat::RGBA8(_)   => GL_FLOAT,
-            PixelFormat::R8(_)      => GL_FLOAT,
+            PixelFormat::RGB8(_)    => gl::FLOAT,
+            PixelFormat::RGBA8(_)   => gl::FLOAT,
+            PixelFormat::R8(_)      => gl::FLOAT,
         }
     }
 
@@ -360,31 +360,31 @@ impl ReadbackState {
 
             let fbb = driver.get_framebuffer_gl_id(fb.res_id());
             let mut current_fb = 0;
-            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &mut current_fb);
+            gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut current_fb);
             let mut viewport : [GLint; 4] = [0, 0, 0, 0];
             let mut scissor  : [GLint; 4] = [0, 0, 0, 0];
 
             // TODO: scissor test flags and other related states
-            glGetIntegerv(GL_VIEWPORT, &mut viewport as *mut [_] as *mut _);
-            glGetIntegerv(GL_SCISSOR_BOX, &mut scissor as *mut [_] as *mut _);
+            gl::GetIntegerv(gl::VIEWPORT, &mut viewport as *mut [_] as *mut _);
+            gl::GetIntegerv(gl::SCISSOR_BOX, &mut scissor as *mut [_] as *mut _);
 
-            glBindFramebuffer(GL_FRAMEBUFFER, fbb);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, fbb);
             Gles3Driver::check_gl_error();
 
             let vw = surface.desc().sampler_desc.width() as GLsizei;
             let vh = surface.desc().sampler_desc.height() as GLsizei;
-            glViewport(0, 0, vw, vh);
-            glScissor(0, 0, vw, vh);
+            gl::Viewport(0, 0, vw, vh);
+            gl::Scissor(0, 0, vw, vh);
 
-            let flags = GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT;
-            glClearDepthf(1.0);
+            let flags = gl::DEPTH_BUFFER_BIT | gl::COLOR_BUFFER_BIT;
+            gl::ClearDepthf(1.0);
 
-            let draw_buffer : [GLenum; 4] = [ GL_COLOR_ATTACHMENT0, GL_NONE, GL_NONE, GL_NONE ];
-            glDrawBuffers(4, &draw_buffer as *const GLenum);
+            let draw_buffer : [GLenum; 4] = [ gl::COLOR_ATTACHMENT0, gl::NONE, gl::NONE, gl::NONE ];
+            gl::DrawBuffers(4, &draw_buffer as *const GLenum);
 
             let i_cols : [GLuint; 4] = [0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF];
-            glClearBufferuiv(GL_COLOR as GLenum, 0, i_cols.as_ptr() as *const GLuint);
-            glClear(flags);
+            gl::ClearBufferuiv(gl::COLOR as GLenum, 0, i_cols.as_ptr() as *const GLuint);
+            gl::Clear(flags);
 
             let bindings = Bindings {
                 vertex_buffers  : vec!{ self.vb.clone() },
@@ -399,14 +399,14 @@ impl ReadbackState {
             let data = Self::alloc_pixels(surface, (w * 16) as usize, h as usize);
             assert_ne!(data, std::ptr::null_mut());
             let pf = Self::pixel_format(surface);
-            glReadBuffer(GL_COLOR_ATTACHMENT0 as GLenum);
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-            glReadPixels(x as GLint, y as GLint, w as GLsizei, h as GLsizei, Self::gl_format(&pf), Self::gl_elem_type(&pf), data as *mut ::core::ffi::c_void);
+            gl::ReadBuffer(gl::COLOR_ATTACHMENT0 as GLenum);
+            gl::BindBuffer(gl::PIXEL_PACK_BUFFER, 0);
+            gl::ReadPixels(x as GLint, y as GLint, w as GLsizei, h as GLsizei, Self::gl_format(&pf), Self::gl_elem_type(&pf), data as *mut ::core::ffi::c_void);
             Gles3Driver::check_gl_error();
-            glBindFramebuffer(GL_FRAMEBUFFER, current_fb as GLuint);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, current_fb as GLuint);
             Gles3Driver::check_gl_error();
-            glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-            glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+            gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+            gl::Scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 
             Some(Self::data_to_readback(data, w as usize, h as usize, &pf))
         }

@@ -29,7 +29,7 @@
 //
 use rs_math3d::*;
 use rs_ctypes::*;
-use rs_gles3::*;
+use gl::types::*;
 use crate::*;
 use super::readback::*;
 
@@ -63,7 +63,7 @@ pub struct GLProgram {
 
 impl Drop for GLProgram {
     fn drop(&mut self) {
-        unsafe { glDeleteProgram(self.prog_id) };
+        unsafe { gl::DeleteProgram(self.prog_id) };
     }
 }
 
@@ -118,39 +118,39 @@ impl GLVertexFormat for VertexFormat {
 
     fn gl_elem_type(&self) -> GLenum {
         match self {
-            VertexFormat::Byte      => GL_UNSIGNED_BYTE,
-            VertexFormat::Byte2     => GL_UNSIGNED_BYTE,
-            VertexFormat::Byte3     => GL_UNSIGNED_BYTE,
-            VertexFormat::Byte4     => GL_UNSIGNED_BYTE,
+            VertexFormat::Byte      => gl::UNSIGNED_BYTE,
+            VertexFormat::Byte2     => gl::UNSIGNED_BYTE,
+            VertexFormat::Byte3     => gl::UNSIGNED_BYTE,
+            VertexFormat::Byte4     => gl::UNSIGNED_BYTE,
 
-            VertexFormat::SByte     => GL_BYTE,
-            VertexFormat::SByte2    => GL_BYTE,
-            VertexFormat::SByte3    => GL_BYTE,
-            VertexFormat::SByte4    => GL_BYTE,
+            VertexFormat::SByte     => gl::BYTE,
+            VertexFormat::SByte2    => gl::BYTE,
+            VertexFormat::SByte3    => gl::BYTE,
+            VertexFormat::SByte4    => gl::BYTE,
 
-            VertexFormat::Int       => GL_INT,
-            VertexFormat::Int2      => GL_INT,
-            VertexFormat::Int3      => GL_INT,
-            VertexFormat::Int4      => GL_INT,
+            VertexFormat::Int       => gl::INT,
+            VertexFormat::Int2      => gl::INT,
+            VertexFormat::Int3      => gl::INT,
+            VertexFormat::Int4      => gl::INT,
 
-            VertexFormat::UInt      => GL_UNSIGNED_INT,
-            VertexFormat::UInt2     => GL_UNSIGNED_INT,
-            VertexFormat::UInt3     => GL_UNSIGNED_INT,
-            VertexFormat::UInt4     => GL_UNSIGNED_INT,
+            VertexFormat::UInt      => gl::UNSIGNED_INT,
+            VertexFormat::UInt2     => gl::UNSIGNED_INT,
+            VertexFormat::UInt3     => gl::UNSIGNED_INT,
+            VertexFormat::UInt4     => gl::UNSIGNED_INT,
 
-            VertexFormat::Short     => GL_SHORT,
-            VertexFormat::Short2    => GL_SHORT,
-            VertexFormat::Short3    => GL_SHORT,
-            VertexFormat::Short4    => GL_SHORT,
+            VertexFormat::Short     => gl::SHORT,
+            VertexFormat::Short2    => gl::SHORT,
+            VertexFormat::Short3    => gl::SHORT,
+            VertexFormat::Short4    => gl::SHORT,
 
-            VertexFormat::Float     => GL_FLOAT,
-            VertexFormat::Float2    => GL_FLOAT,
-            VertexFormat::Float3    => GL_FLOAT,
-            VertexFormat::Float4    => GL_FLOAT,
+            VertexFormat::Float     => gl::FLOAT,
+            VertexFormat::Float2    => gl::FLOAT,
+            VertexFormat::Float3    => gl::FLOAT,
+            VertexFormat::Float4    => gl::FLOAT,
 
-            VertexFormat::Float2x2  => GL_FLOAT,
-            VertexFormat::Float3x3  => GL_FLOAT,
-            VertexFormat::Float4x4  => GL_FLOAT,
+            VertexFormat::Float2x2  => gl::FLOAT,
+            VertexFormat::Float3x3  => gl::FLOAT,
+            VertexFormat::Float4x4  => gl::FLOAT,
         }
     }
 
@@ -207,21 +207,21 @@ fn setup_uniforms(uniforms: *const c_void, data_desc_layout: &[UniformDataDesc],
             let offset = data_desc_layout[i].offset();
             let location = prg_desc_layout[i].1 as GLint;
             match &data_desc_layout[i].desc().format() {
-                UniformDataType::UInt => { let s : &[u32]     = uniform_ptr_to_slice(uniforms, offset, 1);  glUniform1uiv(location, 1, s.as_ptr()); },
-                UniformDataType::UInt2=> { let s : &[u32]     = uniform_ptr_to_slice(uniforms, offset, 2);  glUniform2uiv(location, 1, s.as_ptr()); },
-                UniformDataType::UInt3=> { let s : &[u32]     = uniform_ptr_to_slice(uniforms, offset, 3);  glUniform3uiv(location, 1, s.as_ptr()); },
-                UniformDataType::UInt4=> { let s : &[u32]     = uniform_ptr_to_slice(uniforms, offset, 4);  glUniform4uiv(location, 1, s.as_ptr()); },
-                UniformDataType::Int  => { let s : &[i32]     = uniform_ptr_to_slice(uniforms, offset, 1);  glUniform1iv(location, 1, s.as_ptr()); },
-                UniformDataType::Int2 => { let s : &[i32]     = uniform_ptr_to_slice(uniforms, offset, 2);  glUniform2iv(location, 1, s.as_ptr()); },
-                UniformDataType::Int3 => { let s : &[i32]     = uniform_ptr_to_slice(uniforms, offset, 3);  glUniform3iv(location, 1, s.as_ptr()); },
-                UniformDataType::Int4 => { let s : &[i32]     = uniform_ptr_to_slice(uniforms, offset, 4);  glUniform4iv(location, 1, s.as_ptr()); },
-                UniformDataType::Float  => { let s : &[f32]   = uniform_ptr_to_slice(uniforms, offset, 1);  glUniform1fv(location, 1, s.as_ptr()); },
-                UniformDataType::Float2 => { let s : &[f32]   = uniform_ptr_to_slice(uniforms, offset, 2);  glUniform2fv(location, 1, s.as_ptr()); },
-                UniformDataType::Float3 => { let s : &[f32]   = uniform_ptr_to_slice(uniforms, offset, 3);  glUniform3fv(location, 1, s.as_ptr()); },
-                UniformDataType::Float4 => { let s : &[f32]   = uniform_ptr_to_slice(uniforms, offset, 4);  glUniform4fv(location, 1, s.as_ptr()); },
-                UniformDataType::Float2x2 => { let s : &[f32] = uniform_ptr_to_slice(uniforms, offset, 4);  glUniformMatrix2fv(location, 1, false as GLboolean, s.as_ptr()); },
-                UniformDataType::Float3x3 => { let s : &[f32] = uniform_ptr_to_slice(uniforms, offset, 9);  glUniformMatrix3fv(location, 1, false as GLboolean, s.as_ptr()); },
-                UniformDataType::Float4x4 => { let s : &[f32] = uniform_ptr_to_slice(uniforms, offset, 16); glUniformMatrix4fv(location, 1, false as GLboolean, s.as_ptr()); },
+                UniformDataType::UInt => { let s : &[u32]     = uniform_ptr_to_slice(uniforms, offset, 1);  gl::Uniform1uiv(location, 1, s.as_ptr()); },
+                UniformDataType::UInt2=> { let s : &[u32]     = uniform_ptr_to_slice(uniforms, offset, 2);  gl::Uniform2uiv(location, 1, s.as_ptr()); },
+                UniformDataType::UInt3=> { let s : &[u32]     = uniform_ptr_to_slice(uniforms, offset, 3);  gl::Uniform3uiv(location, 1, s.as_ptr()); },
+                UniformDataType::UInt4=> { let s : &[u32]     = uniform_ptr_to_slice(uniforms, offset, 4);  gl::Uniform4uiv(location, 1, s.as_ptr()); },
+                UniformDataType::Int  => { let s : &[i32]     = uniform_ptr_to_slice(uniforms, offset, 1);  gl::Uniform1iv(location, 1, s.as_ptr()); },
+                UniformDataType::Int2 => { let s : &[i32]     = uniform_ptr_to_slice(uniforms, offset, 2);  gl::Uniform2iv(location, 1, s.as_ptr()); },
+                UniformDataType::Int3 => { let s : &[i32]     = uniform_ptr_to_slice(uniforms, offset, 3);  gl::Uniform3iv(location, 1, s.as_ptr()); },
+                UniformDataType::Int4 => { let s : &[i32]     = uniform_ptr_to_slice(uniforms, offset, 4);  gl::Uniform4iv(location, 1, s.as_ptr()); },
+                UniformDataType::Float  => { let s : &[f32]   = uniform_ptr_to_slice(uniforms, offset, 1);  gl::Uniform1fv(location, 1, s.as_ptr()); },
+                UniformDataType::Float2 => { let s : &[f32]   = uniform_ptr_to_slice(uniforms, offset, 2);  gl::Uniform2fv(location, 1, s.as_ptr()); },
+                UniformDataType::Float3 => { let s : &[f32]   = uniform_ptr_to_slice(uniforms, offset, 3);  gl::Uniform3fv(location, 1, s.as_ptr()); },
+                UniformDataType::Float4 => { let s : &[f32]   = uniform_ptr_to_slice(uniforms, offset, 4);  gl::Uniform4fv(location, 1, s.as_ptr()); },
+                UniformDataType::Float2x2 => { let s : &[f32] = uniform_ptr_to_slice(uniforms, offset, 4);  gl::UniformMatrix2fv(location, 1, false as GLboolean, s.as_ptr()); },
+                UniformDataType::Float3x3 => { let s : &[f32] = uniform_ptr_to_slice(uniforms, offset, 9);  gl::UniformMatrix3fv(location, 1, false as GLboolean, s.as_ptr()); },
+                UniformDataType::Float4x4 => { let s : &[f32] = uniform_ptr_to_slice(uniforms, offset, 16); gl::UniformMatrix4fv(location, 1, false as GLboolean, s.as_ptr()); },
             }
         }
     }
@@ -234,7 +234,7 @@ struct GLDeviceBuffer {
 
 impl Drop for GLDeviceBuffer {
     fn drop(&mut self) {
-        unsafe { glDeleteBuffers(1, &self.gl_id as *const GLuint) };
+        unsafe { gl::DeleteBuffers(1, &self.gl_id as *const GLuint) };
     }
 }
 
@@ -245,7 +245,7 @@ struct GLTexture {
 impl Drop for GLTexture {
     fn drop(&mut self) {
         unsafe {
-            glDeleteTextures(1, &self.gl_id as *const GLuint);
+            gl::DeleteTextures(1, &self.gl_id as *const GLuint);
         }
     }
 }
@@ -257,7 +257,7 @@ struct GLRenderTarget {
 impl Drop for GLRenderTarget {
     fn drop(&mut self) {
         unsafe {
-            glDeleteRenderbuffers(1, &self.gl_id as *const GLuint);
+            gl::DeleteRenderbuffers(1, &self.gl_id as *const GLuint);
         }
     }
 }
@@ -272,73 +272,73 @@ trait GLPixelFormat {
 impl GLPixelFormat for PixelFormat {
     fn gl_internal_format(&self) -> GLenum {
         match self {
-            PixelFormat::RGB8U  => GL_RGB8UI,
-            PixelFormat::RGBA8U => GL_RGBA8UI,
-            PixelFormat::R8U    => GL_R8UI,
-            PixelFormat::RGB32U => GL_RGB32UI,
-            PixelFormat::RGBA32U=> GL_RGBA32UI,
-            PixelFormat::R32U   => GL_R32UI,
+            PixelFormat::RGB8U  => gl::RGB8UI,
+            PixelFormat::RGBA8U => gl::RGBA8UI,
+            PixelFormat::R8U    => gl::R8UI,
+            PixelFormat::RGB32U => gl::RGB32UI,
+            PixelFormat::RGBA32U=> gl::RGBA32UI,
+            PixelFormat::R32U   => gl::R32UI,
 
-            PixelFormat::RGB32F => GL_RGB32F,
-            PixelFormat::RGBA32F=> GL_RGBA32F,
-            PixelFormat::R32F   => GL_R32F,
+            PixelFormat::RGB32F => gl::RGB32F,
+            PixelFormat::RGBA32F=> gl::RGBA32F,
+            PixelFormat::R32F   => gl::R32F,
 
-            PixelFormat::D16    => GL_DEPTH_COMPONENT16,
-            PixelFormat::D32    => GL_DEPTH_COMPONENT32F,
-            PixelFormat::D24S8  => GL_DEPTH24_STENCIL8,
-            PixelFormat::D32S8  => GL_DEPTH32F_STENCIL8,
+            PixelFormat::D16    => gl::DEPTH_COMPONENT16,
+            PixelFormat::D32    => gl::DEPTH_COMPONENT32F,
+            PixelFormat::D24S8  => gl::DEPTH24_STENCIL8,
+            PixelFormat::D32S8  => gl::DEPTH32F_STENCIL8,
 
-            PixelFormat::RGB8(_)    => GL_RGB8,
-            PixelFormat::RGBA8(_)   => GL_RGBA8,
-            PixelFormat::R8(_)      => GL_R8,
+            PixelFormat::RGB8(_)    => gl::RGB8,
+            PixelFormat::RGBA8(_)   => gl::RGBA8,
+            PixelFormat::R8(_)      => gl::R8,
         }
     }
 
     fn gl_format(&self) -> GLenum {
         match self {
-            PixelFormat::RGB8U  => GL_RGB_INTEGER,
-            PixelFormat::RGBA8U => GL_RGBA_INTEGER,
-            PixelFormat::R8U    => GL_RED_INTEGER,
-            PixelFormat::RGB32U => GL_RGB_INTEGER,
-            PixelFormat::RGBA32U=> GL_RGBA_INTEGER,
-            PixelFormat::R32U   => GL_RED_INTEGER,
+            PixelFormat::RGB8U  => gl::RGB_INTEGER,
+            PixelFormat::RGBA8U => gl::RGBA_INTEGER,
+            PixelFormat::R8U    => gl::RED_INTEGER,
+            PixelFormat::RGB32U => gl::RGB_INTEGER,
+            PixelFormat::RGBA32U=> gl::RGBA_INTEGER,
+            PixelFormat::R32U   => gl::RED_INTEGER,
 
-            PixelFormat::RGB32F => GL_RGB,
-            PixelFormat::RGBA32F=> GL_RGBA,
-            PixelFormat::R32F   => GL_RED,
+            PixelFormat::RGB32F => gl::RGB,
+            PixelFormat::RGBA32F=> gl::RGBA,
+            PixelFormat::R32F   => gl::RED,
 
-            PixelFormat::D16    => GL_DEPTH_COMPONENT,
-            PixelFormat::D32    => GL_DEPTH_COMPONENT,
-            PixelFormat::D24S8  => GL_DEPTH_STENCIL,
-            PixelFormat::D32S8  => GL_DEPTH_STENCIL,
+            PixelFormat::D16    => gl::DEPTH_COMPONENT,
+            PixelFormat::D32    => gl::DEPTH_COMPONENT,
+            PixelFormat::D24S8  => gl::DEPTH_STENCIL,
+            PixelFormat::D32S8  => gl::DEPTH_STENCIL,
 
-            PixelFormat::RGB8(_)    => GL_RGB,
-            PixelFormat::RGBA8(_)   => GL_RGBA,
-            PixelFormat::R8(_)      => GL_RED,
+            PixelFormat::RGB8(_)    => gl::RGB,
+            PixelFormat::RGBA8(_)   => gl::RGBA,
+            PixelFormat::R8(_)      => gl::RED,
         }
     }
 
     fn gl_elem_type(&self) -> GLenum {
         match &self {
-            PixelFormat::RGB8U  => GL_UNSIGNED_BYTE,
-            PixelFormat::RGBA8U => GL_UNSIGNED_BYTE,
-            PixelFormat::R8U    => GL_UNSIGNED_BYTE,
-            PixelFormat::RGB32U => GL_UNSIGNED_INT,
-            PixelFormat::RGBA32U=> GL_UNSIGNED_INT,
-            PixelFormat::R32U   => GL_UNSIGNED_INT,
+            PixelFormat::RGB8U  => gl::UNSIGNED_BYTE,
+            PixelFormat::RGBA8U => gl::UNSIGNED_BYTE,
+            PixelFormat::R8U    => gl::UNSIGNED_BYTE,
+            PixelFormat::RGB32U => gl::UNSIGNED_INT,
+            PixelFormat::RGBA32U=> gl::UNSIGNED_INT,
+            PixelFormat::R32U   => gl::UNSIGNED_INT,
 
-            PixelFormat::RGB32F => GL_FLOAT,
-            PixelFormat::RGBA32F=> GL_FLOAT,
-            PixelFormat::R32F   => GL_FLOAT,
+            PixelFormat::RGB32F => gl::FLOAT,
+            PixelFormat::RGBA32F=> gl::FLOAT,
+            PixelFormat::R32F   => gl::FLOAT,
 
-            PixelFormat::D16    => GL_UNSIGNED_SHORT,
-            PixelFormat::D32    => GL_FLOAT,
-            PixelFormat::D24S8  => GL_UNSIGNED_INT_24_8,
-            PixelFormat::D32S8  => GL_FLOAT_32_UNSIGNED_INT_24_8_REV,
+            PixelFormat::D16    => gl::UNSIGNED_SHORT,
+            PixelFormat::D32    => gl::FLOAT,
+            PixelFormat::D24S8  => gl::UNSIGNED_INT_24_8,
+            PixelFormat::D32S8  => gl::FLOAT_32_UNSIGNED_INT_24_8_REV,
 
-            PixelFormat::RGB8(_)    => GL_UNSIGNED_BYTE,
-            PixelFormat::RGBA8(_)   => GL_UNSIGNED_BYTE,
-            PixelFormat::R8(_)      => GL_UNSIGNED_BYTE,
+            PixelFormat::RGB8(_)    => gl::UNSIGNED_BYTE,
+            PixelFormat::RGBA8(_)   => gl::UNSIGNED_BYTE,
+            PixelFormat::R8(_)      => gl::UNSIGNED_BYTE,
         }
     }
 
@@ -381,7 +381,7 @@ struct GLShader {
 
 impl Drop for GLShader {
     fn drop(&mut self) {
-        unsafe { glDeleteProgram(self.gl_id) }
+        unsafe { gl::DeleteProgram(self.gl_id) }
     }
 }
 
@@ -397,7 +397,7 @@ struct GLFrameBuffer {
 impl Drop for GLFrameBuffer {
     fn drop(&mut self) {
         unsafe {
-            glDeleteFramebuffers(1, &self.gl_id as *const GLuint)
+            gl::DeleteFramebuffers(1, &self.gl_id as *const GLuint)
         }
     }
 }
@@ -409,21 +409,21 @@ trait GLBlendFactor {
 impl GLBlendFactor for BlendFactor {
     fn gl_blend_factor(&self) -> GLenum {
         match self {
-            BlendFactor::Zero               => GL_ZERO,
-            BlendFactor::One                => GL_ONE,
-            BlendFactor::SrcColor           => GL_SRC_COLOR,
-            BlendFactor::OneMinusSrcColor   => GL_ONE_MINUS_SRC_COLOR,
-            BlendFactor::SrcAlpha           => GL_SRC_ALPHA,
-            BlendFactor::OneMinusSrcAlpha   => GL_ONE_MINUS_SRC_ALPHA,
-            BlendFactor::DstColor           => GL_DST_COLOR,
-            BlendFactor::OneMinusDstColor   => GL_ONE_MINUS_DST_COLOR,
-            BlendFactor::DstAlpha           => GL_DST_ALPHA,
-            BlendFactor::OneMinusDstAlpha   => GL_ONE_MINUS_DST_ALPHA,
-            BlendFactor::SrcAlphaSaturate   => GL_SRC_ALPHA_SATURATE,
-            BlendFactor::ConstantColor         => GL_CONSTANT_COLOR,
-            BlendFactor::OneMinusConstantColor => GL_ONE_MINUS_CONSTANT_COLOR,
-            BlendFactor::ConstantAlpha         => GL_CONSTANT_ALPHA,
-            BlendFactor::OneMinusConstantAlpha => GL_ONE_MINUS_CONSTANT_ALPHA,
+            BlendFactor::Zero               => gl::ZERO,
+            BlendFactor::One                => gl::ONE,
+            BlendFactor::SrcColor           => gl::SRC_COLOR,
+            BlendFactor::OneMinusSrcColor   => gl::ONE_MINUS_SRC_COLOR,
+            BlendFactor::SrcAlpha           => gl::SRC_ALPHA,
+            BlendFactor::OneMinusSrcAlpha   => gl::ONE_MINUS_SRC_ALPHA,
+            BlendFactor::DstColor           => gl::DST_COLOR,
+            BlendFactor::OneMinusDstColor   => gl::ONE_MINUS_DST_COLOR,
+            BlendFactor::DstAlpha           => gl::DST_ALPHA,
+            BlendFactor::OneMinusDstAlpha   => gl::ONE_MINUS_DST_ALPHA,
+            BlendFactor::SrcAlphaSaturate   => gl::SRC_ALPHA_SATURATE,
+            BlendFactor::ConstantColor         => gl::CONSTANT_COLOR,
+            BlendFactor::OneMinusConstantColor => gl::ONE_MINUS_CONSTANT_COLOR,
+            BlendFactor::ConstantAlpha         => gl::CONSTANT_ALPHA,
+            BlendFactor::OneMinusConstantAlpha => gl::ONE_MINUS_CONSTANT_ALPHA,
         }
     }
 }
@@ -514,8 +514,8 @@ impl Gles3Driver {
         let mut max_tex_size   = 0;
 
         unsafe {
-            glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &mut max_rt_size as *mut GLint);
-            glGetIntegerv(GL_MAX_TEXTURE_SIZE, &mut max_tex_size as *mut GLint);
+            gl::GetIntegerv(gl::MAX_RENDERBUFFER_SIZE, &mut max_rt_size as *mut GLint);
+            gl::GetIntegerv(gl::MAX_TEXTURE_SIZE, &mut max_tex_size as *mut GLint);
         }
 
         let min_surface_size    = std::cmp::min(4096, std::cmp::min(max_rt_size, max_tex_size));
@@ -543,16 +543,16 @@ impl Gles3Driver {
     fn initialize(mut self) -> DriverPtr {
         self.read_back_state    = Some(ReadbackState::new(&mut self));
         unsafe {
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
             IntrusivePtr::from_raw_no_increment(IntrusivePtr::new(self).into_raw_mut() as *mut dyn Driver)
         }
     }
 
     fn buffer_type_to_gl(bt: &DeviceBufferDesc) -> GLenum {
         match bt {
-            DeviceBufferDesc::Vertex(_)  => GL_ARRAY_BUFFER,
-            DeviceBufferDesc::Index(_)   => GL_ELEMENT_ARRAY_BUFFER,
-            DeviceBufferDesc::Pixel(_)   => GL_PIXEL_UNPACK_BUFFER,
+            DeviceBufferDesc::Vertex(_)  => gl::ARRAY_BUFFER,
+            DeviceBufferDesc::Index(_)   => gl::ELEMENT_ARRAY_BUFFER,
+            DeviceBufferDesc::Pixel(_)   => gl::PIXEL_UNPACK_BUFFER,
         }
     }
 
@@ -565,9 +565,9 @@ impl Gles3Driver {
             };
 
         match usage {
-            Usage::Static(_)    => GL_STATIC_DRAW,
-            Usage::Streamed(_)  => GL_STREAM_DRAW,
-            Usage::Dynamic(_)   => GL_DYNAMIC_DRAW,
+            Usage::Static(_)    => gl::STATIC_DRAW,
+            Usage::Streamed(_)  => gl::STREAM_DRAW,
+            Usage::Dynamic(_)   => gl::DYNAMIC_DRAW,
         }
     }
 
@@ -619,22 +619,22 @@ impl Gles3Driver {
         unsafe {
 
             let mut res : GLuint = 0;
-            glGenTextures(1, &mut res);
+            gl::GenTextures(1, &mut res);
             match &desc.image_type {
                 SamplerType::Sampler2D(pch_x, pch_y) => {
-                    glBindTexture(GL_TEXTURE_2D, res);
-                    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-                    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+                    gl::BindTexture(gl::TEXTURE_2D, res);
+                    gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
+                    gl::PixelStorei(gl::PACK_ALIGNMENT, 1);
 
                     // TODO: if one day, we need to have device buffer, bind it here
-                    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+                    gl::BindBuffer(gl::PIXEL_UNPACK_BUFFER, 0);
 
                     let ptr = match data {
                         Some(b) => b.ptr() as *const c_void,
                         None => ::core::ptr::null()
                     };
 
-                    glTexImage2D(GL_TEXTURE_2D,
+                    gl::TexImage2D(gl::TEXTURE_2D,
                         0,
                         desc.pixel_format.gl_internal_format() as GLint,
                         pch_x.size as GLsizei,
@@ -647,16 +647,16 @@ impl Gles3Driver {
 
                     Self::check_gl_error();
 
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, Self::gl_wrap(&pch_x.wrap) as GLint);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, Self::gl_wrap(&pch_x.wrap) as GLint);
+                    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, Self::gl_wrap(&pch_x.wrap) as GLint);
+                    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, Self::gl_wrap(&pch_x.wrap) as GLint);
                     match &desc.pixel_format {
                         PixelFormat::R8(min_mag) | PixelFormat::RGB8(min_mag) | PixelFormat::RGBA8(min_mag) => {
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, Self::gl_filter(&min_mag.min_filter) as GLint);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, Self::gl_filter(&min_mag.mag_filter) as GLint);
+                            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, Self::gl_filter(&min_mag.min_filter) as GLint);
+                            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, Self::gl_filter(&min_mag.mag_filter) as GLint);
                         },
                         _ => {
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST as GLint);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST as GLint);
+                            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as GLint);
+                            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
                         }
                     }
                 }
@@ -668,16 +668,16 @@ impl Gles3Driver {
     fn create_render_target(desc: &SamplerDesc, _sample_size: usize) -> GLuint {
         unsafe {
             let mut res : GLuint = 0;
-            glGenRenderbuffers(1, &mut res);
+            gl::GenRenderbuffers(1, &mut res);
             match &desc.image_type {
                 SamplerType::Sampler2D(pch_x, pch_y) => {
-                    glBindRenderbuffer(GL_RENDERBUFFER, res);
-                    glRenderbufferStorage(GL_RENDERBUFFER,
+                    gl::BindRenderbuffer(gl::RENDERBUFFER, res);
+                    gl::RenderbufferStorage(gl::RENDERBUFFER,
                         desc.pixel_format.gl_internal_format(),
                         pch_x.size as GLsizei,
                         pch_y.size as GLsizei
                     );
-                    if glGetError() != GL_NO_ERROR {
+                    if gl::GetError() != gl::NO_ERROR {
                         panic!("Error creating render target");
                     }
                 }
@@ -688,48 +688,48 @@ impl Gles3Driver {
 
     fn gl_wrap(wm: &WrapMode) -> GLenum {
         match wm {
-            WrapMode::Repeat => GL_REPEAT,
-            WrapMode::ClampToEdge => GL_CLAMP_TO_EDGE,
+            WrapMode::Repeat => gl::REPEAT,
+            WrapMode::ClampToEdge => gl::CLAMP_TO_EDGE,
             WrapMode::ClampToBorder => panic!("unsupported wrap mode!"),
-            WrapMode::MirroredRepeat => GL_MIRRORED_REPEAT,
+            WrapMode::MirroredRepeat => gl::MIRRORED_REPEAT,
         }
     }
 
     fn gl_filter(filter: &Filter) -> GLenum {
         match filter {
-            Filter::Nearest => GL_NEAREST,
-            Filter::Linear => GL_LINEAR,
-            Filter::NearestMipmapNearest => GL_NEAREST_MIPMAP_NEAREST,
-            Filter::NearestMipmapLinear => GL_NEAREST_MIPMAP_LINEAR,
-            Filter::LinearMipmapNearest => GL_LINEAR_MIPMAP_NEAREST,
-            Filter::LinearMipmapLinear => GL_LINEAR_MIPMAP_LINEAR,
+            Filter::Nearest => gl::NEAREST,
+            Filter::Linear => gl::LINEAR,
+            Filter::NearestMipmapNearest => gl::NEAREST_MIPMAP_NEAREST,
+            Filter::NearestMipmapLinear => gl::NEAREST_MIPMAP_LINEAR,
+            Filter::LinearMipmapNearest => gl::LINEAR_MIPMAP_NEAREST,
+            Filter::LinearMipmapLinear => gl::LINEAR_MIPMAP_LINEAR,
         }
     }
 
     fn load_shader(src: &str, ty: GLenum) -> Option<GLuint> {
         unsafe {
-            let shader = glCreateShader(ty);
+            let shader = gl::CreateShader(ty);
             if shader == 0 {
                 return None
             }
 
-            glShaderSource(shader, 1, &(src.as_ptr() as *const i8), core::ptr::null());
-            glCompileShader(shader);
+            gl::ShaderSource(shader, 1, &(src.as_ptr() as *const i8), core::ptr::null());
+            gl::CompileShader(shader);
 
             let mut compiled = 0;
-            glGetShaderiv(shader, GL_COMPILE_STATUS, &mut compiled);
+            gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut compiled);
 
             let mut info_len = 0;
-            glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &mut info_len);
+            gl::GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut info_len);
             if info_len > 1 {
                 let s = alloc_string(info_len as usize);
-                glGetShaderInfoLog(shader, info_len as GLsizei, core::ptr::null_mut(), s.as_ptr() as *mut GLchar);
+                gl::GetShaderInfoLog(shader, info_len as GLsizei, core::ptr::null_mut(), s.as_ptr() as *mut GLchar);
                 println!("Compilation Log: {}", s);
                 free_string(s, info_len as usize);
             }
 
             if compiled == 0 {
-                glDeleteShader(shader);
+                gl::DeleteShader(shader);
                 return None
             }
             Some(shader)
@@ -762,8 +762,8 @@ impl Gles3Driver {
 
     pub fn check_gl_error() {
         unsafe {
-            let error = glGetError();
-            if error != GL_NO_ERROR {
+            let error = gl::GetError();
+            if error != gl::NO_ERROR {
                 panic!("Error : {:#X}", error);
             }
         }
@@ -785,15 +785,15 @@ impl Driver for Gles3Driver {
         unsafe {
             let data = Self::buffer_data(&desc);
             let mut buff = 0;
-            glGenBuffers(1, &mut buff);
-            glBindBuffer(Self::buffer_type_to_gl(&desc), buff);
+            gl::GenBuffers(1, &mut buff);
+            gl::BindBuffer(Self::buffer_type_to_gl(&desc), buff);
             let buff_data =
                 match data {
                     Some(d) => d,
                     None    => std::ptr::null(),
                 };
 
-            glBufferData(Self::buffer_type_to_gl(&desc), desc.size() as GLsizeiptr, buff_data as *const rs_ctypes::c_void, Self::buffer_usage_to_gl(&desc));
+            gl::BufferData(Self::buffer_type_to_gl(&desc), desc.size() as GLsizeiptr, buff_data as *const rs_ctypes::c_void, Self::buffer_usage_to_gl(&desc));
 
             let gl_buff = GLDeviceBuffer { gl_id: buff, desc: Self::erase_buffer_data(&desc) };
             let idx = self.device_buffers.add(gl_buff);
@@ -828,44 +828,44 @@ impl Driver for Gles3Driver {
     fn create_shader(&mut self, desc: ShaderDesc) -> Option<ShaderPtr> {
         let desc_copy2 = desc.clone();
         unsafe {
-            let program_object = glCreateProgram();
+            let program_object = gl::CreateProgram();
             if program_object == 0 {
                 return None
             }
 
-            let vertex_shader    = Self::load_shader(desc.vertex_shader.as_str(), GL_VERTEX_SHADER);
-            let fragment_shader  = Self::load_shader(desc.pixel_shader.as_str(), GL_FRAGMENT_SHADER);
+            let vertex_shader    = Self::load_shader(desc.vertex_shader.as_str(), gl::VERTEX_SHADER);
+            let fragment_shader  = Self::load_shader(desc.pixel_shader.as_str(), gl::FRAGMENT_SHADER);
 
             match (vertex_shader, fragment_shader) {
                 (None, None) => (),
-                (None, Some(f)) => glDeleteShader(f),
-                (Some(v), None) => glDeleteShader(v),
+                (None, Some(f)) => gl::DeleteShader(f),
+                (Some(v), None) => gl::DeleteShader(v),
                 (Some(v), Some(f)) => {
-                    glAttachShader(program_object, v);
-                    glAttachShader(program_object, f);
-                    glLinkProgram(program_object);
+                    gl::AttachShader(program_object, v);
+                    gl::AttachShader(program_object, f);
+                    gl::LinkProgram(program_object);
 
                     let mut linked = 0;
-                    glGetProgramiv(program_object, GL_LINK_STATUS, &mut linked);
+                    gl::GetProgramiv(program_object, gl::LINK_STATUS, &mut linked);
                     let mut info_len = 0;
-                    glGetProgramiv(program_object, GL_INFO_LOG_LENGTH, &mut info_len);
+                    gl::GetProgramiv(program_object, gl::INFO_LOG_LENGTH, &mut info_len);
                     if info_len > 1 {
                         let s = alloc_string(info_len as usize);
-                        glGetProgramInfoLog(program_object, info_len as GLsizei, core::ptr::null_mut(), s.as_ptr() as *mut GLchar);
+                        gl::GetProgramInfoLog(program_object, info_len as GLsizei, core::ptr::null_mut(), s.as_ptr() as *mut GLchar);
                         println!("Shader Linking: {}", s);
                         free_string(s, info_len as usize);
                     }
 
 
                     // done with the shaders
-                    glDetachShader(program_object, v);
-                    glDetachShader(program_object, f);
+                    gl::DetachShader(program_object, v);
+                    gl::DetachShader(program_object, f);
 
-                    glDeleteShader(f);
-                    glDeleteShader(v);
+                    gl::DeleteShader(f);
+                    gl::DeleteShader(v);
 
                     if linked == 0 {
-                        glDeleteProgram(program_object);
+                        gl::DeleteProgram(program_object);
                         return None
                     }
                 }
@@ -879,7 +879,7 @@ impl Driver for Gles3Driver {
                     let mut s = a.clone();
                     s.push('\0');
 
-                    let au = glGetAttribLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
+                    let au = gl::GetAttribLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
                     if au < 0 {
                         println!("attribute {} not found in shader", s);
                         return None // will leak shaders!
@@ -895,7 +895,7 @@ impl Driver for Gles3Driver {
                 let mut s = u.clone();
                 s.push('\0');
 
-                let au = glGetUniformLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
+                let au = gl::GetUniformLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
                 if au < 0 {
                     println!("uniform {} not found in shader", s);
                     return None // will leak shaders!
@@ -909,7 +909,7 @@ impl Driver for Gles3Driver {
                 let mut s = u.clone();
                 s.push('\0');
 
-                let au = glGetUniformLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
+                let au = gl::GetUniformLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
                 if au < 0 {
                     println!("vertex texture {} not found in shader", s);
                     return None // will leak shaders!
@@ -924,7 +924,7 @@ impl Driver for Gles3Driver {
                 let mut s = u.clone();
                 s.push('\0');
 
-                let au = glGetUniformLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
+                let au = gl::GetUniformLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
                 if au < 0 {
                     println!("uniform {} not found in shader", s);
                     return None // will leak shaders!
@@ -938,7 +938,7 @@ impl Driver for Gles3Driver {
                 let mut s = u.clone();
                 s.push('\0');
 
-                let au = glGetUniformLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
+                let au = gl::GetUniformLocation(program_object, s.as_bytes().as_ptr() as *const GLchar);
                 if au < 0 {
                     println!("pixel texture {} not found in shader", s);
                     return None // will leak shaders!
@@ -979,8 +979,8 @@ impl Driver for Gles3Driver {
     fn create_frame_buffer(&mut self, desc: FrameBufferDesc) -> Option<FrameBufferPtr> {
         unsafe {
             let mut res : GLuint = 0;
-            glGenFramebuffers(1, &mut res);
-            glBindFramebuffer(GL_FRAMEBUFFER, res);
+            gl::GenFramebuffers(1, &mut res);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, res);
 
             let mut colors : [u32; 4] = [0; 4];
             for i in 0..4u32 {
@@ -988,12 +988,12 @@ impl Driver for Gles3Driver {
                     Some(SurfaceAttachment::Texture(ca)) => {
                         let gl_id = self.textures[ca.res_id()].gl_id;
                         colors[i as usize] = gl_id;
-                        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, gl_id, 0);
+                        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0 + i, gl::TEXTURE_2D, gl_id, 0);
                     },
                     Some(SurfaceAttachment::RenderTarget(ca)) => {
                         let gl_id = self.render_targets[ca.res_id()].gl_id;
                         colors[i as usize] = gl_id;
-                        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, gl_id);
+                        gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0 + i, gl::RENDERBUFFER, gl_id);
                     },
                     _ => ()
                 }
@@ -1002,22 +1002,22 @@ impl Driver for Gles3Driver {
             match &desc.depth_stencil_attachement {
                 SurfaceAttachment::RenderTarget(ca) =>  {
                     let gl_id = self.render_targets[ca.res_id()].gl_id;
-                    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gl_id);
+                    gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::RENDERBUFFER, gl_id);
                 },
                 SurfaceAttachment::Texture(ca) => {
                     let gl_id = self.textures[ca.res_id()].gl_id;
-                    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gl_id, 0);
+                    gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::TEXTURE_2D, gl_id, 0);
                 }
             }
 
-            if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE {
+            if gl::CheckFramebufferStatus(gl::FRAMEBUFFER) != gl::FRAMEBUFFER_COMPLETE {
                 println!("Framebuffer is not complete!");
-                glDeleteFramebuffers(1, &mut res);
+                gl::DeleteFramebuffers(1, &mut res);
                 return None
             }
 
             let mut color0 = 0;
-            glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 as GLenum, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME as GLenum, &mut color0);
+            gl::GetFramebufferAttachmentParameteriv(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0 as GLenum, gl::FRAMEBUFFER_ATTACHMENT_OBJECT_NAME as GLenum, &mut color0);
             assert_ne!(colors[0], 0);
             assert_eq!(colors[0], color0 as u32);
 
@@ -1027,7 +1027,7 @@ impl Driver for Gles3Driver {
 
             let iptr : IntrusivePtr<dyn Driver>= IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver);
 
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
 
             Some(FrameBufferPtr::new(FrameBuffer::new(ResourceType::FrameBuffer, idx, desc, Some(iptr))))
         }
@@ -1052,57 +1052,57 @@ impl Driver for Gles3Driver {
             // blend
             match &gl_pipe.desc.blend {
                 BlendOp::Add(blend) | BlendOp::Subtract(blend) => {
-                    glEnable(GL_BLEND);
-                    glBlendFuncSeparate(
+                    gl::Enable(gl::BLEND);
+                    gl::BlendFuncSeparate(
                         blend.src_factor_rgb.gl_blend_factor(),
                         blend.dst_factor_rgb.gl_blend_factor(),
                         blend.src_factor_rgb.gl_blend_factor(),
                         blend.dst_factor_rgb.gl_blend_factor());
                     },
-                _ => glDisable(GL_BLEND),
+                _ => gl::Disable(gl::BLEND),
             }
 
             match &gl_pipe.desc.blend {
-                BlendOp::Add(_) => glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD),
-                BlendOp::Subtract(_) => glBlendEquationSeparate(GL_FUNC_SUBTRACT, GL_FUNC_SUBTRACT),
-                BlendOp::ReverseSubtract(_) => glBlendEquationSeparate(GL_FUNC_REVERSE_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT),
+                BlendOp::Add(_) => gl::BlendEquationSeparate(gl::FUNC_ADD, gl::FUNC_ADD),
+                BlendOp::Subtract(_) => gl::BlendEquationSeparate(gl::FUNC_SUBTRACT, gl::FUNC_SUBTRACT),
+                BlendOp::ReverseSubtract(_) => gl::BlendEquationSeparate(gl::FUNC_REVERSE_SUBTRACT, gl::FUNC_REVERSE_SUBTRACT),
                 _ => ()
             }
 
             let (gl_prim, gl_elem_count) =
                 match gl_pipe.desc.primitive_type {
-                    PrimitiveType::Lines        => (GL_LINES, 2 * prim_count),
-                    PrimitiveType::LineStrip    => (GL_LINE_STRIP, 1 + prim_count),
-                    PrimitiveType::Points       => (GL_POINTS, prim_count),
-                    PrimitiveType::Triangles    => (GL_TRIANGLES, 3 * prim_count),
-                    PrimitiveType::TriangleStrip    => (GL_TRIANGLE_STRIP, 2 + prim_count)
+                    PrimitiveType::Lines        => (gl::LINES, 2 * prim_count),
+                    PrimitiveType::LineStrip    => (gl::LINE_STRIP, 1 + prim_count),
+                    PrimitiveType::Points       => (gl::POINTS, prim_count),
+                    PrimitiveType::Triangles    => (gl::TRIANGLES, 3 * prim_count),
+                    PrimitiveType::TriangleStrip    => (gl::TRIANGLE_STRIP, 2 + prim_count)
                 };
 
             match gl_pipe.desc.cull_mode {
-                CullMode::None => glDisable(GL_CULL_FACE),
-                CullMode::Winding => glEnable(GL_CULL_FACE),
+                CullMode::None => gl::Disable(gl::CULL_FACE),
+                CullMode::Winding => gl::Enable(gl::CULL_FACE),
             }
 
             match gl_pipe.desc.face_winding {
-                FaceWinding::CCW => glCullFace(GL_BACK),
-                FaceWinding::CW => glCullFace(GL_FRONT),
+                FaceWinding::CCW => gl::CullFace(gl::BACK),
+                FaceWinding::CW => gl::CullFace(gl::FRONT),
             }
 
             if gl_pipe.desc.depth_test {
-                glEnable(GL_DEPTH_TEST)
+                gl::Enable(gl::DEPTH_TEST)
             } else {
-                glDisable(GL_DEPTH_TEST)
+                gl::Disable(gl::DEPTH_TEST)
             }
 
-            glDepthMask(if gl_pipe.desc.depth_write { GL_TRUE } else { GL_FALSE } as GLboolean);
+            gl::DepthMask(if gl_pipe.desc.depth_write { gl::TRUE } else { gl::FALSE } as GLboolean);
 
-            glUseProgram(gl_prog.gl_id);
+            gl::UseProgram(gl_prog.gl_id);
             for (l, layout) in gl_pipe.desc.buffer_layouts.iter().enumerate() {
                 let gl_vb = &self.device_buffers[bindings.vertex_buffers[layout.buffer_id].res_id()];
-                glBindBuffer(GL_ARRAY_BUFFER, gl_vb.gl_id);
+                gl::BindBuffer(gl::ARRAY_BUFFER, gl_vb.gl_id);
                 for (i, a) in layout.vertex_attributes.iter().enumerate() {
                     let aidx = &gl_prog.vertex_attributes[l][i];
-                    glEnableVertexAttribArray(aidx.1);
+                    gl::EnableVertexAttribArray(aidx.1);
                     match a.format() {
                         VertexFormat::Int |
                         VertexFormat::Int2 |
@@ -1112,13 +1112,13 @@ impl Driver for Gles3Driver {
                         VertexFormat::UInt2 |
                         VertexFormat::UInt3 |
                         VertexFormat::UInt4  => {
-                            glVertexAttribIPointer(aidx.1, a.format().gl_elem_count() as GLint, a.format().gl_elem_type(), layout.stride as GLint, a.offset() as *const c_void);
+                            gl::VertexAttribIPointer(aidx.1, a.format().gl_elem_count() as GLint, a.format().gl_elem_type(), layout.stride as GLint, a.offset() as *const c_void);
                         },
                         _ => {
-                            glVertexAttribPointer(aidx.1, a.format().gl_elem_count() as GLint, a.format().gl_elem_type(), a.format().gl_is_normalized(), layout.stride as GLint, a.offset() as *const c_void);
+                            gl::VertexAttribPointer(aidx.1, a.format().gl_elem_count() as GLint, a.format().gl_elem_type(), a.format().gl_is_normalized(), layout.stride as GLint, a.offset() as *const c_void);
                         }
                     }
-                    glVertexAttribDivisor(aidx.1, layout.divisor as GLuint);
+                    gl::VertexAttribDivisor(aidx.1, layout.divisor as GLuint);
                 }
             }
 
@@ -1126,44 +1126,44 @@ impl Driver for Gles3Driver {
 
             for (i, t) in bindings.vertex_images.iter().enumerate() {
                 let location = gl_prog.vertex_surfaces[i].1;
-                glActiveTexture(((GL_TEXTURE0 as usize) + i) as GLenum);
-                glBindTexture(GL_TEXTURE_2D, self.textures[t.res_id()].gl_id as GLuint);
-                glUniform1i(location as GLint, i as GLint);
+                gl::ActiveTexture(((gl::TEXTURE0 as usize) + i) as GLenum);
+                gl::BindTexture(gl::TEXTURE_2D, self.textures[t.res_id()].gl_id as GLuint);
+                gl::Uniform1i(location as GLint, i as GLint);
             }
 
             let pixel_sampler_offset = bindings.vertex_images.len();
 
             for (i, t) in bindings.pixel_images.iter().enumerate() {
                 let location = gl_prog.pixel_surfaces[i].1;
-                glActiveTexture(((GL_TEXTURE0 as usize) + i + pixel_sampler_offset) as GLenum);
-                glBindTexture(GL_TEXTURE_2D, self.textures[t.res_id()].gl_id as GLuint);
-                glUniform1i(location as GLint, (i + pixel_sampler_offset) as GLint);
+                gl::ActiveTexture(((gl::TEXTURE0 as usize) + i + pixel_sampler_offset) as GLenum);
+                gl::BindTexture(gl::TEXTURE_2D, self.textures[t.res_id()].gl_id as GLuint);
+                gl::Uniform1i(location as GLint, (i + pixel_sampler_offset) as GLint);
             }
 
             match &bindings.index_buffer {
                 Some(ib) => {
-                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.device_buffers[ib.res_id()].gl_id);
+                    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.device_buffers[ib.res_id()].gl_id);
 
                     let itype =
                         match gl_pipe.desc.index_type {
                             IndexType::None => panic!("attempt to bind an index buffer to a pipeline that doesn't support it"),
-                            IndexType::UInt16 => GL_UNSIGNED_SHORT,
-                            IndexType::UInt32 => GL_UNSIGNED_INT,
+                            IndexType::UInt16 => gl::UNSIGNED_SHORT,
+                            IndexType::UInt32 => gl::UNSIGNED_INT,
                         };
 
-                    glDrawElementsInstanced(gl_prim, gl_elem_count as GLsizei, itype, core::ptr::null() as *const rs_ctypes::c_void, instance_count as GLint);
+                    gl::DrawElementsInstanced(gl_prim, gl_elem_count as GLsizei, itype, core::ptr::null() as *const rs_ctypes::c_void, instance_count as GLint);
                 },
                 None => {
                     if gl_pipe.desc.index_type != IndexType::None {
                         panic!("no index buffer bound but index type exist in pipeline")
                     }
-                    glDrawArraysInstanced(gl_prim, 0, gl_elem_count as GLsizei, instance_count as GLint);
+                    gl::DrawArraysInstanced(gl_prim, 0, gl_elem_count as GLsizei, instance_count as GLint);
                 }
             }
 
             for l in &gl_prog.vertex_attributes {
                 for v in l {
-                    glDisableVertexAttribArray(v.1);
+                    gl::DisableVertexAttribArray(v.1);
                 }
             }
         }
@@ -1171,16 +1171,16 @@ impl Driver for Gles3Driver {
 
     fn begin_pass(&mut self, pass: &Pass) {
         unsafe {
-            glFlush();
+            gl::Flush();
 
             match &pass.frame_buffer {
                 None => {
-                    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                    gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
                     Self::check_gl_error();
                 },
 
                 Some(fb) => {
-                    glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffers[fb.res_id()].gl_id);
+                    gl::BindFramebuffer(gl::FRAMEBUFFER, self.framebuffers[fb.res_id()].gl_id);
                     Self::check_gl_error();
                 },
             }
@@ -1189,17 +1189,17 @@ impl Driver for Gles3Driver {
             match &pass.frame_buffer {
                 Some(fb) => {
                     let fb_ref = &self.framebuffers[fb.res_id()];
-                    let mut draw_buffer : [GLenum; 4] = [ GL_NONE, GL_NONE, GL_NONE, GL_NONE ];
+                    let mut draw_buffer : [GLenum; 4] = [ gl::NONE, gl::NONE, gl::NONE, gl::NONE ];
                     for (idx, attach) in fb_ref.desc.color_attachements.iter().enumerate() {
                         match attach {
                             Some(_) => {
-                                draw_buffer[idx] = GL_COLOR_ATTACHMENT0 + (idx as GLenum);
+                                draw_buffer[idx] = gl::COLOR_ATTACHMENT0 + (idx as GLenum);
                             },
                             None => (),
                         };
                     }
 
-                    glDrawBuffers(4, &draw_buffer as *const GLenum);
+                    gl::DrawBuffers(4, &draw_buffer as *const GLenum);
                     Self::check_gl_error();
 
                     for idx in 0..4 {
@@ -1211,19 +1211,19 @@ impl Driver for Gles3Driver {
                                         match surf_ref.pixel_format().to_orig_surface_type() {
                                             OrigSurfaceType::UInt => {
                                                 let i_cols : [GLuint; 4] = [col.x as GLuint, col.y as GLuint, col.z as GLuint, col.w as GLuint];
-                                                glClearBufferuiv(GL_COLOR as GLenum, idx as GLint, i_cols.as_ptr() as *const GLuint);
+                                                gl::ClearBufferuiv(gl::COLOR as GLenum, idx as GLint, i_cols.as_ptr() as *const GLuint);
                                             },
                                             OrigSurfaceType::Float => {
                                                 let float_col = color4b_to_color4f(col);
                                                 let f_cols : [GLfloat; 4] = [float_col.x, float_col.y, float_col.z, float_col.w];
-                                                glClearBufferfv(GL_COLOR as GLenum, idx as GLint, f_cols.as_ptr() as *const GLfloat);
+                                                gl::ClearBufferfv(gl::COLOR as GLenum, idx as GLint, f_cols.as_ptr() as *const GLfloat);
                                             }
                                         }
                                     },
                                     _ => {  // assume that it's the default fixed point frame buffer
                                         let float_col = color4b_to_color4f(col);
                                         let f_cols : [GLfloat; 4] = [float_col.x, float_col.y, float_col.z, float_col.w];
-                                        glClearBufferfv(GL_COLOR as GLenum, idx as GLint, f_cols.as_ptr() as *const GLfloat);
+                                        gl::ClearBufferfv(gl::COLOR as GLenum, idx as GLint, f_cols.as_ptr() as *const GLfloat);
                                     }
                                 }
                                 Self::check_gl_error();
@@ -1235,7 +1235,7 @@ impl Driver for Gles3Driver {
                     // clear the depth
                     match pass.depth_action {
                         DepthPassAction::Clear(f) => {
-                            glClearBufferfv(GL_DEPTH as GLenum, 0, &f as *const _ as *const GLfloat);
+                            gl::ClearBufferfv(gl::DEPTH as GLenum, 0, &f as *const _ as *const GLfloat);
                             Self::check_gl_error();
 
                         },
@@ -1250,9 +1250,9 @@ impl Driver for Gles3Driver {
                             ColorPassAction::Clear(col) => {
                                 let float_col = color4b_to_color4f(col);
                                 let f_cols : [GLfloat; 4] = [float_col.x, float_col.y, float_col.z, float_col.w];
-                                glClearColor(f_cols[0], f_cols[1], f_cols[2], f_cols[3]);
+                                gl::ClearColor(f_cols[0], f_cols[1], f_cols[2], f_cols[3]);
 
-                                bits |= GL_COLOR_BUFFER_BIT;
+                                bits |= gl::COLOR_BUFFER_BIT;
                             },
                             _ => ()
                         }
@@ -1260,12 +1260,12 @@ impl Driver for Gles3Driver {
 
                     match pass.depth_action {
                         DepthPassAction::Clear(depth) => {
-                            glClearDepthf(depth);
-                            bits   |= GL_DEPTH_BUFFER_BIT;
+                            gl::ClearDepthf(depth);
+                            bits   |= gl::DEPTH_BUFFER_BIT;
                         },
                         _ => ()
                     }
-                    glClear(bits);
+                    gl::Clear(bits);
                     Self::check_gl_error();
                 }
             }
@@ -1277,11 +1277,11 @@ impl Driver for Gles3Driver {
     }
 
     fn set_viewport(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        unsafe { glViewport(x as GLint, y as GLint, w as GLsizei, h as GLsizei) }
+        unsafe { gl::Viewport(x as GLint, y as GLint, w as GLsizei, h as GLsizei) }
     }
 
     fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        unsafe { glScissor(x as GLint, y as GLint, w as GLsizei, h as GLsizei) }
+        unsafe { gl::Scissor(x as GLint, y as GLint, w as GLsizei, h as GLsizei) }
     }
 
     fn update_device_buffer(&mut self, dev_buf: &DeviceBufferPtr, offset: usize, pl: &dyn Payload) {
@@ -1304,18 +1304,18 @@ impl Driver for Gles3Driver {
 
             let target =
                 match self.device_buffers[dev_buf.res_id()].desc {
-                    DeviceBufferDesc::Vertex(_)  => GL_ARRAY_BUFFER,
-                    DeviceBufferDesc::Index(_)   => GL_ELEMENT_ARRAY_BUFFER,
-                    DeviceBufferDesc::Pixel(_)   => GL_PIXEL_UNPACK_BUFFER,
+                    DeviceBufferDesc::Vertex(_)  => gl::ARRAY_BUFFER,
+                    DeviceBufferDesc::Index(_)   => gl::ELEMENT_ARRAY_BUFFER,
+                    DeviceBufferDesc::Pixel(_)   => gl::PIXEL_UNPACK_BUFFER,
                 };
-            glBindBuffer(target, self.device_buffers[dev_buf.res_id()].gl_id as GLuint);
-            let ptr = glMapBufferRange(target, offset as GLintptr, pl.size() as GLsizeiptr, GL_MAP_WRITE_BIT as GLbitfield) as *mut u8;
+            gl::BindBuffer(target, self.device_buffers[dev_buf.res_id()].gl_id as GLuint);
+            let ptr = gl::MapBufferRange(target, offset as GLintptr, pl.size() as GLsizeiptr, gl::MAP_WRITE_BIT as GLbitfield) as *mut u8;
             Self::check_gl_error();
 
             std::ptr::copy_nonoverlapping(pl.ptr() as *mut u8, ptr, pl.size());
 
-            glBindBuffer(target, self.device_buffers[dev_buf.res_id()].gl_id as GLuint);
-            assert_eq!(glUnmapBuffer(target), GL_TRUE as GLboolean);
+            gl::BindBuffer(target, self.device_buffers[dev_buf.res_id()].gl_id as GLuint);
+            assert_eq!(gl::UnmapBuffer(target), gl::TRUE as GLboolean);
             Self::check_gl_error();
         }
     }
@@ -1341,26 +1341,29 @@ impl Drop for Gles3Driver {
     }
 }
 
-pub fn get_driver() -> DriverPtr {
+pub fn get_driver<F: FnMut(&'static str)-> *const std::os::raw::c_void>(f: F) -> DriverPtr {
     unsafe {
         let mut range : [GLint; 2] = [0, 0];
         let mut precision = 0;
-        glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_HIGH_FLOAT, range.as_mut_ptr(), &mut precision);
+
+        gl::load_with(f);
+
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::HIGH_FLOAT, range.as_mut_ptr(), &mut precision);
         println!("highp float range: {:?} - precision: {}", range, precision);
 
-        glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_HIGH_INT, range.as_mut_ptr(), &mut precision);
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::HIGH_INT, range.as_mut_ptr(), &mut precision);
         println!("highp int range: {:?} - precision: {}", range, precision);
 
-        glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_MEDIUM_FLOAT, range.as_mut_ptr(), &mut precision);
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::MEDIUM_FLOAT, range.as_mut_ptr(), &mut precision);
         println!("mediump float range: {:?} - precision: {}", range, precision);
 
-        glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_MEDIUM_INT, range.as_mut_ptr(), &mut precision);
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::MEDIUM_INT, range.as_mut_ptr(), &mut precision);
         println!("mediump int range: {:?} - precision: {}", range, precision);
 
-        glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_LOW_FLOAT, range.as_mut_ptr(), &mut precision);
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::LOW_FLOAT, range.as_mut_ptr(), &mut precision);
         println!("lowp float range: {:?} - precision: {}", range, precision);
 
-        glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_LOW_INT, range.as_mut_ptr(), &mut precision);
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::LOW_INT, range.as_mut_ptr(), &mut precision);
         println!("lowp int range: {:?} - precision: {}", range, precision);
 
     }
