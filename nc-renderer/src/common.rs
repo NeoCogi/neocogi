@@ -1106,7 +1106,8 @@ pub trait Driver : IntrusiveCounter {
 
     fn delete_resource(&mut self, resource_type: &ResourceType, res_id: usize);
 
-    fn update_device_buffer(&mut self, dev_buf: &DeviceBufferPtr, offset: usize, pl: &dyn Payload);
+    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: &dyn Payload);
+    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Box<dyn Payload>);
 
     fn begin_pass(&mut self, pass: &Pass);
     fn end_pass(&mut self);

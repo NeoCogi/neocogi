@@ -615,11 +615,8 @@ impl Gles3Driver {
         }
     }
 
-    fn create_texture(desc: &SamplerDesc, data: &Option<Box<dyn Payload>>) -> GLuint {
+    fn upload_texture(res: GLuint, desc: &SamplerDesc, data: &Option<Box<dyn Payload>>) {
         unsafe {
-
-            let mut res : GLuint = 0;
-            gl::GenTextures(1, &mut res);
             match &desc.image_type {
                 SamplerType::Sampler2D(pch_x, pch_y) => {
                     gl::BindTexture(gl::TEXTURE_2D, res);
@@ -661,6 +658,14 @@ impl Gles3Driver {
                     }
                 }
             }
+        }
+    }
+    fn create_texture(desc: &SamplerDesc, data: &Option<Box<dyn Payload>>) -> GLuint {
+        unsafe {
+
+            let mut res : GLuint = 0;
+            gl::GenTextures(1, &mut res);
+            Self::upload_texture(res, desc, data);
             res
         }
     }
@@ -724,7 +729,14 @@ impl Gles3Driver {
             if info_len > 1 {
                 let s = alloc_string(info_len as usize);
                 gl::GetShaderInfoLog(shader, info_len as GLsizei, core::ptr::null_mut(), s.as_ptr() as *mut GLchar);
-                println!("Compilation Log: {}", s);
+                let sht =
+                    match ty {
+                        gl::VERTEX_SHADER => "vertex shader",
+                        gl::FRAGMENT_SHADER => "fragment shader",
+                        _ => panic!("invalid shader type")
+                    };
+
+                println!("[{}] Compilation Log: {}", sht, s);
                 free_string(s, info_len as usize);
             }
 
@@ -1284,7 +1296,7 @@ impl Driver for Gles3Driver {
         unsafe { gl::Scissor(x as GLint, y as GLint, w as GLsizei, h as GLsizei) }
     }
 
-    fn update_device_buffer(&mut self, dev_buf: &DeviceBufferPtr, offset: usize, pl: &dyn Payload) {
+    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: &dyn Payload) {
         unsafe {
             match self.device_buffers[dev_buf.res_id()].desc {
                 DeviceBufferDesc::Vertex(Usage::Static(_))   |
@@ -1318,6 +1330,13 @@ impl Driver for Gles3Driver {
             assert_eq!(gl::UnmapBuffer(target), gl::TRUE as GLboolean);
             Self::check_gl_error();
         }
+    }
+
+    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Box<dyn Payload>) {
+        // TODO: check payload size and format
+        let res_id  = dev_buf.res_id();
+        let gl_id   = self.textures[res_id].gl_id;
+        Self::upload_texture(gl_id, &dev_buf.desc().sampler_desc, &Some(pl));
     }
 
     fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
