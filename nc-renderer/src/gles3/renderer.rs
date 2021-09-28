@@ -645,7 +645,7 @@ impl Gles3Driver {
                     Self::check_gl_error();
 
                     gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, Self::gl_wrap(&pch_x.wrap) as GLint);
-                    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, Self::gl_wrap(&pch_x.wrap) as GLint);
+                    gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, Self::gl_wrap(&pch_y.wrap) as GLint);
                     match &desc.pixel_format {
                         PixelFormat::R8(min_mag) | PixelFormat::RGB8(min_mag) | PixelFormat::RGBA8(min_mag) => {
                             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, Self::gl_filter(&min_mag.min_filter) as GLint);
@@ -1068,9 +1068,9 @@ impl Driver for Gles3Driver {
                     gl::BlendFuncSeparate(
                         blend.src_factor_rgb.gl_blend_factor(),
                         blend.dst_factor_rgb.gl_blend_factor(),
-                        blend.src_factor_rgb.gl_blend_factor(),
-                        blend.dst_factor_rgb.gl_blend_factor());
-                    },
+                        blend.src_factor_alpha.gl_blend_factor(),
+                        blend.dst_factor_alpha.gl_blend_factor());
+                },
                 _ => gl::Disable(gl::BLEND),
             }
 
@@ -1310,7 +1310,6 @@ impl Driver for Gles3Driver {
 
             let buff_size   = self.device_buffers[dev_buf.res_id()].desc.size();
             if pl.size() + offset > buff_size {
-                //return None
                 panic!("payload exceeds device buffer size")
             }
 
@@ -1326,7 +1325,6 @@ impl Driver for Gles3Driver {
 
             std::ptr::copy_nonoverlapping(pl.ptr() as *mut u8, ptr, pl.size());
 
-            gl::BindBuffer(target, self.device_buffers[dev_buf.res_id()].gl_id as GLuint);
             assert_eq!(gl::UnmapBuffer(target), gl::TRUE as GLboolean);
             Self::check_gl_error();
         }

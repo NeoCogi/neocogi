@@ -973,11 +973,11 @@ pub struct Blend {
 impl Blend {
     pub fn default() -> Self {
         Self {
-            src_factor_rgb          : BlendFactor::SrcAlpha,
+            src_factor_rgb          : BlendFactor::One,
             src_factor_alpha        : BlendFactor::One,
 
             dst_factor_rgb          : BlendFactor::OneMinusSrcAlpha,
-            dst_factor_alpha        : BlendFactor::Zero,
+            dst_factor_alpha        : BlendFactor::OneMinusSrcAlpha,
         }
     }
 }
