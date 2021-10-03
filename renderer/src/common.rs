@@ -426,7 +426,7 @@ macro_rules! render_data {
             $($field_name: $field_type,)*
         }
 
-        impl $crate::renderer::UniformBlockTrait for $name {
+        impl $crate::UniformBlockTrait for $name {
             // This is purely an example—not a good one.
             fn get_uniform_descriptors() -> Vec<UniformDataDesc> {
                 vec![$(UniformDataDesc::new(stringify!($field_name).to_string(), <$field_type>::get_uniform_type(), 1, $crate::offset_of!($name, $field_name))),*]
@@ -841,13 +841,13 @@ impl SamplerDesc {
 
 }
 pub struct TextureDesc {
-    pub(crate) sampler_desc    : SamplerDesc,
-    pub(crate) payload         : Option<Box<dyn Payload>>
+    pub sampler_desc    : SamplerDesc,
+    pub payload         : Option<Box<dyn Payload>>
 }
 
 pub struct RenderTargetDesc {
-    pub(crate) sampler_desc    : SamplerDesc,
-    pub(crate) sample_count    : usize
+    pub sampler_desc    : SamplerDesc,
+    pub sample_count    : usize
 }
 
 pub type Texture    = Resource<TextureDesc>;
@@ -973,11 +973,11 @@ pub struct Blend {
 impl Blend {
     pub fn default() -> Self {
         Self {
-            src_factor_rgb          : BlendFactor::SrcAlpha,
+            src_factor_rgb          : BlendFactor::One,
             src_factor_alpha        : BlendFactor::One,
 
             dst_factor_rgb          : BlendFactor::OneMinusSrcAlpha,
-            dst_factor_alpha        : BlendFactor::Zero,
+            dst_factor_alpha        : BlendFactor::OneMinusSrcAlpha,
         }
     }
 }
@@ -1055,6 +1055,8 @@ pub type FrameBuffer    = Resource<FrameBufferDesc>;
 pub type FrameBufferPtr = IntrusivePtr<FrameBuffer>;
 
 pub struct Pass {
+    pub width           : usize,
+    pub height          : usize,
     pub frame_buffer    : Option<FrameBufferPtr>,
     pub color_actions   : [ColorPassAction; 4],
     pub depth_action    : DepthPassAction,
@@ -1106,7 +1108,8 @@ pub trait Driver : IntrusiveCounter {
 
     fn delete_resource(&mut self, resource_type: &ResourceType, res_id: usize);
 
-    fn update_device_buffer(&mut self, dev_buf: &DeviceBufferPtr, offset: usize, pl: &dyn Payload);
+    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: &dyn Payload);
+    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Box<dyn Payload>);
 
     fn begin_pass(&mut self, pass: &Pass);
     fn end_pass(&mut self);

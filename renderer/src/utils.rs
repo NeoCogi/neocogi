@@ -108,7 +108,7 @@ out highp   vec2        vUV;
 void main() {
     gl_Position = vec4(position, 0.0, 1.0);
     vUV = uv;
-}\0";
+}";
 
 static COPY_UINT_PIXEL_SHADER : &'static str = "
 #version 300 es
@@ -125,7 +125,7 @@ void main() {
     uvec4 texel = texture(uTexture, vUV);
     vec4 col = vec4(texel) / 255.0;
     fragColor = col;
-}\0";
+}";
 
 static COPY_FLOAT_PIXEL_SHADER : &'static str = "
 #version 300 es
@@ -140,7 +140,7 @@ out         vec4        fragColor;
 
 void main() {
     fragColor = texture(uTexture, vUV);
-}\0";
+}";
 
 
 impl ScreenQuad {

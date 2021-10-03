@@ -35,11 +35,6 @@ pub use common::*;
 pub use utils::*;
 pub use gles3::get_driver;
 
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+mod gl {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
