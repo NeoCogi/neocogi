@@ -1,4 +1,5 @@
 [workspace]
 members = [
-    "nc-renderer"
+    "nc-renderer",
+    "nc-ui"
 ]
