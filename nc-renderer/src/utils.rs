@@ -29,7 +29,7 @@
 //
 use crate::*;
 use rs_ctypes::*;
-use rs_math3d::*;
+use crate::rs_math3d::*;
 
 ///
 /// create a frame buffer with only color & depth render targets
