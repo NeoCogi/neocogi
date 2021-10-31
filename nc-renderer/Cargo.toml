@@ -1,6 +1,6 @@
 [package]
 name = "nc-renderer"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2018"
 license = "BSD-3-Clause"
 authors = ["Raja Lehtihet <raja.lehtihet@gmail.com>", "Wael El Oraiby <wael.eloraiby@gmail.com>"]
@@ -9,7 +9,7 @@ repository = "https://github.com/NeoCogi/neocogi"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rs-math3d = "0.9.15"
+rs-math3d = "0.9.16"
 rs-ctypes = "0.1.1"
 
 [build-dependencies]

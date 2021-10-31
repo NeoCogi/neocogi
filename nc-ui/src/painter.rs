@@ -56,7 +56,6 @@
 //
 use crate::*;
 use nc_renderer::*;
-use rs_math3d::*;
 use rs_ctypes::*;
 
 use egui::{
