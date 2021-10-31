@@ -94,7 +94,7 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
 
     match event {
         FramebufferSize(width, height) => {
-            state.input.screen_rect = Some(Rect::from_min_size(
+            state.input.screen_rect = Some(epaint::emath::Rect::from_min_size(
                 Pos2::new(0f32, 0f32),
                 egui::vec2(width as f32, height as f32) / state.input.pixels_per_point.unwrap(),
             ))
