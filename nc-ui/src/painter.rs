@@ -55,7 +55,8 @@
 // DEALINGS IN THE SOFTWARE.
 //
 use crate::*;
-use nc_renderer::*;
+use crate::rs_math3d::*;
+use crate::nc_renderer::*;
 use rs_ctypes::*;
 
 use egui::{
