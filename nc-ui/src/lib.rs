@@ -60,7 +60,14 @@ mod clipboard;
 
 pub use painter::*;
 pub use input::*;
-pub use nc_renderer::*;
+
+pub mod nc_renderer {
+    pub use nc_renderer::*;
+}
+
+pub mod rs_math3d {
+    pub use nc_renderer::rs_math3d::*;
+}
 
 pub extern crate glfw;
 pub extern crate egui;

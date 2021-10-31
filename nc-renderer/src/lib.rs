@@ -34,7 +34,10 @@ pub mod utils;
 pub use common::*;
 pub use utils::*;
 pub use gles3::get_driver;
-pub use rs_math3d::*;
+
+pub mod rs_math3d {
+    pub use rs_math3d::*;
+}
 
 mod gl {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
