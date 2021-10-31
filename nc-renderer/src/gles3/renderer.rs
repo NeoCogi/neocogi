@@ -27,10 +27,10 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-use rs_math3d::*;
 use rs_ctypes::*;
 use gl::types::*;
 use crate::*;
+use crate::rs_math3d::*;
 use super::readback::*;
 
 use std::collections::{VecDeque};
