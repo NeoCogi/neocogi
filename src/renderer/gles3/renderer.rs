@@ -28,8 +28,8 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //
 use rs_ctypes::*;
-use gl::types::*;
-use crate::*;
+use super::super::*;
+use super::super::gl::types::*;
 use crate::rs_math3d::*;
 use super::readback::*;
 

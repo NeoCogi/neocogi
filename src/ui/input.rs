@@ -58,7 +58,7 @@
 #![allow(clippy::single_match)]
 
 // Re-export dependencies.
-pub use egui;
+pub use super::egui;
 
 use crate::*;
 

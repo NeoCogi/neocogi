@@ -28,11 +28,12 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //
 use rs_ctypes::*;
-use gl::types::*;
+use super::super::*;
+use super::super::gl::types::*;
 use crate::rs_math3d::*;
 
-use crate::*;
 use super::renderer::*;
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Readback surface

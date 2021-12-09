@@ -364,10 +364,10 @@ macro_rules! render_data {
             $($field_name: $field_type,)*
         }
 
-        impl $crate::VertexTrait for $name {
+        impl $crate::renderer::VertexTrait for $name {
             // This is purely an example—not a good one.
-            fn get_attribute_descriptors() -> Vec<$crate::VertexAttributeDesc> {
-                vec![$($crate::VertexAttributeDesc::new(stringify!($field_name).to_string(), <$field_type>::get_attribute_type(), $crate::offset_of!($name, $field_name))),*]
+            fn get_attribute_descriptors() -> Vec<$crate::renderer::VertexAttributeDesc> {
+                vec![$($crate::renderer::VertexAttributeDesc::new(stringify!($field_name).to_string(), <$field_type>::get_attribute_type(), $crate::offset_of!($name, $field_name))),*]
             }
 
             fn get_attribute_names() -> Vec<String> {
@@ -426,10 +426,10 @@ macro_rules! render_data {
             $($field_name: $field_type,)*
         }
 
-        impl $crate::UniformBlockTrait for $name {
+        impl $crate::renderer::UniformBlockTrait for $name {
             // This is purely an example—not a good one.
-            fn get_uniform_descriptors() -> Vec<UniformDataDesc> {
-                vec![$(UniformDataDesc::new(stringify!($field_name).to_string(), <$field_type>::get_uniform_type(), 1, $crate::offset_of!($name, $field_name))),*]
+            fn get_uniform_descriptors() -> Vec<$crate::renderer::UniformDataDesc> {
+                vec![$($crate::renderer::UniformDataDesc::new(stringify!($field_name).to_string(), <$field_type>::get_uniform_type(), 1, $crate::offset_of!($name, $field_name))),*]
             }
 
             fn get_uniform_names() -> Vec<String> {

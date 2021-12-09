@@ -56,10 +56,10 @@
 //
 use crate::*;
 use crate::rs_math3d::*;
-use crate::nc_renderer::*;
+use crate::renderer::*;
 use rs_ctypes::*;
 
-use egui::{
+use ::egui::{
     paint::{Color32, Mesh, Texture},
     vec2, ClippedMesh,
 };
@@ -208,7 +208,7 @@ impl Painter {
         size: (usize, usize),
         srgba_pixels: &[Color32],
         filtering: bool,
-    ) -> egui::TextureId {
+    ) -> ::egui::TextureId {
         assert_eq!(size.0 * size.1, srgba_pixels.len());
 
         let mut pixels: Vec<u8> = Vec::with_capacity(srgba_pixels.len() * 4);
@@ -219,7 +219,7 @@ impl Painter {
             pixels.push(srgba.a());
         }
 
-        let id = egui::TextureId::User(self.user_textures.len() as u64);
+        let id = ::egui::TextureId::User(self.user_textures.len() as u64);
         self.user_textures.push(UserTexture {
             size,
             pixels,
@@ -285,13 +285,13 @@ impl Painter {
         }
     }
 
-    fn get_texture(&self, texture_id: egui::TextureId) -> TexturePtr {
+    fn get_texture(&self, texture_id: ::egui::TextureId) -> TexturePtr {
         match texture_id {
-            egui::TextureId::Egui => {
+            ::egui::TextureId::Egui => {
                 self.egui_texture.as_ref().unwrap().clone()
             },
 
-            egui::TextureId::User(id) => {
+            ::egui::TextureId::User(id) => {
 
                 let id = id as usize;
                 assert!(id < self.user_textures.len());
@@ -301,10 +301,10 @@ impl Painter {
         }
     }
 
-    pub fn update_user_texture_data(&mut self, texture_id: egui::TextureId, pixels: &[Color32]) {
+    pub fn update_user_texture_data(&mut self, texture_id: ::egui::TextureId, pixels: &[Color32]) {
         match texture_id {
-            egui::TextureId::Egui => {}
-            egui::TextureId::User(id) => {
+            ::egui::TextureId::Egui => {}
+            ::egui::TextureId::User(id) => {
                 let id = id as usize;
                 assert!(id < self.user_textures.len());
                 self.user_textures[id].pixels = Vec::with_capacity(pixels.len() * 4);

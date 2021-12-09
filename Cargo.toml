@@ -1,5 +1,29 @@
-[workspace]
-members = [
-    "nc-renderer",
-    "nc-ui"
-]
+[package]
+name = "neocogi"
+version = "0.1.4"
+edition = "2018"
+license = "BSD-3-Clause"
+authors = ["Raja Lehtihet <raja.lehtihet@gmail.com>", "Wael El Oraiby <wael.eloraiby@gmail.com>"]
+description = "neocogi rendering lib"
+repository = "https://github.com/NeoCogi/neocogi"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rs-math3d = "0.9.16"
+rs-ctypes = "0.1.1"
+glfw = { version="0.43.0", default-features=false }
+egui = { version = "0.15.0", default-features=false }
+
+[dependencies.epaint]
+version = "0.15.0"
+optional = false
+default-features = false
+features = ["multi_threaded"]
+
+[build-dependencies]
+gl_generator = "0.14.0"
+
+[features]
+default = ["renderer", "ui"]
+renderer = []
+ui = ["renderer"]
