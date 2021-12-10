@@ -1,6 +1,6 @@
 [package]
 name = "neocogi"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2018"
 license = "BSD-3-Clause"
 authors = ["Raja Lehtihet <raja.lehtihet@gmail.com>", "Wael El Oraiby <wael.eloraiby@gmail.com>"]
@@ -11,19 +11,14 @@ repository = "https://github.com/NeoCogi/neocogi"
 [dependencies]
 rs-math3d = "0.9.16"
 rs-ctypes = "0.1.1"
-glfw = { version="0.43.0", default-features=false }
-egui = { version = "0.15.0", default-features=false }
-
-[dependencies.epaint]
-version = "0.15.0"
-optional = false
-default-features = false
-features = ["multi_threaded"]
+glfw = { version="0.43.0", default-features=false, optional=true }
+egui = { version = "0.15.0", default-features=false, optional=true }
 
 [build-dependencies]
 gl_generator = "0.14.0"
 
 [features]
-default = ["renderer", "ui"]
+default = ["renderer", "ui", "with-fonts"]
 renderer = []
-ui = ["renderer"]
+ui = ["renderer", "glfw", "egui", "egui/multi_threaded"]
+with-fonts=["ui", "egui/default_fonts"]
