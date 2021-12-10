@@ -58,11 +58,8 @@
 #![allow(clippy::single_match)]
 
 // Re-export dependencies.
-pub use super::egui;
-
 use crate::*;
-
-use egui::*;
+use crate::egui::*;
 
 #[cfg(not(feature = "clipboard"))]
 

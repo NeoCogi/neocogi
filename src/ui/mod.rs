@@ -60,6 +60,3 @@ mod clipboard;
 
 pub use painter::*;
 pub use input::*;
-
-pub extern crate glfw;
-pub extern crate egui;

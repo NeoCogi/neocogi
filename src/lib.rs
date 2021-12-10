@@ -7,7 +7,7 @@ pub mod ui;
 
 #[cfg(feature="ui")]
 pub mod egui {
-    pub extern crate egui;
+    pub use egui::*;
 }
 
 pub mod rs_math3d {
