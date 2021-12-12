@@ -132,6 +132,8 @@ const FS_SRC: &str = r#"
     }
 "#;
 
+const MAX_ELEM_COUNT : usize = 65536 * 4;
+
 pub struct Painter {
     driver  : DriverPtr,
     pipeline: PipelinePtr,
@@ -188,8 +190,8 @@ impl Painter {
 
         let pipeline = drv.create_pipeline(pipeline_desc).unwrap();
 
-        let index_buffer    = drv.create_device_buffer(DeviceBufferDesc::Index(Usage::Dynamic(65536 * 4))).unwrap();
-        let vertex_buffer   = drv.create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(65536 * 4 * std::mem::size_of::<Vertex>()))).unwrap();
+        let index_buffer    = drv.create_device_buffer(DeviceBufferDesc::Index(Usage::Dynamic(MAX_ELEM_COUNT * std::mem::size_of::<u16>()))).unwrap();
+        let vertex_buffer   = drv.create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(MAX_ELEM_COUNT * std::mem::size_of::<Vertex>()))).unwrap();
         Painter {
             driver: drv.clone(),
             pipeline,
@@ -201,6 +203,11 @@ impl Painter {
             egui_texture_version: None,
             user_textures: Default::default(),
         }
+    }
+
+    pub fn set_canvas_size(&mut self, width: u32, height: u32) {
+        self.canvas_width   = width;
+        self.canvas_height  = height;
     }
 
     pub fn new_user_texture(
@@ -366,31 +373,34 @@ impl Painter {
 
     fn paint_mesh(&mut self, mesh: &Mesh, screen_size: Vec2f) {
         debug_assert!(mesh.is_valid());
-        let indices: Vec<u16> = mesh.indices.iter().map(|idx| *idx as u16).collect();
+        let meshes = mesh.clone().split_to_u16();
+        for mesh in meshes {
+            let indices: Vec<u16> = mesh.indices.iter().map(|idx| *idx as u16).collect();
 
-        let mut vertices: Vec<Vertex> = Vec::with_capacity(mesh.vertices.len());
-        for v in &mesh.vertices {
-            let vert = Vertex {
-                a_pos   : Vec2f::new(v.pos.x, v.pos.y),
-                s_rgba  : color4b(v.color[0], v.color[1], v.color[2], v.color[3]),
-                a_tc    : Vec2f::new(v.uv.x, v.uv.y),
+            let mut vertices: Vec<Vertex> = Vec::with_capacity(mesh.vertices.len());
+            for v in &mesh.vertices {
+                let vert = Vertex {
+                    a_pos   : Vec2f::new(v.pos.x, v.pos.y),
+                    s_rgba  : color4b(v.color[0], v.color[1], v.color[2], v.color[3]),
+                    a_tc    : Vec2f::new(v.uv.x, v.uv.y),
+                };
+
+                vertices.push(vert);
+            }
+
+            self.driver.update_device_buffer(&mut self.vertex_buffer, 0, &vertices);
+            self.driver.update_device_buffer(&mut self.index_buffer, 0, &indices);
+
+            let bindings = Bindings {
+                vertex_buffers  : vec!{ self.vertex_buffer.clone() },
+                index_buffer    : Some(self.index_buffer.clone()),
+
+                vertex_images   : Vec::new(),
+                pixel_images    : Vec::from([self.get_texture(mesh.texture_id)]),
             };
 
-            vertices.push(vert);
+            let u = Uniforms { u_screen_size: screen_size };
+            self.driver.draw(&self.pipeline, &bindings, &u as *const Uniforms as *const c_void, (indices.len() / 3) as u32, 1);
         }
-
-        self.driver.update_device_buffer(&mut self.vertex_buffer, 0, &vertices);
-        self.driver.update_device_buffer(&mut self.index_buffer, 0, &indices);
-
-        let bindings = Bindings {
-            vertex_buffers  : vec!{ self.vertex_buffer.clone() },
-            index_buffer    : Some(self.index_buffer.clone()),
-
-            vertex_images   : Vec::new(),
-            pixel_images    : Vec::from([self.get_texture(mesh.texture_id)]),
-        };
-
-        let u = Uniforms { u_screen_size: screen_size };
-        self.driver.draw(&self.pipeline, &bindings, &u as *const Uniforms as *const c_void, (indices.len() / 3) as u32, 1);
     }
 }
