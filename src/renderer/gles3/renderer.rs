@@ -1316,7 +1316,7 @@ impl Driver for Gles3Driver {
 
             let buff_size   = self.device_buffers[dev_buf.res_id()].desc.size();
             if pl.size() + offset > buff_size {
-                panic!(format!("payload of size {} exceeds device buffer size of {}", pl.size() + offset, buff_size))
+                panic!("payload of size {} exceeds device buffer size of {}", pl.size() + offset, buff_size)
             }
 
             let target =

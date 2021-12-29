@@ -193,7 +193,7 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
         }
 
         Scroll (x, y) => {
-            state.input.scroll_delta = vec2(x as f32, y as f32);
+            state.input.events.push(egui::Event::Scroll(vec2(x as f32, y as f32)));
         }
 
         _ => {}

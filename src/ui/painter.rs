@@ -60,7 +60,7 @@ use crate::renderer::*;
 use rs_ctypes::*;
 
 use ::egui::{
-    paint::{Color32, Mesh, Texture},
+    epaint::{Color32, Mesh, FontImage},
     vec2, ClippedMesh,
 };
 
@@ -237,7 +237,7 @@ impl Painter {
         id
     }
 
-    fn upload_egui_texture(&mut self, texture: &Texture) {
+    fn upload_egui_texture(&mut self, texture: &FontImage) {
         if self.egui_texture_version == Some(texture.version) {
             return; // No change
         }
@@ -332,7 +332,7 @@ impl Painter {
         frame_buffer: Option<FrameBufferPtr>,
         bg_color: Option<Color32>,
         meshes: Vec<ClippedMesh>,
-        egui_texture: &Texture,
+        egui_texture: &FontImage,
         pixels_per_point: f32,
     ) {
         self.upload_egui_texture(egui_texture);
