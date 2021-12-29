@@ -1,6 +1,6 @@
 [package]
 name = "neocogi"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2018"
 license = "BSD-3-Clause"
 authors = ["Raja Lehtihet <raja.lehtihet@gmail.com>", "Wael El Oraiby <wael.eloraiby@gmail.com>"]

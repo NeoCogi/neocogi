@@ -71,17 +71,19 @@ use super::clipboard::{
 pub struct EguiInputState {
     pub pointer_pos: Pos2,
     pub clipboard: Option<ClipboardContext>,
-    pub input: RawInput,
+    pub egui_input: RawInput,
     pub modifiers: Modifiers,
+    current_pixels_per_point: f32,
 }
 
 impl EguiInputState {
-    pub fn new(input: RawInput) -> Self {
+    pub fn new(egui_input: RawInput) -> Self {
         EguiInputState {
             pointer_pos: Pos2::new(0f32, 0f32),
             clipboard: init_clipboard(),
-            input,
+            egui_input,
             modifiers: Modifiers::default(),
+            current_pixels_per_point: 1.0,
         }
     }
 }
@@ -90,14 +92,19 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
     use glfw::WindowEvent::*;
 
     match event {
+        ContentScale(pixels_per_point, _) => {
+            state.egui_input.pixels_per_point = Some(pixels_per_point);
+            state.current_pixels_per_point = pixels_per_point;
+        },
+
         FramebufferSize(width, height) => {
-            state.input.screen_rect = Some(epaint::emath::Rect::from_min_size(
+            state.egui_input.screen_rect = Some(epaint::emath::Rect::from_min_size(
                 Pos2::new(0f32, 0f32),
-                egui::vec2(width as f32, height as f32) / state.input.pixels_per_point.unwrap(),
+                egui::vec2(width as f32, height as f32) / state.current_pixels_per_point,
             ))
         }
 
-        MouseButton (mouse_btn, glfw::Action::Press, _) => state.input.events.push(egui::Event::PointerButton {
+        MouseButton (mouse_btn, glfw::Action::Press, _) => state.egui_input.events.push(egui::Event::PointerButton {
             pos: state.pointer_pos,
             button: match mouse_btn {
                 glfw::MouseButtonLeft => egui::PointerButton::Primary,
@@ -109,7 +116,7 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
             modifiers: state.modifiers,
         }),
 
-        MouseButton (mouse_btn, glfw::Action::Release, _) => state.input.events.push(egui::Event::PointerButton {
+        MouseButton (mouse_btn, glfw::Action::Release, _) => state.egui_input.events.push(egui::Event::PointerButton {
             pos: state.pointer_pos,
             button: match mouse_btn {
                 glfw::MouseButtonLeft => egui::PointerButton::Primary,
@@ -123,11 +130,11 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
 
         CursorPos(x, y) => {
             state.pointer_pos = pos2(
-                x as f32 / state.input.pixels_per_point.unwrap(),
-                y as f32 / state.input.pixels_per_point.unwrap(),
+                x as f32 / state.current_pixels_per_point,
+                y as f32 / state.current_pixels_per_point,
             );
             state
-                .input
+                .egui_input
                 .events
                 .push(egui::Event::PointerMoved(state.pointer_pos))
         }
@@ -147,7 +154,7 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
                     ..Default::default()
                 };
 
-                state.input.events.push(Event::Key {
+                state.egui_input.events.push(Event::Key {
                     key,
                     pressed: false,
                     modifiers: state.modifiers,
@@ -171,15 +178,15 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
                 };
 
                 if state.modifiers.command && key == egui::Key::X {
-                    state.input.events.push(egui::Event::Cut);
+                    state.egui_input.events.push(egui::Event::Cut);
                 } else if state.modifiers.command && key == egui::Key::C {
-                    state.input.events.push(egui::Event::Copy);
+                    state.egui_input.events.push(egui::Event::Copy);
                 } else if state.modifiers.command && key == egui::Key::V {
                     if let Some(clipboard_ctx) = state.clipboard.as_mut() {
-                        state.input.events.push(egui::Event::Text(clipboard_ctx.get_contents().unwrap_or("".to_string())));
+                        state.egui_input.events.push(egui::Event::Text(clipboard_ctx.get_contents().unwrap_or("".to_string())));
                     }
                 } else {
-                    state.input.events.push(Event::Key {
+                    state.egui_input.events.push(Event::Key {
                         key,
                         pressed: true,
                         modifiers: state.modifiers,
@@ -189,11 +196,11 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
         }
 
         Char(c) => {
-            state.input.events.push(Event::Text(c.to_string()));
+            state.egui_input.events.push(Event::Text(c.to_string()));
         }
 
         Scroll (x, y) => {
-            state.input.events.push(egui::Event::Scroll(vec2(x as f32, y as f32)));
+            state.egui_input.events.push(egui::Event::Scroll(vec2(x as f32, y as f32)));
         }
 
         _ => {}
