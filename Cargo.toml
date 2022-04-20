@@ -11,8 +11,8 @@ repository = "https://github.com/NeoCogi/neocogi"
 [dependencies]
 rs-math3d = "0.9.16"
 rs-ctypes = "0.1.1"
-glfw = { version="0.43.0", default-features=false, optional=true }
-egui = { version = "0.16.0", default-features=false, optional=true }
+glfw = { version="0.44.0", default-features=false, optional=true }
+egui = { version = "0.17.0", default-features=false, optional=true }
 
 [build-dependencies]
 gl_generator = "0.14.0"
@@ -22,3 +22,5 @@ default = ["renderer", "ui", "with-fonts"]
 renderer = []
 ui = ["renderer", "glfw", "egui", "egui/multi_threaded"]
 with-fonts=["ui", "egui/default_fonts"]
+
+[dev-dependencies]
