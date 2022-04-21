@@ -74,8 +74,8 @@ fn main() {
 
         let egui_output = egui_ctx.run(egui_input_state.egui_input.take(), |egui_ctx| {
             egui::SidePanel::left("Test").show(&egui_ctx, |ui| {
-                if ui.button("clear all").clicked() {
-                    //grid.clear_all();
+                if ui.button("click me!").clicked() {
+                    println!("Clicked")
                 }
             });
 
@@ -122,7 +122,7 @@ fn main() {
             match event {
                 glfw::WindowEvent::Key(glfw::Key::Escape, _, _, _) |
                 glfw::WindowEvent::Close  => quit = true,
-                _ => ()
+                _ => neocogi::ui::handle_event(event, &mut egui_input_state),
             }
         }
 

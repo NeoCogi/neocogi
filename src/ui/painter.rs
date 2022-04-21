@@ -57,8 +57,6 @@
 use crate::*;
 use crate::rs_math3d::*;
 use crate::renderer::*;
-use ::egui::TextureHandle;
-use ::egui::TexturesDelta;
 
 use std::collections::HashMap;
 
@@ -260,17 +258,7 @@ impl Painter {
             }
         };
 
-
         println!("uploading egui texture: {}x{}", texture.width(), texture.height());
-        // let mut pixels: Vec<u8> = Vec::with_capacity(texture.pixels.len() * 4);
-        // for &alpha in &texture.pixels {
-        //     let srgba = Color32::from_white_alpha(alpha);
-
-        //     pixels.push(srgba.r());
-        //     pixels.push(srgba.g());
-        //     pixels.push(srgba.b());
-        //     pixels.push(srgba.a());
-        // }
 
         let tex_desc    = TextureDesc {
             sampler_desc    : SamplerDesc::default(texture.width(), texture.height())
@@ -392,6 +380,15 @@ impl Painter {
 
             if mesh.vertices.len() > 0 {
                 self.paint_mesh(&mesh, Vec2f::new(screen_size_points.x, screen_size_points.y));
+            }
+        }
+
+        for id in &egui_texture.free {
+            match id {
+                egui::TextureId::Managed(id) => {
+                    self.egui_textures.remove(id);
+                },
+                _ => ()
             }
         }
     }
