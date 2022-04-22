@@ -8,6 +8,77 @@ use neocogi::rs_math3d::*;
 
 use neocogi::renderer::*;
 
+static VERTEX_SHADER : &'static str = "
+#version 300 es
+in  highp   vec4        position;
+in  highp   vec4        color;
+out highp   vec4        v_color;
+void main() {
+    gl_Position = position;
+    v_color     = color;
+}";
+
+static PIXEL_SHADER : &'static str = "
+#version 300 es
+precision mediump float;
+        in highp    vec4        v_color;
+layout(location = 0) out lowp  vec4     color_buffer;
+void main() {
+    highp vec4 col  = v_color;
+    color_buffer    = col;
+}";
+
+
+render_data! {
+    vertex Vertex {
+        position: Vec4f,
+        color   : Vec4f,
+    }
+}
+
+fn init_render_objects(driver: &mut DriverPtr) -> PipelinePtr {
+    let mut model_attribs = Vec::new();
+    model_attribs.push(Vertex::get_attribute_names());
+
+    let model_shader_desc =
+        ShaderDesc {
+            vertex_shader       : String::from(VERTEX_SHADER),
+            pixel_shader        : String::from(PIXEL_SHADER),
+
+            vertex_attributes   : model_attribs,
+            vertex_uniforms     : Vec::new(),
+            vertex_surfaces     : Vec::new(),
+
+            pixel_uniforms      : Vec::new(),
+            pixel_surfaces      : Vec::new(),
+        };
+
+    let model_program = driver.create_shader(model_shader_desc).unwrap();
+
+    let vertex_layout = VertexBufferLayout {
+        buffer_id           : 0,
+        vertex_attributes   : Vertex::get_attribute_descriptors(),
+        stride              : Vertex::stride(),
+        divisor             : 0,
+    };
+
+    let tri_pipeline_desc = PipelineDesc {
+        primitive_type      : PrimitiveType::Triangles,
+        shader              : model_program.clone(),
+        buffer_layouts      : vec! { vertex_layout.clone() },
+        uniform_descs       : Vec::new(),
+        index_type          : IndexType::None,
+        face_winding        : FaceWinding::CCW,
+        cull_mode           : CullMode::None,
+        depth_write         : true,
+        depth_test          : true,
+        blend               : BlendOp::None,
+    };
+
+    driver.create_pipeline(tri_pipeline_desc).unwrap()
+
+}
+
 fn main() {
     // initialize GLFW3 with OpenGL ES 3.0
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
@@ -38,6 +109,15 @@ fn main() {
 
     let mut driver = renderer::get_driver();
 
+    let vertices = vec! {
+        Vertex { position: Vec4f::new(-0.5, -0.5, 0.0, 1.0), color: Vec4f::new(1.0, 0.0, 0.0, 1.0) },
+        Vertex { position: Vec4f::new(0.5, -0.5,  0.0, 1.0), color: Vec4f::new(0.0, 0.0, 1.0, 1.0) },
+        Vertex { position: Vec4f::new(0.0, 0.5,   0.0, 1.0), color: Vec4f::new(0.0, 1.0, 0.0, 1.0) },
+    };
+
+    let mut vertex_buffer   = driver.create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(3 * std::mem::size_of::<Vertex>()))).unwrap();
+    let pipeline = init_render_objects(&mut driver);
+
     let mut quit = false;
     while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
@@ -45,7 +125,7 @@ fn main() {
         let pass = Pass {
             frame_buffer: None,
             color_actions: [
-                ColorPassAction::Clear(color4b(0x7F, 0x7F, 0x7F, 0xFF)),
+                ColorPassAction::Clear(color4b(0x00, 0x00, 0x00, 0x00)),
                 ColorPassAction::Previous,
                 ColorPassAction::Previous,
                 ColorPassAction::Previous,
@@ -56,6 +136,16 @@ fn main() {
         };
 
         driver.begin_pass(&pass);
+        let bindings = Bindings {
+            vertex_buffers  : vec!{ vertex_buffer.clone() },
+            index_buffer    : None,
+
+            vertex_images   : Vec::new(),
+            pixel_images    : Vec::new(),
+        };
+
+        driver.update_device_buffer(&mut vertex_buffer, 0, &vertices);
+        driver.draw(&pipeline, &bindings, std::ptr::null(), 1, 1);
         driver.end_pass();
         window.swap_buffers();
 
