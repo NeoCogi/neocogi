@@ -140,7 +140,6 @@ const MAX_ELEM_COUNT : usize = 65536 * 4;
 pub struct Painter {
     driver  : DriverPtr,
     pipeline: PipelinePtr,
-    index_buffer: DeviceBufferPtr,
     vertex_buffer: DeviceBufferPtr,
     canvas_width: u32,
     canvas_height: u32,
@@ -182,7 +181,7 @@ impl Painter {
             shader              : program,
             buffer_layouts      : vec! { vertex_layout.clone() },
             uniform_descs       : Uniforms::get_uniform_descriptors(),
-            index_type          : IndexType::UInt16,
+            index_type          : IndexType::None,
             face_winding        : FaceWinding::CCW,
             cull_mode           : CullMode::None,
             depth_write         : true,
@@ -192,14 +191,12 @@ impl Painter {
 
         let pipeline = drv.create_pipeline(pipeline_desc).unwrap();
 
-        let index_buffer    = drv.create_device_buffer(DeviceBufferDesc::Index(Usage::Dynamic(MAX_ELEM_COUNT * std::mem::size_of::<u16>()))).unwrap();
         let vertex_buffer   = drv.create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(MAX_ELEM_COUNT * std::mem::size_of::<Vertex>()))).unwrap();
         Painter {
             driver: drv.clone(),
             pipeline,
             canvas_width,
             canvas_height,
-            index_buffer,
             vertex_buffer,
             egui_textures: Default::default(),
             user_textures: Default::default(),
@@ -395,34 +392,39 @@ impl Painter {
 
     fn paint_mesh(&mut self, mesh: &Mesh, screen_size: Vec2f) {
         debug_assert!(mesh.is_valid());
-        let meshes = mesh.clone().split_to_u16();
-        for mesh in meshes {
-            let indices: Vec<u16> = mesh.indices.iter().map(|idx| *idx as u16).collect();
-
-            let mut vertices: Vec<Vertex> = Vec::with_capacity(mesh.vertices.len());
-            for v in &mesh.vertices {
-                let vert = Vertex {
+        let vertices : Vec<Vertex> =
+            mesh.indices
+            .iter()
+            .map(|idx| {
+                let v = mesh.vertices[*idx as usize];
+                Vertex {
                     a_pos   : Vec2f::new(v.pos.x, v.pos.y),
                     s_rgba  : color4b(v.color[0], v.color[1], v.color[2], v.color[3]),
                     a_tc    : Vec2f::new(v.uv.x, v.uv.y),
+                }
+            }).collect();
+
+        let max_part_size = 3 * 4096;
+        let index_count = mesh.indices.len();
+        let parts = mesh.indices.len() / max_part_size;
+
+        for i in 0..parts + 1 {
+            let remaining_count = index_count - i * max_part_size;
+            if remaining_count > 0 {
+                let part_index_count = usize::min(remaining_count, max_part_size);
+                self.driver.update_device_buffer(&mut self.vertex_buffer, 0, &vertices);
+
+                let bindings = Bindings {
+                    vertex_buffers  : vec!{ self.vertex_buffer.clone() },
+                    index_buffer    : None,
+
+                    vertex_images   : Vec::new(),
+                    pixel_images    : Vec::from([self.get_texture(mesh.texture_id)]),
                 };
 
-                vertices.push(vert);
+                let u = Uniforms { u_screen_size: screen_size };
+                self.driver.draw(&self.pipeline, &bindings, &u as *const Uniforms as *const c_void, (part_index_count / 3) as u32, 1);
             }
-
-            self.driver.update_device_buffer(&mut self.vertex_buffer, 0, &vertices);
-            self.driver.update_device_buffer(&mut self.index_buffer, 0, &indices);
-
-            let bindings = Bindings {
-                vertex_buffers  : vec!{ self.vertex_buffer.clone() },
-                index_buffer    : Some(self.index_buffer.clone()),
-
-                vertex_images   : Vec::new(),
-                pixel_images    : Vec::from([self.get_texture(mesh.texture_id)]),
-            };
-
-            let u = Uniforms { u_screen_size: screen_size };
-            self.driver.draw(&self.pipeline, &bindings, &u as *const Uniforms as *const c_void, (indices.len() / 3) as u32, 1);
         }
     }
 }
