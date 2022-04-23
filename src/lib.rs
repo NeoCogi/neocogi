@@ -14,4 +14,7 @@ pub mod rs_math3d {
     pub use rs_math3d::*;
 }
 
+
+pub mod scene;
+
 pub extern crate glfw;
