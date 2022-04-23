@@ -57,6 +57,7 @@
 mod painter;
 mod input;
 mod clipboard;
+pub mod pointer;
 
 pub use painter::*;
 pub use input::*;
