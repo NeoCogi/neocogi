@@ -592,7 +592,7 @@ impl UMNode {
 
     pub fn arrow_cone(start: &Vec3f, end: &Vec3f, cone_pct: f32, color: &Color4b) -> Self {
         let seg = *end - *start;
-        let tip_normal = seg * cone_pct * 0.5;
+        let tip_normal = seg * cone_pct * 0.25;
         let tip_start = *start + seg * (1.0 - cone_pct);
         let tris = Self::cone(&tip_start, &tip_normal, seg.length() * cone_pct, color, 8);
 

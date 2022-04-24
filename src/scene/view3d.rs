@@ -34,11 +34,10 @@ use crate::rs_math3d::*;
 use crate::renderer::*;
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NavigationMode {
     Pan,
-    Rotate,
-    Zoom,
+    Orbit,
 }
 
 pub struct View3D {
@@ -56,7 +55,7 @@ impl View3D {
     pub fn new(camera: Camera, dimension: Dimensioni, bounds: Box3f) -> Self {
         Self {
             camera      : camera,
-            nav_mode    : NavigationMode::Rotate,
+            nav_mode    : NavigationMode::Orbit,
             dimension   : dimension,
             scroll      : 0.0,
             bounds      : bounds,
@@ -69,7 +68,7 @@ impl View3D {
 
     fn update(&mut self) {
         match (&self.nav_mode, self.pointer_state.event()) {
-            (NavigationMode::Rotate, pointer::Event::Drag(prev, _, curr, _)) => {
+            (NavigationMode::Orbit, pointer::Event::Drag(prev, _, curr, _)) => {
                 let p = Vec2f::new(prev.x, prev.y);
                 let c = Vec2f::new(curr.x, curr.y);
                 self.camera = self.camera.tracball_rotate(self.dimension, &p, &c);
@@ -107,8 +106,13 @@ impl View3D {
         self.update();
     }
 
+    pub fn get_navigation_mode(&self) -> NavigationMode { self.nav_mode }
     pub fn set_navigation_mode(&mut self, nav_mode: NavigationMode) {
-        self.nav_mode   = nav_mode;
+        if nav_mode != self.nav_mode {
+            self.nav_mode   = nav_mode;
+            self.pointer_state  = pointer::State::new();
+            self.update();  // idem potent in this case
+        }
     }
 
     pub fn pointer_event(&self) -> pointer::Event { self.pointer_state.event() }
