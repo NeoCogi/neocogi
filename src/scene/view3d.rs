@@ -53,11 +53,12 @@ pub struct View3D {
 
 impl View3D {
     pub fn new(camera: Camera, dimension: Dimensioni, bounds: Box3f) -> Self {
+        let scroll = camera.distance();
         Self {
             camera      : camera,
             nav_mode    : NavigationMode::Orbit,
             dimension   : dimension,
-            scroll      : 0.0,
+            scroll,
             bounds      : bounds,
             pvm         : Mat4f::identity(),
 
@@ -81,11 +82,11 @@ impl View3D {
             },
 
             (_, pointer::Event::Scroll(v)) => {
-                self.scroll += v as f32 / 128.0;
-                self.scroll = f32::max(0.1, self.scroll);
-                let distance        = self.scroll + self.bounds.extent().length() ;
+                self.scroll += v;
+                self.scroll = f32::max(0.5, self.scroll);
+                let distance        = self.scroll;
                 let aspect          = (self.dimension.width as f32) / (self.dimension.height as f32);
-                self.camera   = Camera::new(self.bounds.center(), distance, self.camera.rotation(), std::f32::consts::PI * 0.25, aspect, 0.1, self.bounds.extent().length() * 100.0);
+                self.camera   = Camera::new(self.camera.target(), distance, self.camera.rotation(), std::f32::consts::PI * 0.25, aspect, 0.1, self.bounds.extent().length() * 100.0);
             }
 
             _ => ()

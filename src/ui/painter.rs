@@ -270,6 +270,10 @@ impl Painter {
         self.egui_textures.insert(tex_id, tex);
     }
 
+    fn update_egui_texture(&mut self, tex_id: u64, pos: Vec2i, delta: &egui::ImageData) {
+        // TODO
+    }
+
     fn upload_user_textures(&mut self) {
         for (_, user_texture) in &mut self.user_textures {
             if !user_texture.texture.is_none() && !user_texture.dirty {
@@ -340,7 +344,10 @@ impl Painter {
         for (id, delta) in &egui_texture.set {
             match id {
                 egui::TextureId::Managed(id) => {
-                    self.upload_egui_texture(*id, &delta.image);
+                    match &delta.pos {
+                        None => self.upload_egui_texture(*id, &delta.image),
+                        Some(p) => self.update_egui_texture(*id, Vec2i::new(p[0] as _, p[1] as _), &delta.image),
+                    }
                 },
                 _ => ()
             }

@@ -179,6 +179,8 @@ impl Camera {
     pub fn rotation(&self) -> Quatf { self.rotation }
     pub fn up(&self) -> Vec3f { self.up }
     pub fn direction(&self) -> Vec3f { self.direction }
+    pub fn distance(&self) -> f32 { self.distance }
+    pub fn target(&self) -> Vec3f { self.target }
     pub fn view_matrix(&self) -> Mat4f { self.view }
     pub fn projection_matrix(&self) -> Mat4f { self.projection }
     pub fn with_aspect(mut self, aspect: f32) -> Self {
