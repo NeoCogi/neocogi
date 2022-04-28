@@ -81,11 +81,11 @@ render_data! {
 }
 
 #[derive(Default, Clone)]
-struct UserTexture {
+struct PaintTexture {
     size: (usize, usize),
 
     /// Pending upload (will be emptied later).
-    pixels: Vec<u8>,
+    pixels: Vec<Color4b>,
 
     /// Lazily uploaded
     texture: Option<TexturePtr>,
@@ -143,8 +143,8 @@ pub struct Painter {
     vertex_buffer: DeviceBufferPtr,
     canvas_width: u32,
     canvas_height: u32,
-    egui_textures: HashMap<u64, TexturePtr>,
-    user_textures: HashMap<u64, UserTexture>,
+    egui_textures: HashMap<u64, PaintTexture>,
+    user_textures: HashMap<u64, PaintTexture>,
 }
 
 impl Painter {
@@ -216,16 +216,13 @@ impl Painter {
     ) -> ::egui::TextureId {
         assert_eq!(size.0 * size.1, srgba_pixels.len());
 
-        let mut pixels: Vec<u8> = Vec::with_capacity(srgba_pixels.len() * 4);
+        let mut pixels: Vec<Color4b> = Vec::with_capacity(srgba_pixels.len());
         for srgba in srgba_pixels {
-            pixels.push(srgba.r());
-            pixels.push(srgba.g());
-            pixels.push(srgba.b());
-            pixels.push(srgba.a());
+            pixels.push(color4b(srgba.r(), srgba.g(), srgba.b(), srgba.a()));
         }
 
         let id = self.user_textures.len() as u64;
-        self.user_textures.insert(id, UserTexture {
+        self.user_textures.insert(id, PaintTexture {
             size,
             pixels,
             texture: None,
@@ -237,23 +234,28 @@ impl Painter {
 
     fn upload_egui_texture(&mut self, tex_id: u64, texture: &egui::ImageData) {
 
-        let pixels: Vec<Color32> = match &texture {
+        let pixels: Vec<Color4b> = match &texture {
             egui::ImageData::Color(image) => {
                 assert_eq!(
                     image.width() * image.height(),
                     image.pixels.len(),
                     "Mismatch between texture size and texel count"
                 );
-                image.pixels.clone()
+                image.pixels
+                .iter()
+                .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
+                .collect()
             }
             egui::ImageData::Alpha(image) => {
                 let gamma = 1.0;
                 image
                     .srgba_pixels(gamma)
-                    //.map(|color| color.to_tuple())
+                    .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
                     .collect()
             }
         };
+
+        let pclone = pixels.clone();
 
         println!("uploading egui texture: {}x{}", texture.width(), texture.height());
 
@@ -267,11 +269,89 @@ impl Painter {
         };
 
         let tex = self.driver.create_texture(tex_desc).unwrap();
-        self.egui_textures.insert(tex_id, tex);
+        let pt = PaintTexture {
+            size: (texture.width(), texture.height()),
+
+            /// Pending upload (will be emptied later).
+            pixels: pclone,
+
+            /// Lazily uploaded
+            texture: Some(tex),
+
+            /// For user textures there is a choice between
+            /// Linear (default) and Nearest.
+            filtering: true,
+
+            /// User textures can be modified and this flag
+            /// is used to indicate if pixel data for the
+            /// texture has been updated.
+            dirty: false,
+        };
+        self.egui_textures.insert(tex_id, pt);
     }
 
     fn update_egui_texture(&mut self, tex_id: u64, pos: Vec2i, delta: &egui::ImageData) {
         // TODO
+        println!("TODO: update egui texture! {:?}", delta.size());
+
+        let tex = self.egui_textures.get_mut(&tex_id).unwrap();
+        let pixels = &mut tex.pixels;
+        let d : Vec<Color4b> = match &delta {
+            egui::ImageData::Color(image) => {
+                assert_eq!(
+                    image.width() * image.height(),
+                    image.pixels.len(),
+                    "Mismatch between texture size and texel count"
+                );
+                image.pixels
+                .iter()
+                .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
+                .collect()
+            }
+            egui::ImageData::Alpha(image) => {
+                let gamma = 1.0;
+                image
+                    .srgba_pixels(gamma)
+                    .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
+                    .collect()
+            }
+        };
+        for y in 0..delta.size()[1] {
+            for x in 0..delta.size()[0] {
+                pixels[tex.size.0 * (y + pos.y as usize) + x + pos.x as usize] = d[delta.size()[0] * y + x];
+            }
+        }
+
+        let tex_desc    = TextureDesc {
+            sampler_desc    : SamplerDesc::default(tex.size.0, tex.size.1)
+                .with_pixel_format(PixelFormat::RGBA8(MinMagFilter::default()
+                    .with_mag_filter(Filter::Linear)
+                    .with_min_filter(Filter::Linear)))
+                .with_wrap_mode(WrapMode::ClampToEdge),
+            payload         : Some(Box::new(pixels.clone()))
+        };
+
+        let ptex = self.driver.create_texture(tex_desc).unwrap();
+        let pt = PaintTexture {
+            size: tex.size,
+
+            /// Pending upload (will be emptied later).
+            pixels: tex.pixels.clone(),
+
+            /// Lazily uploaded
+            texture: Some(ptex),
+
+            /// For user textures there is a choice between
+            /// Linear (default) and Nearest.
+            filtering: true,
+
+            /// User textures can be modified and this flag
+            /// is used to indicate if pixel data for the
+            /// texture has been updated.
+            dirty: false,
+        };
+        self.egui_textures.insert(tex_id, pt);
+
     }
 
     fn upload_user_textures(&mut self) {
@@ -302,7 +382,7 @@ impl Painter {
     fn get_texture(&self, texture_id: ::egui::TextureId) -> TexturePtr {
         match texture_id {
             ::egui::TextureId::Managed(id) => {
-                self.egui_textures[&id].clone()
+                self.egui_textures[&id].texture.as_ref().unwrap().clone()
             },
 
             ::egui::TextureId::User(id) => {
@@ -318,10 +398,7 @@ impl Painter {
             ::egui::TextureId::User(id) => {
                 let mut tex_pixels = Vec::with_capacity(pixels.len() * 4);
                 for p in pixels {
-                    tex_pixels.push(p.r());
-                    tex_pixels.push(p.g());
-                    tex_pixels.push(p.b());
-                    tex_pixels.push(p.a());
+                    tex_pixels.push(color4b(p.r(), p.g(), p.b(), p.a()));
                 }
 
                 let mut user_tex = self.user_textures[&id].clone();
