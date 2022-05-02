@@ -41,6 +41,8 @@ use neocogi::egui;
 use neocogi::scene::*;
 use neocogi::ui::*;
 
+use neocogi::scene::utility_mesh::*;
+
 fn main() {
     // initialize GLFW3 with OpenGL ES 3.0
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();

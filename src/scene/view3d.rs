@@ -60,7 +60,7 @@ impl View3D {
             dimension   : dimension,
             scroll,
             bounds      : bounds,
-            pvm         : Mat4f::identity(),
+            pvm         : camera.projection_matrix() * camera.view_matrix(),
 
             pointer_state   : pointer::State::new(),
         }
