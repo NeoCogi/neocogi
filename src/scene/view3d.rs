@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 //
 // Copyright 2021-Present (c) Raja Lehtihet & Wael El Oraiby
 //
@@ -42,6 +44,7 @@ pub enum NavigationMode {
 
 pub struct View3D {
     camera              : Camera,
+    fov                 : f32,
     nav_mode            : NavigationMode,
     dimension           : Dimensioni,
     scroll              : f32,
@@ -55,6 +58,7 @@ impl View3D {
     pub fn new(camera: Camera, dimension: Dimensioni, bounds: Box3f) -> Self {
         let scroll = camera.distance();
         Self {
+            fov         : camera.fov(),
             camera      : camera,
             nav_mode    : NavigationMode::Orbit,
             dimension   : dimension,
@@ -68,6 +72,9 @@ impl View3D {
     }
 
     fn update(&mut self) {
+        // TODO: do proper computation of the far plane
+        let far_plane = self.bounds.extent().length() * 100.0;
+        self.camera = self.camera.with_far_plane(far_plane);
         match (&self.nav_mode, self.pointer_state.event()) {
             (NavigationMode::Orbit, pointer::Event::Drag(prev, _, curr, _)) => {
                 let p = Vec2f::new(prev.x, prev.y);
@@ -86,7 +93,7 @@ impl View3D {
                 self.scroll = f32::max(0.5, self.scroll);
                 let distance        = self.scroll;
                 let aspect          = (self.dimension.width as f32) / (self.dimension.height as f32);
-                self.camera   = Camera::new(self.camera.target(), distance, self.camera.rotation(), std::f32::consts::PI * 0.25, aspect, 0.1, self.bounds.extent().length() * 100.0);
+                self.camera   = Camera::new(self.camera.target(), distance, self.camera.rotation(), self.camera.fov(), aspect, self.camera.near_plane(), self.camera.far_plane());
             }
 
             _ => ()

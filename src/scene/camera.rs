@@ -175,6 +175,19 @@ impl Camera {
         }
     }
 
+    fn update_matrices(&mut self) {
+        let pos = Vec3f::new(0.0, 0.0, 1.0);
+        let up  = Vec3f::new(0.0, 1.0, 0.0);
+
+        let rot_matrix  = Quatf::mat4(&self.rotation);
+        let cam_pos     = self.target + transform_vec3(&rot_matrix, &pos) * self.distance;
+        let cam_up      = transform_vec3(&rot_matrix, &up);
+        let cam_dir     = Vec3f::normalize(&(self.target - cam_pos));
+
+        self.view        = lookat(&cam_pos, &self.target, &cam_up);
+        self.projection = perspective(self.fov, self.aspect, self.near_plane, self.far_plane);
+    }
+
     pub fn position(&self) -> Vec3f { self.pos }
     pub fn rotation(&self) -> Quatf { self.rotation }
     pub fn up(&self) -> Vec3f { self.up }
@@ -185,7 +198,27 @@ impl Camera {
     pub fn projection_matrix(&self) -> Mat4f { self.projection }
     pub fn with_aspect(mut self, aspect: f32) -> Self {
         self.aspect = aspect;
-        self.projection = perspective(self.fov, aspect, self.near_plane, self.far_plane);
+        self.update_matrices();
+        self
+    }
+    pub fn fov(&self) -> f32 { self.fov }
+    pub fn with_fov(mut self, fov: f32) -> Self {
+        self.fov    = fov;
+        self.projection = perspective(self.fov, self.aspect, self.near_plane, self.far_plane);
+        self
+    }
+
+    pub fn near_plane(&self) -> f32 { self.near_plane }
+    pub fn with_near_plane(mut self, np: f32) -> Self {
+        self.near_plane = np;
+        self.update_matrices();
+        self
+    }
+
+    pub fn far_plane(&self) -> f32 { self.far_plane }
+    pub fn with_far_plane(mut self, fp: f32) -> Self {
+        self.far_plane  = fp;
+        self.update_matrices();
         self
     }
 }
