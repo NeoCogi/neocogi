@@ -60,11 +60,13 @@ use crate::renderer::*;
 
 use std::collections::HashMap;
 
+use ::egui::ClippedPrimitive;
+use ::egui::epaint::Primitive;
 use rs_ctypes::*;
 
 use ::egui::{
     epaint::{Color32, Mesh},
-    vec2, ClippedMesh,
+    vec2,
 };
 
 render_data! {
@@ -246,7 +248,7 @@ impl Painter {
                 .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
                 .collect()
             }
-            egui::ImageData::Alpha(image) => {
+            egui::ImageData::Font(image) => {
                 let gamma = 1.0;
                 image
                     .srgba_pixels(gamma)
@@ -308,7 +310,7 @@ impl Painter {
                 .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
                 .collect()
             }
-            egui::ImageData::Alpha(image) => {
+            egui::ImageData::Font(image) => {
                 let gamma = 1.0;
                 image
                     .srgba_pixels(gamma)
@@ -414,7 +416,7 @@ impl Painter {
         &mut self,
         frame_buffer: Option<FrameBufferPtr>,
         bg_color: Option<Color32>,
-        meshes: Vec<ClippedMesh>,
+        meshes: Vec<ClippedPrimitive>,
         egui_texture: &egui::TexturesDelta,
         pixels_per_point: f32,
     ) {
@@ -436,7 +438,7 @@ impl Painter {
         let screen_size_points = screen_size_pixels / pixels_per_point;
 
 
-        for ClippedMesh(clip_rect, mesh) in meshes {
+        for ClippedPrimitive { clip_rect, primitive } in meshes {
 
             let clip_min_x = pixels_per_point * clip_rect.min.x;
             let clip_min_y = pixels_per_point * clip_rect.min.y;
@@ -459,8 +461,15 @@ impl Painter {
                 (clip_max_y - clip_min_y) as u32,
             );
 
-            if mesh.vertices.len() > 0 {
-                self.paint_mesh(&mesh, Vec2f::new(screen_size_points.x, screen_size_points.y));
+            match primitive {
+                Primitive::Mesh(mesh) => {
+                    if mesh.vertices.len() > 0 {
+                        self.paint_mesh(&mesh, Vec2f::new(screen_size_points.x, screen_size_points.y));
+                    }
+                },
+                Primitive::Callback(_) => {
+                    panic!("PrimitiveCallback Not supported yet!")
+                }
             }
         }
 
