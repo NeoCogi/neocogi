@@ -32,6 +32,7 @@ use crate::rs_math3d::*;
 use crate::*;
 use std::ffi::c_void;
 use std::ops::*;
+use std::sync::*;
 
 static VERTEX_SHADER: &'static str = "
 #version 300 es
@@ -797,6 +798,9 @@ pub struct UMRenderer {
     vb: DeviceBufferPtr,
 }
 
+unsafe impl Sync for UMRenderer {}
+unsafe impl Send for UMRenderer {}
+
 impl UMRenderer {
     pub fn new(driver: &mut DriverPtr, max_verts: usize) -> Self {
         let mut model_attribs = Vec::new();
@@ -875,7 +879,7 @@ impl UMRenderer {
         }
     }
 
-    fn draw_chunks<T>(
+    fn draw_chunks<T: Sized + Clone + Sync + Send + 'static>(
         &mut self,
         pipeline: &PipelinePtr,
         pvm: &Mat4f,
@@ -889,9 +893,10 @@ impl UMRenderer {
         while rem_elms != 0 {
             let start_chnk_idx = i * chunk_size;
             let count = usize::min(elems.len() - start_chnk_idx, chunk_size);
-            let pl = &elems[start_chnk_idx..start_chnk_idx + count];
 
-            self.driver.update_device_buffer(&mut self.vb, 0, &pl);
+            let pl = elems[start_chnk_idx..start_chnk_idx + count].to_vec();
+
+            self.driver.update_device_buffer(&mut self.vb, 0, Arc::new(pl));
             let bindings = Bindings {
                 vertex_buffers: vec![self.vb.clone()],
                 index_buffer: None,

@@ -36,6 +36,7 @@ use super::readback::*;
 use std::collections::{VecDeque};
 use core::ops::{Index};
 use core::sync::atomic::*;
+use std::sync::*;
 
 fn color4b_to_color4f(col: Color4b) -> Vec4f {
     let r = col.x as f32 / 255.0;
@@ -597,7 +598,7 @@ impl Gles3Driver {
 
         let usage =
             match usage {
-                Usage::Static(p)    => Usage::Static(Box::new(NullPayload{ size: p.size() })),
+                Usage::Static(p)    => Usage::Static(Arc::new(NullPayload{ size: p.size() })),
                 Usage::Streamed(s)  => Usage::Streamed(*s),
                 Usage::Dynamic (s)  => Usage::Dynamic(*s),
             };
@@ -616,7 +617,7 @@ impl Gles3Driver {
         }
     }
 
-    fn upload_texture(res: GLuint, desc: &SamplerDesc, data: &Option<Box<dyn Payload>>) {
+    fn upload_texture(res: GLuint, desc: &SamplerDesc, data: Option<Arc<dyn Payload>>) {
         unsafe {
             match &desc.image_type {
                 SamplerType::Sampler2D(pch_x, pch_y) => {
@@ -627,10 +628,17 @@ impl Gles3Driver {
                     // TODO: if one day, we need to have device buffer, bind it here
                     //gl::BindBuffer(gl::PIXEL_UNPACK_BUFFER, 0);
 
-                    let ptr = match data {
+                    let ptr = match &data {
                         Some(b) => b.ptr() as *const c_void,
                         None => ::core::ptr::null()
                     };
+
+                    let (ptr2, len) = match &data {
+                        Some(b) => (b.ptr(), b.size()),
+                        None => (::core::ptr::null(), 0)
+                    };
+
+                    let sl = std::slice::from_raw_parts(ptr2, len);
 
                     gl::TexImage2D(gl::TEXTURE_2D,
                         0,
@@ -661,7 +669,7 @@ impl Gles3Driver {
             }
         }
     }
-    fn create_texture(desc: &SamplerDesc, data: &Option<Box<dyn Payload>>) -> GLuint {
+    fn create_texture(desc: &SamplerDesc, data: Option<Arc<dyn Payload>>) -> GLuint {
         unsafe {
 
             let mut res : GLuint = 0;
@@ -820,7 +828,7 @@ impl Driver for Gles3Driver {
 
     fn create_texture(&mut self, desc: TextureDesc) -> Option<TexturePtr> {
         let new_desc = Self::erase_texture_data(&desc);
-        let idx = Self::create_texture(&desc.sampler_desc, &desc.payload);
+        let idx = Self::create_texture(&desc.sampler_desc, desc.payload);
         let img = GLTexture { gl_id: idx };
         let idx = self.textures.add(img);
 
@@ -1302,7 +1310,7 @@ impl Driver for Gles3Driver {
         }
     }
 
-    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: &dyn Payload) {
+    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: Arc<dyn Payload>) {
         unsafe {
             match self.device_buffers[dev_buf.res_id()].desc {
                 DeviceBufferDesc::Vertex(Usage::Static(_))   |
@@ -1336,11 +1344,11 @@ impl Driver for Gles3Driver {
         }
     }
 
-    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Box<dyn Payload>) {
+    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Arc<dyn Payload>) {
         // TODO: check payload size and format
         let res_id  = dev_buf.res_id();
         let gl_id   = self.textures[res_id].gl_id;
-        Self::upload_texture(gl_id, &dev_buf.desc().sampler_desc, &Some(pl));
+        Self::upload_texture(gl_id, &dev_buf.desc().sampler_desc, Some(pl));
     }
 
     fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
@@ -1357,6 +1365,9 @@ impl IntrusiveCounter for Gles3Driver {
         self.rc.fetch_sub(1, Ordering::SeqCst)
     }
 }
+
+unsafe impl Send for Gles3Driver {}
+unsafe impl Sync for Gles3Driver {}
 
 impl Drop for Gles3Driver {
     fn drop(&mut self) {

@@ -33,6 +33,7 @@ use super::super::gl::types::*;
 use crate::rs_math3d::*;
 
 use super::renderer::*;
+use std::sync::*;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -123,10 +124,10 @@ impl ReadbackState {
             2, 3, 0,
         };
 
-        let vb_desc = DeviceBufferDesc::Vertex(Usage::Static(Box::new(quad_verts)));
+        let vb_desc = DeviceBufferDesc::Vertex(Usage::Static(Arc::new(quad_verts)));
         let vb = driver.create_device_buffer(vb_desc).unwrap();
 
-        let ib_desc = DeviceBufferDesc::Index(Usage::Static(Box::new(quad_index)));
+        let ib_desc = DeviceBufferDesc::Index(Usage::Static(Arc::new(quad_index)));
         let ib = driver.create_device_buffer(ib_desc).unwrap();
 
         Self {

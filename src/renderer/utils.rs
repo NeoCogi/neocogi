@@ -30,6 +30,7 @@
 use super::*;
 use rs_ctypes::*;
 use crate::rs_math3d::*;
+use std::sync::*;
 
 ///
 /// create a frame buffer with only color & depth render targets
@@ -203,10 +204,10 @@ impl ScreenQuad {
             2, 3, 0,
         };
 
-        let vb_desc = DeviceBufferDesc::Vertex(Usage::Static(Box::new(quad_verts)));
+        let vb_desc = DeviceBufferDesc::Vertex(Usage::Static(Arc::new(quad_verts)));
         let vb = driver.create_device_buffer(vb_desc).unwrap();
 
-        let ib_desc = DeviceBufferDesc::Index(Usage::Static(Box::new(quad_index)));
+        let ib_desc = DeviceBufferDesc::Index(Usage::Static(Arc::new(quad_index)));
         let ib = driver.create_device_buffer(ib_desc).unwrap();
 
         Self {

@@ -32,8 +32,9 @@ use rs_math3d::*;
 
 use core::sync::atomic::*;
 use core::ops::{Deref, DerefMut};
+use std::sync::*;
 
-pub trait IntrusiveCounter {
+pub trait IntrusiveCounter : Sync + Send {
     fn increment(&mut self);
     fn decrement(&mut self) -> isize;
 }
@@ -41,6 +42,7 @@ pub trait IntrusiveCounter {
 #[repr(C)]
 pub struct IntrusivePtr<T : IntrusiveCounter + ?Sized> {
     object  : *mut T,
+    phantom : std::marker::PhantomData<T>,
 }
 
 impl<T: IntrusiveCounter> IntrusivePtr<T> {
@@ -48,7 +50,7 @@ impl<T: IntrusiveCounter> IntrusivePtr<T> {
         t.increment();
         let b = Box::new(t);
         let r = Box::into_raw(b);
-        let s = Self { object: r };
+        let s = Self { object: r , phantom: std::marker::PhantomData::default() };
         s
     }
 }
@@ -56,8 +58,8 @@ impl<T: IntrusiveCounter> IntrusivePtr<T> {
 impl<T: IntrusiveCounter + ?Sized> IntrusivePtr<T> {
     pub fn as_ref(&self) -> *const T { self.object }
     pub(crate) unsafe fn into_raw_mut(self) -> *mut T { let obj = self.object; std::mem::forget(self); obj }
-    pub(crate) unsafe fn from_raw_no_increment(raw: *mut T) -> Self { Self { object: raw } }
-    pub(crate) unsafe fn from_raw_increment(raw: *mut T) -> Self { (*raw).increment(); Self { object: raw } }
+    pub(crate) unsafe fn from_raw_no_increment(raw: *mut T) -> Self { Self { object: raw, phantom: std::marker::PhantomData::default() } }
+    pub(crate) unsafe fn from_raw_increment(raw: *mut T) -> Self { (*raw).increment(); Self { object: raw, phantom: std::marker::PhantomData::default() } }
 }
 
 impl<T: IntrusiveCounter + ?Sized> Drop for IntrusivePtr<T> {
@@ -74,7 +76,7 @@ impl<T: IntrusiveCounter + ?Sized> Drop for IntrusivePtr<T> {
 impl<T: IntrusiveCounter + ?Sized> Clone for IntrusivePtr<T> {
     fn clone(&self) -> Self {
         unsafe { (*self.object).increment() };
-        Self { object : self.object }
+        Self { object : self.object, phantom: std::marker::PhantomData::default() }
     }
 }
 
@@ -115,6 +117,9 @@ pub struct Resource<Desc> {
     depends_on  : Option<IntrusivePtr<dyn Driver>>,   /// resources depend on drivers or other resources
     rc      : AtomicIsize,
 }
+
+unsafe impl<Desc> Send for Resource<Desc> {}
+unsafe impl<Desc> Sync for Resource<Desc> {}
 
 impl<Desc> Resource<Desc> {
     pub(crate)  fn new(res_type: ResourceType, res_id: usize, desc: Desc, depends_on : Option<IntrusivePtr<dyn Driver>>) -> Self {
@@ -577,23 +582,23 @@ pub trait UniformBlockTrait {
 /// Buffers
 ////////////////////////////////////////////////////////////////////////////////
 
-pub trait Payload {
+pub trait Payload : Send + Sync {
     fn ptr(&self) -> *const u8;
     fn size(&self) -> usize;
 }
 
-impl<T> Payload for Vec<T> {
+impl<T: Send + Sync> Payload for Vec<T> {
     fn ptr(&self) -> *const u8 { self.as_ptr() as *const u8 }
     fn size(&self) -> usize { ::core::mem::size_of::<T>() * self.len() }
 }
 
-impl<T> Payload for &[T] {
-    fn ptr(&self) -> *const u8 { self.as_ptr() as *const u8 }
-    fn size(&self) -> usize { ::core::mem::size_of::<T>() * self.len() }
-}
+// impl<T: Send + Sync> Payload for &[T] {
+//     fn ptr(&self) -> *const u8 { self.as_ptr() as *const u8 }
+//     fn size(&self) -> usize { ::core::mem::size_of::<T>() * self.len() }
+// }
 
 pub enum Usage {
-    Static(Box<dyn Payload>),
+    Static(Arc<dyn Payload>),
     Dynamic(usize),
     Streamed(usize),
 }
@@ -840,9 +845,10 @@ impl SamplerDesc {
     }
 
 }
+
 pub struct TextureDesc {
     pub sampler_desc    : SamplerDesc,
-    pub payload         : Option<Box<dyn Payload>>
+    pub payload         : Option<Arc<dyn Payload>>
 }
 
 pub struct RenderTargetDesc {
@@ -872,6 +878,9 @@ pub struct ShaderDesc {
     pub pixel_surfaces      : Vec<String>,
 }
 
+unsafe impl Send for ShaderDesc {}
+unsafe impl Sync for ShaderDesc {}
+
 pub type Shader     = Resource<ShaderDesc>;
 pub type ShaderPtr  = IntrusivePtr<Shader>;
 
@@ -885,7 +894,7 @@ pub enum IndexType {
     UInt32,
 }
 
-pub trait IndexTypeTrait {
+pub trait IndexTypeTrait : Send + Sync {
     fn to_index_type() -> IndexType;
 }
 
@@ -1012,6 +1021,9 @@ pub struct PipelineDesc {
     pub blend               : BlendOp,
 }
 
+unsafe impl Send for PipelineDesc {}
+unsafe impl Sync for PipelineDesc {}
+
 pub type Pipeline   = Resource<PipelineDesc>;
 pub type PipelinePtr= IntrusivePtr<Pipeline>;
 
@@ -1050,6 +1062,9 @@ pub struct FrameBufferDesc {
     pub color_attachements          : [Option<SurfaceAttachment>; 4],
     pub depth_stencil_attachement   : SurfaceAttachment,
 }
+
+unsafe impl Send for FrameBufferDesc {}
+unsafe impl Sync for FrameBufferDesc {}
 
 pub type FrameBuffer    = Resource<FrameBufferDesc>;
 pub type FrameBufferPtr = IntrusivePtr<FrameBuffer>;
@@ -1108,8 +1123,8 @@ pub trait Driver : IntrusiveCounter {
 
     fn delete_resource(&mut self, resource_type: &ResourceType, res_id: usize);
 
-    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: &dyn Payload);
-    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Box<dyn Payload>);
+    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: Arc<dyn Payload>);
+    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Arc<dyn Payload>);
 
     fn begin_pass(&mut self, pass: &Pass);
     fn end_pass(&mut self);

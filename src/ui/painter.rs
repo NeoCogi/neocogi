@@ -63,6 +63,7 @@ use std::collections::HashMap;
 use ::egui::ClippedPrimitive;
 use ::egui::epaint::Primitive;
 use rs_ctypes::*;
+use std::sync::*;
 
 use ::egui::{
     epaint::{Color32, Mesh},
@@ -267,7 +268,7 @@ impl Painter {
                     .with_mag_filter(Filter::Linear)
                     .with_min_filter(Filter::Linear)))
                 .with_wrap_mode(WrapMode::ClampToEdge),
-            payload         : Some(Box::new(pixels))
+            payload         : Some(Arc::new(pixels))
         };
 
         let tex = self.driver.create_texture(tex_desc).unwrap();
@@ -330,7 +331,7 @@ impl Painter {
                     .with_mag_filter(Filter::Linear)
                     .with_min_filter(Filter::Linear)))
                 .with_wrap_mode(WrapMode::ClampToEdge),
-            payload         : Some(Box::new(pixels.clone()))
+            payload         : Some(Arc::new(pixels.clone()))
         };
 
         let ptex = self.driver.create_texture(tex_desc).unwrap();
@@ -366,7 +367,7 @@ impl Painter {
 
             let tex_desc    = TextureDesc {
                 sampler_desc    : SamplerDesc::default(user_texture.size.0, user_texture.size.1).with_pixel_format(PixelFormat::RGBA8(MinMagFilter::default().with_mag_filter(Filter::Linear).with_min_filter(Filter::Linear))),
-                payload         : Some(Box::new(pixels))
+                payload         : Some(Arc::new(pixels))
             };
 
             if user_texture.texture.is_none() {
@@ -467,9 +468,31 @@ impl Painter {
                         self.paint_mesh(&mesh, Vec2f::new(screen_size_points.x, screen_size_points.y));
                     }
                 },
-                Primitive::Callback(_) => {
-                    panic!("PrimitiveCallback Not supported yet!")
-                }
+                Primitive::Callback(cb) => {
+                    // Transform callback rect to physical pixels:
+                    let rect_min_x = pixels_per_point * cb.rect.min.x;
+                    let rect_min_y = pixels_per_point * cb.rect.min.y;
+                    let rect_max_x = pixels_per_point * cb.rect.max.x;
+                    let rect_max_y = pixels_per_point * cb.rect.max.y;
+
+                    let rect_min_x = rect_min_x.round() as u32;
+                    let rect_min_y = rect_min_y.round() as u32;
+                    let rect_max_x = rect_max_x.round() as u32;
+                    let rect_max_y = rect_max_y.round() as u32;
+
+                    let r = cb.rect;
+                    //self.driver.set_scissor(r.min.x as _, r.min.y as _, r.width() as _, r.height() as _);
+                    self.driver.set_viewport(rect_min_x, rect_min_y, rect_max_x - rect_min_x, rect_max_y - rect_min_y);
+
+                    let info = egui::PaintCallbackInfo {
+                        viewport: cb.rect,
+                        clip_rect: clip_rect,
+                        pixels_per_point,
+                        screen_size_px: [screen_size_pixels.x as u32, screen_size_pixels.y as u32],
+                    };
+
+                    let mut d : Option<()> = None;
+                    cb.call(&info, &mut d);                }
             }
         }
 
@@ -505,7 +528,10 @@ impl Painter {
             let remaining_count = index_count - i * max_part_size;
             if remaining_count > 0 {
                 let part_index_count = usize::min(remaining_count, max_part_size);
-                self.driver.update_device_buffer(&mut self.vertex_buffer, 0, &vertices);
+                let vs = vertices[i * max_part_size..i * max_part_size + part_index_count].to_vec();
+
+                let tri_count = vs.len() / 3;
+                self.driver.update_device_buffer(&mut self.vertex_buffer, 0, Arc::new(vs));
 
                 let bindings = Bindings {
                     vertex_buffers  : vec!{ self.vertex_buffer.clone() },
@@ -516,7 +542,7 @@ impl Painter {
                 };
 
                 let u = Uniforms { u_screen_size: screen_size };
-                self.driver.draw(&self.pipeline, &bindings, &u as *const Uniforms as *const c_void, (part_index_count / 3) as u32, 1);
+                self.driver.draw(&self.pipeline, &bindings, &u as *const Uniforms as *const c_void, tri_count as u32, 1);
             }
         }
     }

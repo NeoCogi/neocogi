@@ -37,6 +37,8 @@ use neocogi::rs_math3d::*;
 
 use neocogi::renderer::*;
 
+use std::sync::*;
+
 static VERTEX_SHADER : &'static str = "
 #version 300 es
 in  highp   vec4        position;
@@ -173,7 +175,7 @@ fn main() {
             pixel_images    : Vec::new(),
         };
 
-        driver.update_device_buffer(&mut vertex_buffer, 0, &vertices);
+        driver.update_device_buffer(&mut vertex_buffer, 0, Arc::new(vertices.to_vec()));
         driver.draw(&pipeline, &bindings, std::ptr::null(), 1, 1);
         driver.end_pass();
         window.swap_buffers();
