@@ -438,7 +438,6 @@ impl Painter {
         let screen_size_pixels = vec2(self.canvas_width as f32, self.canvas_height as f32);
         let screen_size_points = screen_size_pixels / pixels_per_point;
 
-
         for ClippedPrimitive { clip_rect, primitive } in meshes {
 
             let clip_min_x = pixels_per_point * clip_rect.min.x;
@@ -454,12 +453,17 @@ impl Painter {
             let clip_max_x = clip_max_x.round() as i32;
             let clip_max_y = clip_max_y.round() as i32;
 
+            let r = Recti::new(clip_min_x,
+                self.canvas_height as i32 - clip_max_y,
+                (clip_max_x - clip_min_x),
+                (clip_max_y - clip_min_y));
+
             //scissor Y coordinate is from the bottom
             self.driver.set_scissor (
-                clip_min_x as u32,
-                self.canvas_height as u32 - clip_max_y as u32,
-                (clip_max_x - clip_min_x) as u32,
-                (clip_max_y - clip_min_y) as u32,
+                r.x as u32,
+                r.y as u32,
+                r.width as u32,
+                r.height as u32,
             );
 
             match primitive {
@@ -475,13 +479,16 @@ impl Painter {
                     let rect_max_x = pixels_per_point * cb.rect.max.x;
                     let rect_max_y = pixels_per_point * cb.rect.max.y;
 
+                    let rect_min_x = rect_min_x.clamp(0.0, screen_size_pixels.x);
+                    let rect_min_y = rect_min_y.clamp(0.0, screen_size_pixels.y);
+                    let rect_max_x = rect_max_x.clamp(rect_min_x, screen_size_pixels.x);
+                    let rect_max_y = rect_max_y.clamp(rect_min_y, screen_size_pixels.y);
+
                     let rect_min_x = rect_min_x.round() as u32;
                     let rect_min_y = rect_min_y.round() as u32;
                     let rect_max_x = rect_max_x.round() as u32;
                     let rect_max_y = rect_max_y.round() as u32;
 
-                    let r = cb.rect;
-                    //self.driver.set_scissor(r.min.x as _, r.min.y as _, r.width() as _, r.height() as _);
                     self.driver.set_viewport(rect_min_x, rect_min_y, rect_max_x - rect_min_x, rect_max_y - rect_min_y);
 
                     let info = egui::PaintCallbackInfo {
@@ -492,7 +499,11 @@ impl Painter {
                     };
 
                     let mut d : Option<()> = None;
-                    cb.call(&info, &mut d);                }
+                    cb.call(&info, &mut d);
+
+                    self.driver.set_viewport(0, 0, self.canvas_width, self.canvas_height);
+
+                }
             }
         }
 
