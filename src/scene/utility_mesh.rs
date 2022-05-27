@@ -619,12 +619,12 @@ impl UMNode {
         Self::Assembly(vec![Self::Segments(lines), tris])
     }
 
-    pub fn arrow_sphere(start: &Vec3f, end: &Vec3f, cone_pct: f32, color: &Color4b) -> Self {
+    pub fn arrow_sphere(start: &Vec3f, end: &Vec3f, sphere_pct: f32, color: &Color4b) -> Self {
         let seg = *end - *start;
-        let tip_start = *start + seg * 0.8;
-        let tris = Self::sphere(&tip_start, cone_pct, 3, color);
+        let tip_start = *start + seg * (1.0 - sphere_pct * 0.5);
+        let tris = Self::sphere(&((tip_start + *end) * 0.5), sphere_pct * seg.length() / 2.0, 3, color);
 
-        let lines = vec![Segment::new(start, &tip_start, color)];
+        let lines = vec![Segment::new(start, end, color)];
 
         Self::Assembly(vec![Self::Segments(lines), tris])
     }
