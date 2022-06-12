@@ -18,3 +18,8 @@ pub mod rs_math3d {
 pub mod scene;
 
 pub extern crate glfw;
+
+pub enum UpdateResult {
+    Handled,
+    Unhandled,
+}

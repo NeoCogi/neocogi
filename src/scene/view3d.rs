@@ -71,21 +71,24 @@ impl View3D {
 
     }
 
-    fn update(&mut self) {
+    fn update(&mut self) -> UpdateResult {
         // TODO: do proper computation of the far plane
         let far_plane = self.bounds.extent().length() * 100.0;
         self.camera = self.camera.with_far_plane(far_plane);
+        let handled =
         match (&self.nav_mode, self.pointer_state.event()) {
             (NavigationMode::Orbit, pointer::Event::Drag(prev, _, curr, _)) => {
                 let p = Vec2f::new(prev.x, prev.y);
                 let c = Vec2f::new(curr.x, curr.y);
                 self.camera = self.camera.tracball_rotate(self.dimension, &p, &c);
+                UpdateResult::Handled
             },
 
             (NavigationMode::Pan, pointer::Event::Drag(prev, _, curr, _)) => {
                 let p = Vec2f::new(prev.x, prev.y);
                 let c = Vec2f::new(curr.x, curr.y);
                 self.camera = self.camera.pan(self.dimension, &p, &c);
+                UpdateResult::Handled
             },
 
             (_, pointer::Event::Scroll(v)) => {
@@ -94,17 +97,19 @@ impl View3D {
                 let distance        = self.scroll;
                 let aspect          = (self.dimension.width as f32) / (self.dimension.height as f32);
                 self.camera   = Camera::new(self.camera.target(), distance, self.camera.rotation(), self.camera.fov(), aspect, self.camera.near_plane(), self.camera.far_plane());
+                UpdateResult::Handled
             }
 
-            _ => ()
-        }
+            _ => UpdateResult::Unhandled
+        };
 
         self.pvm    = self.camera.projection_matrix() * self.camera.view_matrix();
+        handled
     }
 
-    pub fn set_pointer(&mut self, pos: Vec2f, st: pointer::ButtonState) {
+    pub fn set_pointer(&mut self, pos: Vec2f, st: pointer::ButtonState) -> UpdateResult {
         self.pointer_state.update(pos, st);
-        self.update();
+        self.update()
     }
 
     pub fn set_dimension(&mut self, dimension: Dimensioni) {
