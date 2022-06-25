@@ -1118,6 +1118,11 @@ impl Driver for Gles3Driver {
 
             gl::DepthMask(if gl_pipe.desc.depth_write { gl::TRUE } else { gl::FALSE } as GLboolean);
 
+            match gl_pipe.desc.polygon_offset {
+                PolygonOffset::None => gl::PolygonOffset(0.0, 0.0),
+                PolygonOffset::FactorUnits(factor, units) => gl::PolygonOffset(factor, units),
+            }
+
             gl::UseProgram(gl_prog.gl_id);
             for (l, layout) in gl_pipe.desc.buffer_layouts.iter().enumerate() {
                 let gl_vb = &self.device_buffers[bindings.vertex_buffers[layout.buffer_id].res_id()];

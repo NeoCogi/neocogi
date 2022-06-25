@@ -104,6 +104,7 @@ fn init_render_objects(driver: &mut DriverPtr) -> PipelinePtr {
         depth_write         : true,
         depth_test          : true,
         blend               : BlendOp::None,
+        polygon_offset      : PolygonOffset::None,
     };
 
     driver.create_pipeline(tri_pipeline_desc).unwrap()

@@ -190,6 +190,7 @@ impl Painter {
             depth_write         : true,
             depth_test          : false,
             blend               : BlendOp::Add(Blend::default()),
+            polygon_offset      : PolygonOffset::None,
         };
 
         let pipeline = drv.create_pipeline(pipeline_desc).unwrap();

@@ -185,6 +185,7 @@ impl ScreenQuad {
             depth_write         : true,
             depth_test          : true,
             blend               : BlendOp::None,
+            polygon_offset      : PolygonOffset::None,
         };
 
         driver.create_pipeline(model_pipeline_desc).unwrap()

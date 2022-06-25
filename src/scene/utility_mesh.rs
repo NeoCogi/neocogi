@@ -843,6 +843,7 @@ impl UMRenderer {
             depth_write: true,
             depth_test: true,
             blend: BlendOp::Add(Blend::default()),
+            polygon_offset      : PolygonOffset::None,
         };
 
         let solid_pipeline = driver.create_pipeline(solid_pipeline_desc).unwrap();
@@ -863,6 +864,7 @@ impl UMRenderer {
             depth_write: true,
             depth_test: true,
             blend: BlendOp::Add(Blend::default()),
+            polygon_offset      : PolygonOffset::None,
         };
 
         let wire_pipeline = driver.create_pipeline(wire_pipeline_desc).unwrap();

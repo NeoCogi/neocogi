@@ -999,6 +999,11 @@ pub enum BlendOp {
     ReverseSubtract(Blend),
 }
 
+#[derive(Clone)]
+pub enum PolygonOffset {
+    None,
+    FactorUnits(f32, f32),
+}
 
 #[derive(Clone)]
 pub struct PipelineDesc {
@@ -1019,6 +1024,7 @@ pub struct PipelineDesc {
     pub depth_test          : bool,
 
     pub blend               : BlendOp,
+    pub polygon_offset      : PolygonOffset,
 }
 
 unsafe impl Send for PipelineDesc {}
