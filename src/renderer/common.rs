@@ -45,6 +45,9 @@ pub struct IntrusivePtr<T : IntrusiveCounter + ?Sized> {
     phantom : std::marker::PhantomData<T>,
 }
 
+unsafe impl<T: IntrusiveCounter> Send for IntrusivePtr<T> {}
+unsafe impl<T: IntrusiveCounter> Sync for IntrusivePtr<T> {}
+
 impl<T: IntrusiveCounter> IntrusivePtr<T> {
     pub fn new(mut t: T) -> Self {
         t.increment();
@@ -1127,6 +1130,9 @@ pub struct Pass {
     pub(crate) commands            : Vec<RenderPassCommand>,
 }
 
+unsafe impl Send for Pass {}
+unsafe impl Sync for Pass {}
+
 impl Pass {
     pub fn new(width           : usize,
         height          : usize,
@@ -1157,7 +1163,7 @@ impl Pass {
         self.commands.push(RenderPassCommand::UpdateTexture(UpdateTextureCommand { tex: tex.clone(), payload: pl }));
     }
 
-    pub fn reset_command_queue(&mut self) {
+    pub fn drain(&mut self) {
         self.commands.clear();
     }
 
@@ -1220,7 +1226,7 @@ pub trait Driver : IntrusiveCounter {
 
     fn delete_resource(&mut self, resource_type: &ResourceType, res_id: usize);
 
-    fn render_pass(&mut self, pass: Pass);
+    fn render_pass(&mut self, pass: &mut Pass);
 
     fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload>;
 }

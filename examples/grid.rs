@@ -178,7 +178,7 @@ fn main() {
             native_pixels_per_point,
         );
 
-        driver.render_pass(pass);
+        driver.render_pass(&mut pass);
         window.swap_buffers();
 
         let (xpos, ypos) = window.get_cursor_pos();

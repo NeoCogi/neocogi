@@ -489,16 +489,20 @@ impl Painter {
                     let rect_max_x = rect_max_x.round() as u32;
                     let rect_max_y = rect_max_y.round() as u32;
 
-                    pass.set_viewport(rect_min_x, rect_min_y, rect_max_x - rect_min_x, rect_max_y - rect_min_y);
+                    let r = Recti::new(rect_min_x as i32, rect_min_y as i32, (rect_max_x - rect_min_x) as i32, (rect_max_y - rect_min_y) as i32);
+
+                    pass.set_viewport(r.x as _, r.y as _, r.width as _, r.height as _);
+
+                    let viewport = egui::Rect::from_min_size(egui::Pos2::new(r.x as f32, r.y as f32), egui::Vec2::new(r.width as f32, r.height as f32));
 
                     let info = egui::PaintCallbackInfo {
-                        viewport: cb.rect,
+                        viewport,
                         clip_rect: clip_rect,
                         pixels_per_point,
                         screen_size_px: [screen_size_pixels.x as u32, screen_size_pixels.y as u32],
                     };
 
-                    cb.call(&info, &mut self.driver);
+                    cb.call(&info, pass);
 
                     pass.set_viewport(0, 0, self.canvas_width, self.canvas_height);
 

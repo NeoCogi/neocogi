@@ -140,7 +140,7 @@ fn main() {
             native_pixels_per_point,
         );
 
-        driver.render_pass(pass);
+        driver.render_pass(&mut pass);
         window.swap_buffers();
 
         glfw.poll_events();

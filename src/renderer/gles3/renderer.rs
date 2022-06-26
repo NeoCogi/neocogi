@@ -1250,7 +1250,7 @@ impl Driver for Gles3Driver {
     }
 
 
-    fn render_pass(&mut self, pass: Pass) {
+    fn render_pass(&mut self, pass: &mut Pass) {
         unsafe {
             gl::Flush();
             gl::Viewport(0, 0, pass.width as i32, pass.height as i32);
@@ -1353,16 +1353,18 @@ impl Driver for Gles3Driver {
                 }
             }
 
-            for mut cmd in pass.commands {
-                match cmd {
-                    RenderPassCommand::Viewport(x, y, w, h) => self.set_viewport(x, y, w, h),
-                    RenderPassCommand::Scissor(x, y, w, h) => self.set_scissor(x, y, w, h),
+            for mut cmd in &mut pass.commands {
+                match &mut cmd {
+                    RenderPassCommand::Viewport(x, y, w, h) => self.set_viewport(*x, *y, *w, *h),
+                    RenderPassCommand::Scissor(x, y, w, h) => self.set_scissor(*x, *y, *w, *h),
                     RenderPassCommand::Draw(cmd) => self.draw(&cmd.pipe, &cmd.bindings, 
                             cmd.uniforms.ptr() as *const _, cmd.prim_count, cmd.instance_count),
-                    RenderPassCommand::UpdateDeviceBuffer(mut cmd) => self.update_device_buffer(&mut cmd.buffer, cmd.offset, cmd.payload),
-                    RenderPassCommand::UpdateTexture(mut cmd) => self.update_texture(&mut cmd.tex, cmd.payload),
+                    RenderPassCommand::UpdateDeviceBuffer(cmd) => self.update_device_buffer(&mut cmd.buffer, cmd.offset, cmd.payload.clone()),
+                    RenderPassCommand::UpdateTexture(cmd) => self.update_texture(&mut cmd.tex, cmd.payload.clone()),
                 }
             }
+
+            pass.drain();
         }
     }
 

@@ -919,7 +919,7 @@ impl UMRenderer {
             rem_elms -= count;
         }
     }
-    
+
     pub fn draw_segments(&mut self, pass: &mut Pass, pvm: &Mat4f, lines: &Vec<Segment>) {
         let chunk_size = self.max_verts / 2;
         let pipeline = self.wire_pipeline.clone();
@@ -936,6 +936,10 @@ impl UMRenderer {
         let chunk_size = self.max_verts / 6;
         let pipeline = self.solid_pipeline.clone();
         self.draw_chunks(pass, &pipeline, pvm, chunk_size, quads, 2);
+    }
+
+    pub fn driver(&self) -> DriverPtr {
+        self.driver.clone()
     }
 
     pub fn draw_node(&mut self, pass: &mut Pass, pvm: &Mat4f, node: &UMNode) {

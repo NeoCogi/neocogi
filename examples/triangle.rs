@@ -177,7 +177,7 @@ fn main() {
 
         pass.update_device_buffer(&mut vertex_buffer, 0, Arc::new(vertices.to_vec()));
         pass.draw(&pipeline, &bindings, Arc::new(Vec::<Vec3f>::new()), 1, 1);
-        driver.render_pass(pass);
+        driver.render_pass(&mut pass);
         window.swap_buffers();
 
         glfw.poll_events();
