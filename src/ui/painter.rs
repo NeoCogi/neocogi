@@ -499,8 +499,7 @@ impl Painter {
                         screen_size_px: [screen_size_pixels.x as u32, screen_size_pixels.y as u32],
                     };
 
-                    let mut d : Option<()> = None;
-                    cb.call(&info, &mut d);
+                    cb.call(&info, &mut self.driver);
 
                     self.driver.set_viewport(0, 0, self.canvas_width, self.canvas_height);
 

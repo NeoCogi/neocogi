@@ -1137,6 +1137,8 @@ pub trait Driver : IntrusiveCounter {
 
     fn set_viewport(&mut self, x: u32, y: u32, w: u32, h: u32);
     fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32);
+    fn clear_depth(&mut self, value: f32);
+    fn clear_stencil(&mut self, value: u8);
 
     fn draw(&mut self, pipe: &Pipeline, bindings: &Bindings, uniforms: *const c_void, prim_count: u32, instance_count: u32);
 

@@ -1362,6 +1362,18 @@ impl Driver for Gles3Driver {
             (&mut (*rb)).read_surface(self, surface, x, y, w, h)
         }
     }
+
+    fn clear_depth(&mut self, value: f32) {
+        unsafe {
+            gl::ClearBufferfv(gl::DEPTH as GLenum, 0, &value as *const _ as *const GLfloat);
+        }
+    }
+
+    fn clear_stencil(&mut self, value: u8) {
+        unsafe {
+
+        }
+    }
 }
 
 impl IntrusiveCounter for Gles3Driver {
