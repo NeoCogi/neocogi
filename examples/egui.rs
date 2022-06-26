@@ -116,34 +116,31 @@ fn main() {
         }
 
         let paint_jobs = egui_ctx.tessellate(egui_output.shapes);
-        let pass = Pass {
-            frame_buffer: None,
-            color_actions: [
+        let mut pass = Pass::new(
+            width as usize,
+            height as usize,
+            None,
+            [
                 ColorPassAction::Clear(color4b(0x7F, 0x7F, 0x7F, 0xFF)),
                 ColorPassAction::Previous,
                 ColorPassAction::Previous,
                 ColorPassAction::Previous,
             ],
-            depth_action: DepthPassAction::Clear(1.0),
-            width: width as usize,
-            height: height as usize,
-        };
-
-        driver.begin_pass(&pass);
+            DepthPassAction::Clear(1.0),
+        );
 
         //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
         //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
         //drawing calls with it.
         //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
         painter.paint_jobs(
-            None,
-            None,
+            &mut pass,
             paint_jobs,
             &egui_output.textures_delta,
             native_pixels_per_point,
         );
 
-        driver.end_pass();
+        driver.render_pass(pass);
         window.swap_buffers();
 
         glfw.poll_events();

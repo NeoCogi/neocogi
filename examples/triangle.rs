@@ -154,20 +154,19 @@ fn main() {
     while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
 
-        let pass = Pass {
-            frame_buffer: None,
-            color_actions: [
+        let mut pass = Pass::new(
+            width as usize,
+            height as usize,
+            None,
+            [
                 ColorPassAction::Clear(color4b(0x00, 0x00, 0x00, 0x00)),
                 ColorPassAction::Previous,
                 ColorPassAction::Previous,
                 ColorPassAction::Previous,
             ],
-            depth_action: DepthPassAction::Clear(1.0),
-            width: width as usize,
-            height: height as usize,
-        };
+            DepthPassAction::Clear(1.0),
+        );
 
-        driver.begin_pass(&pass);
         let bindings = Bindings {
             vertex_buffers  : vec!{ vertex_buffer.clone() },
             index_buffer    : None,
@@ -176,9 +175,9 @@ fn main() {
             pixel_images    : Vec::new(),
         };
 
-        driver.update_device_buffer(&mut vertex_buffer, 0, Arc::new(vertices.to_vec()));
-        driver.draw(&pipeline, &bindings, std::ptr::null(), 1, 1);
-        driver.end_pass();
+        pass.update_device_buffer(&mut vertex_buffer, 0, Arc::new(vertices.to_vec()));
+        pass.draw(&pipeline, &bindings, Arc::new(Vec::<Vec3f>::new()), 1, 1);
+        driver.render_pass(pass);
         window.swap_buffers();
 
         glfw.poll_events();

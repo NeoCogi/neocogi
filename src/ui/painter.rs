@@ -358,7 +358,7 @@ impl Painter {
 
     }
 
-    fn upload_user_textures(&mut self) {
+    fn upload_user_textures(&mut self, pass: &mut Pass) {
         for (_, user_texture) in &mut self.user_textures {
             if !user_texture.texture.is_none() && !user_texture.dirty {
                 continue;
@@ -377,7 +377,7 @@ impl Painter {
                 let tex = self.driver.create_texture(tex_desc).unwrap();
                 user_texture.texture = Some(tex);
             } else {
-                self.driver.update_texture(&mut user_texture.texture.as_mut().unwrap(), tex_desc.payload.unwrap())
+                pass.update_texture(&mut user_texture.texture.as_mut().unwrap(), tex_desc.payload.unwrap())
             }
             user_texture.dirty = false;
         }
@@ -416,8 +416,7 @@ impl Painter {
 
     pub fn paint_jobs(
         &mut self,
-        frame_buffer: Option<FrameBufferPtr>,
-        bg_color: Option<Color32>,
+        pass: &mut Pass,
         meshes: Vec<ClippedPrimitive>,
         egui_texture: &egui::TexturesDelta,
         pixels_per_point: f32,
@@ -434,7 +433,7 @@ impl Painter {
             }
         }
 
-        self.upload_user_textures();
+        self.upload_user_textures(pass);
 
         let screen_size_pixels = vec2(self.canvas_width as f32, self.canvas_height as f32);
         let screen_size_points = screen_size_pixels / pixels_per_point;
@@ -460,7 +459,7 @@ impl Painter {
                 (clip_max_y - clip_min_y));
 
             //scissor Y coordinate is from the bottom
-            self.driver.set_scissor (
+            pass.set_scissor (
                 r.x as u32,
                 r.y as u32,
                 r.width as u32,
@@ -470,7 +469,7 @@ impl Painter {
             match primitive {
                 Primitive::Mesh(mesh) => {
                     if mesh.vertices.len() > 0 {
-                        self.paint_mesh(&mesh, Vec2f::new(screen_size_points.x, screen_size_points.y));
+                        self.paint_mesh(pass, &mesh, Vec2f::new(screen_size_points.x, screen_size_points.y));
                     }
                 },
                 Primitive::Callback(cb) => {
@@ -490,7 +489,7 @@ impl Painter {
                     let rect_max_x = rect_max_x.round() as u32;
                     let rect_max_y = rect_max_y.round() as u32;
 
-                    self.driver.set_viewport(rect_min_x, rect_min_y, rect_max_x - rect_min_x, rect_max_y - rect_min_y);
+                    pass.set_viewport(rect_min_x, rect_min_y, rect_max_x - rect_min_x, rect_max_y - rect_min_y);
 
                     let info = egui::PaintCallbackInfo {
                         viewport: cb.rect,
@@ -501,7 +500,7 @@ impl Painter {
 
                     cb.call(&info, &mut self.driver);
 
-                    self.driver.set_viewport(0, 0, self.canvas_width, self.canvas_height);
+                    pass.set_viewport(0, 0, self.canvas_width, self.canvas_height);
 
                 }
             }
@@ -517,7 +516,7 @@ impl Painter {
         }
     }
 
-    fn paint_mesh(&mut self, mesh: &Mesh, screen_size: Vec2f) {
+    fn paint_mesh(&mut self, pass: &mut Pass, mesh: &Mesh, screen_size: Vec2f) {
         debug_assert!(mesh.is_valid());
         let vertices : Vec<Vertex> =
             mesh.indices
@@ -542,7 +541,7 @@ impl Painter {
                 let vs = vertices[i * max_part_size..i * max_part_size + part_index_count].to_vec();
 
                 let tri_count = vs.len() / 3;
-                self.driver.update_device_buffer(&mut self.vertex_buffer, 0, Arc::new(vs));
+                pass.update_device_buffer(&mut self.vertex_buffer, 0, Arc::new(vs));
 
                 let bindings = Bindings {
                     vertex_buffers  : vec!{ self.vertex_buffer.clone() },
@@ -553,7 +552,7 @@ impl Painter {
                 };
 
                 let u = Uniforms { u_screen_size: screen_size };
-                self.driver.draw(&self.pipeline, &bindings, &u as *const Uniforms as *const c_void, tri_count as u32, 1);
+                pass.draw(&self.pipeline, &bindings, Arc::new(GenPayload::from(u)), tri_count as u32, 1);
             }
         }
     }

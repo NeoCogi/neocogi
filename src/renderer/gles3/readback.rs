@@ -57,7 +57,7 @@ crate::render_data! {
     }
 }
 
-pub struct ReadbackState {
+pub(crate) struct ReadbackState {
     u_fb        : FrameBufferPtr,
     f_fb        : FrameBufferPtr,
     u_pipeline  : PipelinePtr,          // unsigned intX pipeline

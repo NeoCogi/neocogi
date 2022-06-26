@@ -494,7 +494,7 @@ impl Drop for NullPayload {
 ////////////////////////////////////////////////////////////////////////////////
 /// Driver
 ////////////////////////////////////////////////////////////////////////////////
-pub struct Gles3Driver {
+pub(crate) struct Gles3Driver {
     device_buffers  : ResourceContainer<GLDeviceBuffer>,
     textures        : ResourceContainer<GLTexture>,
     render_targets  : ResourceContainer<GLRenderTarget>,
@@ -797,6 +797,189 @@ impl Gles3Driver {
             _ => panic!("readback is None")
         }
     }
+
+    pub fn draw(&mut self, pipe: &Pipeline, bindings: &Bindings, uniforms: *const c_void, prim_count: u32, instance_count: u32) {
+        unsafe {
+            let gl_pipe = &self.pipelines[pipe.res_id()];
+            let gl_prog = &self.shaders[gl_pipe.desc.shader.res_id()];
+
+            // blend
+            match &gl_pipe.desc.blend {
+                BlendOp::Add(blend) | BlendOp::Subtract(blend) => {
+                    gl::Enable(gl::BLEND);
+                    gl::BlendFuncSeparate(
+                        blend.src_factor_rgb.gl_blend_factor(),
+                        blend.dst_factor_rgb.gl_blend_factor(),
+                        blend.src_factor_alpha.gl_blend_factor(),
+                        blend.dst_factor_alpha.gl_blend_factor());
+                },
+                _ => gl::Disable(gl::BLEND),
+            }
+
+            match &gl_pipe.desc.blend {
+                BlendOp::Add(_) => gl::BlendEquationSeparate(gl::FUNC_ADD, gl::FUNC_ADD),
+                BlendOp::Subtract(_) => gl::BlendEquationSeparate(gl::FUNC_SUBTRACT, gl::FUNC_SUBTRACT),
+                BlendOp::ReverseSubtract(_) => gl::BlendEquationSeparate(gl::FUNC_REVERSE_SUBTRACT, gl::FUNC_REVERSE_SUBTRACT),
+                _ => ()
+            }
+
+            let (gl_prim, gl_elem_count) =
+                match gl_pipe.desc.primitive_type {
+                    PrimitiveType::Lines        => (gl::LINES, 2 * prim_count),
+                    PrimitiveType::LineStrip    => (gl::LINE_STRIP, 1 + prim_count),
+                    PrimitiveType::Points       => (gl::POINTS, prim_count),
+                    PrimitiveType::Triangles    => (gl::TRIANGLES, 3 * prim_count),
+                    PrimitiveType::TriangleStrip    => (gl::TRIANGLE_STRIP, 2 + prim_count)
+                };
+
+            match gl_pipe.desc.cull_mode {
+                CullMode::None => gl::Disable(gl::CULL_FACE),
+                CullMode::Winding => gl::Enable(gl::CULL_FACE),
+            }
+
+            match gl_pipe.desc.face_winding {
+                FaceWinding::CCW => gl::CullFace(gl::BACK),
+                FaceWinding::CW => gl::CullFace(gl::FRONT),
+            }
+
+            if gl_pipe.desc.depth_test {
+                gl::Enable(gl::DEPTH_TEST)
+            } else {
+                gl::Disable(gl::DEPTH_TEST)
+            }
+
+            gl::DepthMask(if gl_pipe.desc.depth_write { gl::TRUE } else { gl::FALSE } as GLboolean);
+
+            match gl_pipe.desc.polygon_offset {
+                PolygonOffset::None => gl::PolygonOffset(0.0, 0.0),
+                PolygonOffset::FactorUnits(factor, units) => gl::PolygonOffset(factor, units),
+            }
+
+            gl::UseProgram(gl_prog.gl_id);
+            for (l, layout) in gl_pipe.desc.buffer_layouts.iter().enumerate() {
+                let gl_vb = &self.device_buffers[bindings.vertex_buffers[layout.buffer_id].res_id()];
+                gl::BindBuffer(gl::ARRAY_BUFFER, gl_vb.gl_id);
+                for (i, a) in layout.vertex_attributes.iter().enumerate() {
+                    let aidx = &gl_prog.vertex_attributes[l][i];
+                    gl::EnableVertexAttribArray(aidx.1);
+                    match a.format() {
+                        VertexFormat::Int |
+                        VertexFormat::Int2 |
+                        VertexFormat::Int3 |
+                        VertexFormat::Int4 |
+                        VertexFormat::UInt |
+                        VertexFormat::UInt2 |
+                        VertexFormat::UInt3 |
+                        VertexFormat::UInt4  => {
+                            gl::VertexAttribIPointer(aidx.1, a.format().gl_elem_count() as GLint, a.format().gl_elem_type(), layout.stride as GLint, a.offset() as *const c_void);
+                        },
+                        _ => {
+                            gl::VertexAttribPointer(aidx.1, a.format().gl_elem_count() as GLint, a.format().gl_elem_type(), a.format().gl_is_normalized(), layout.stride as GLint, a.offset() as *const c_void);
+                        }
+                    }
+                    gl::VertexAttribDivisor(aidx.1, layout.divisor as GLuint);
+                }
+            }
+
+            setup_uniforms(uniforms, gl_pipe.desc.uniform_descs.as_slice(), gl_prog.vertex_uniforms.as_slice());
+
+            for (i, t) in bindings.vertex_images.iter().enumerate() {
+                let location = gl_prog.vertex_surfaces[i].1;
+                gl::ActiveTexture(((gl::TEXTURE0 as usize) + i) as GLenum);
+                gl::BindTexture(gl::TEXTURE_2D, self.textures[t.res_id()].gl_id as GLuint);
+                gl::Uniform1i(location as GLint, i as GLint);
+            }
+
+            let pixel_sampler_offset = bindings.vertex_images.len();
+
+            for (i, t) in bindings.pixel_images.iter().enumerate() {
+                let location = gl_prog.pixel_surfaces[i].1;
+                gl::ActiveTexture(((gl::TEXTURE0 as usize) + i + pixel_sampler_offset) as GLenum);
+                gl::BindTexture(gl::TEXTURE_2D, self.textures[t.res_id()].gl_id as GLuint);
+                gl::Uniform1i(location as GLint, (i + pixel_sampler_offset) as GLint);
+            }
+
+            match &bindings.index_buffer {
+                Some(ib) => {
+                    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.device_buffers[ib.res_id()].gl_id);
+
+                    let itype =
+                        match gl_pipe.desc.index_type {
+                            IndexType::None => panic!("attempt to bind an index buffer to a pipeline that doesn't support it"),
+                            IndexType::UInt16 => gl::UNSIGNED_SHORT,
+                            IndexType::UInt32 => gl::UNSIGNED_INT,
+                        };
+
+                    gl::DrawElementsInstanced(gl_prim, gl_elem_count as GLsizei, itype, core::ptr::null() as *const rs_ctypes::c_void, instance_count as GLint);
+                },
+                None => {
+                    if gl_pipe.desc.index_type != IndexType::None {
+                        panic!("no index buffer bound but index type exist in pipeline")
+                    }
+                    gl::DrawArraysInstanced(gl_prim, 0, gl_elem_count as GLsizei, instance_count as GLint);
+                }
+            }
+
+            for l in &gl_prog.vertex_attributes {
+                for v in l {
+                    gl::DisableVertexAttribArray(v.1);
+                }
+            }
+        }
+    }
+
+    fn set_viewport(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        unsafe { gl::Viewport(x as GLint, y as GLint, w as GLsizei, h as GLsizei) }
+    }
+
+    fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        unsafe {
+            gl::Scissor(x as GLint, y as GLint, w as GLsizei, h as GLsizei)
+        }
+    }
+
+    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: Arc<dyn Payload>) {
+        unsafe {
+            match self.device_buffers[dev_buf.res_id()].desc {
+                DeviceBufferDesc::Vertex(Usage::Static(_))   |
+                DeviceBufferDesc::Index(Usage::Static(_))    |
+                DeviceBufferDesc::Pixel(Usage::Static(_))    => {
+                    //return None
+                    panic!("trying to update static buffer")
+                },
+                _ => (),    // TODO: Streamed can be done once per frame ?
+            };
+
+            let buff_size   = self.device_buffers[dev_buf.res_id()].desc.size();
+            if pl.size() + offset > buff_size {
+                panic!("payload of size {} exceeds device buffer size of {}", pl.size() + offset, buff_size)
+            }
+
+            let target =
+                match self.device_buffers[dev_buf.res_id()].desc {
+                    DeviceBufferDesc::Vertex(_)  => gl::ARRAY_BUFFER,
+                    DeviceBufferDesc::Index(_)   => gl::ELEMENT_ARRAY_BUFFER,
+                    DeviceBufferDesc::Pixel(_)   => gl::PIXEL_UNPACK_BUFFER,
+                };
+            gl::BindBuffer(target, self.device_buffers[dev_buf.res_id()].gl_id as GLuint);
+            let ptr = gl::MapBufferRange(target, offset as GLintptr, pl.size() as GLsizeiptr, gl::MAP_WRITE_BIT as GLbitfield) as *mut u8;
+            Self::check_gl_error();
+
+            std::ptr::copy_nonoverlapping(pl.ptr() as *mut u8, ptr, pl.size());
+
+            assert_eq!(gl::UnmapBuffer(target), gl::TRUE as GLboolean);
+            Self::check_gl_error();
+        }
+    }
+
+    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Arc<dyn Payload>) {
+        // TODO: check payload size and format
+        let res_id  = dev_buf.res_id();
+        let gl_id   = self.textures[res_id].gl_id;
+        Self::upload_texture(gl_id, &dev_buf.desc().sampler_desc, Some(pl));
+    }
+
+
 }
 
 
@@ -1066,137 +1249,8 @@ impl Driver for Gles3Driver {
         }
     }
 
-    fn draw(&mut self, pipe: &Pipeline, bindings: &Bindings, uniforms: *const c_void, prim_count: u32, instance_count: u32) {
-        unsafe {
-            let gl_pipe = &self.pipelines[pipe.res_id()];
-            let gl_prog = &self.shaders[gl_pipe.desc.shader.res_id()];
 
-            // blend
-            match &gl_pipe.desc.blend {
-                BlendOp::Add(blend) | BlendOp::Subtract(blend) => {
-                    gl::Enable(gl::BLEND);
-                    gl::BlendFuncSeparate(
-                        blend.src_factor_rgb.gl_blend_factor(),
-                        blend.dst_factor_rgb.gl_blend_factor(),
-                        blend.src_factor_alpha.gl_blend_factor(),
-                        blend.dst_factor_alpha.gl_blend_factor());
-                },
-                _ => gl::Disable(gl::BLEND),
-            }
-
-            match &gl_pipe.desc.blend {
-                BlendOp::Add(_) => gl::BlendEquationSeparate(gl::FUNC_ADD, gl::FUNC_ADD),
-                BlendOp::Subtract(_) => gl::BlendEquationSeparate(gl::FUNC_SUBTRACT, gl::FUNC_SUBTRACT),
-                BlendOp::ReverseSubtract(_) => gl::BlendEquationSeparate(gl::FUNC_REVERSE_SUBTRACT, gl::FUNC_REVERSE_SUBTRACT),
-                _ => ()
-            }
-
-            let (gl_prim, gl_elem_count) =
-                match gl_pipe.desc.primitive_type {
-                    PrimitiveType::Lines        => (gl::LINES, 2 * prim_count),
-                    PrimitiveType::LineStrip    => (gl::LINE_STRIP, 1 + prim_count),
-                    PrimitiveType::Points       => (gl::POINTS, prim_count),
-                    PrimitiveType::Triangles    => (gl::TRIANGLES, 3 * prim_count),
-                    PrimitiveType::TriangleStrip    => (gl::TRIANGLE_STRIP, 2 + prim_count)
-                };
-
-            match gl_pipe.desc.cull_mode {
-                CullMode::None => gl::Disable(gl::CULL_FACE),
-                CullMode::Winding => gl::Enable(gl::CULL_FACE),
-            }
-
-            match gl_pipe.desc.face_winding {
-                FaceWinding::CCW => gl::CullFace(gl::BACK),
-                FaceWinding::CW => gl::CullFace(gl::FRONT),
-            }
-
-            if gl_pipe.desc.depth_test {
-                gl::Enable(gl::DEPTH_TEST)
-            } else {
-                gl::Disable(gl::DEPTH_TEST)
-            }
-
-            gl::DepthMask(if gl_pipe.desc.depth_write { gl::TRUE } else { gl::FALSE } as GLboolean);
-
-            match gl_pipe.desc.polygon_offset {
-                PolygonOffset::None => gl::PolygonOffset(0.0, 0.0),
-                PolygonOffset::FactorUnits(factor, units) => gl::PolygonOffset(factor, units),
-            }
-
-            gl::UseProgram(gl_prog.gl_id);
-            for (l, layout) in gl_pipe.desc.buffer_layouts.iter().enumerate() {
-                let gl_vb = &self.device_buffers[bindings.vertex_buffers[layout.buffer_id].res_id()];
-                gl::BindBuffer(gl::ARRAY_BUFFER, gl_vb.gl_id);
-                for (i, a) in layout.vertex_attributes.iter().enumerate() {
-                    let aidx = &gl_prog.vertex_attributes[l][i];
-                    gl::EnableVertexAttribArray(aidx.1);
-                    match a.format() {
-                        VertexFormat::Int |
-                        VertexFormat::Int2 |
-                        VertexFormat::Int3 |
-                        VertexFormat::Int4 |
-                        VertexFormat::UInt |
-                        VertexFormat::UInt2 |
-                        VertexFormat::UInt3 |
-                        VertexFormat::UInt4  => {
-                            gl::VertexAttribIPointer(aidx.1, a.format().gl_elem_count() as GLint, a.format().gl_elem_type(), layout.stride as GLint, a.offset() as *const c_void);
-                        },
-                        _ => {
-                            gl::VertexAttribPointer(aidx.1, a.format().gl_elem_count() as GLint, a.format().gl_elem_type(), a.format().gl_is_normalized(), layout.stride as GLint, a.offset() as *const c_void);
-                        }
-                    }
-                    gl::VertexAttribDivisor(aidx.1, layout.divisor as GLuint);
-                }
-            }
-
-            setup_uniforms(uniforms, gl_pipe.desc.uniform_descs.as_slice(), gl_prog.vertex_uniforms.as_slice());
-
-            for (i, t) in bindings.vertex_images.iter().enumerate() {
-                let location = gl_prog.vertex_surfaces[i].1;
-                gl::ActiveTexture(((gl::TEXTURE0 as usize) + i) as GLenum);
-                gl::BindTexture(gl::TEXTURE_2D, self.textures[t.res_id()].gl_id as GLuint);
-                gl::Uniform1i(location as GLint, i as GLint);
-            }
-
-            let pixel_sampler_offset = bindings.vertex_images.len();
-
-            for (i, t) in bindings.pixel_images.iter().enumerate() {
-                let location = gl_prog.pixel_surfaces[i].1;
-                gl::ActiveTexture(((gl::TEXTURE0 as usize) + i + pixel_sampler_offset) as GLenum);
-                gl::BindTexture(gl::TEXTURE_2D, self.textures[t.res_id()].gl_id as GLuint);
-                gl::Uniform1i(location as GLint, (i + pixel_sampler_offset) as GLint);
-            }
-
-            match &bindings.index_buffer {
-                Some(ib) => {
-                    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.device_buffers[ib.res_id()].gl_id);
-
-                    let itype =
-                        match gl_pipe.desc.index_type {
-                            IndexType::None => panic!("attempt to bind an index buffer to a pipeline that doesn't support it"),
-                            IndexType::UInt16 => gl::UNSIGNED_SHORT,
-                            IndexType::UInt32 => gl::UNSIGNED_INT,
-                        };
-
-                    gl::DrawElementsInstanced(gl_prim, gl_elem_count as GLsizei, itype, core::ptr::null() as *const rs_ctypes::c_void, instance_count as GLint);
-                },
-                None => {
-                    if gl_pipe.desc.index_type != IndexType::None {
-                        panic!("no index buffer bound but index type exist in pipeline")
-                    }
-                    gl::DrawArraysInstanced(gl_prim, 0, gl_elem_count as GLsizei, instance_count as GLint);
-                }
-            }
-
-            for l in &gl_prog.vertex_attributes {
-                for v in l {
-                    gl::DisableVertexAttribArray(v.1);
-                }
-            }
-        }
-    }
-
-    fn begin_pass(&mut self, pass: &Pass) {
+    fn render_pass(&mut self, pass: Pass) {
         unsafe {
             gl::Flush();
             gl::Viewport(0, 0, pass.width as i32, pass.height as i32);
@@ -1299,79 +1353,26 @@ impl Driver for Gles3Driver {
                 }
             }
 
-        }
-    }
-
-    fn end_pass(&mut self) {
-    }
-
-    fn set_viewport(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        unsafe { gl::Viewport(x as GLint, y as GLint, w as GLsizei, h as GLsizei) }
-    }
-
-    fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        unsafe {
-            gl::Scissor(x as GLint, y as GLint, w as GLsizei, h as GLsizei)
-        }
-    }
-
-    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: Arc<dyn Payload>) {
-        unsafe {
-            match self.device_buffers[dev_buf.res_id()].desc {
-                DeviceBufferDesc::Vertex(Usage::Static(_))   |
-                DeviceBufferDesc::Index(Usage::Static(_))    |
-                DeviceBufferDesc::Pixel(Usage::Static(_))    => {
-                    //return None
-                    panic!("trying to update static buffer")
-                },
-                _ => (),    // TODO: Streamed can be done once per frame ?
-            };
-
-            let buff_size   = self.device_buffers[dev_buf.res_id()].desc.size();
-            if pl.size() + offset > buff_size {
-                panic!("payload of size {} exceeds device buffer size of {}", pl.size() + offset, buff_size)
+            for mut cmd in pass.commands {
+                match cmd {
+                    RenderPassCommand::Viewport(x, y, w, h) => self.set_viewport(x, y, w, h),
+                    RenderPassCommand::Scissor(x, y, w, h) => self.set_scissor(x, y, w, h),
+                    RenderPassCommand::Draw(cmd) => self.draw(&cmd.pipe, &cmd.bindings, 
+                            cmd.uniforms.ptr() as *const _, cmd.prim_count, cmd.instance_count),
+                    RenderPassCommand::UpdateDeviceBuffer(mut cmd) => self.update_device_buffer(&mut cmd.buffer, cmd.offset, cmd.payload),
+                    RenderPassCommand::UpdateTexture(mut cmd) => self.update_texture(&mut cmd.tex, cmd.payload),
+                }
             }
-
-            let target =
-                match self.device_buffers[dev_buf.res_id()].desc {
-                    DeviceBufferDesc::Vertex(_)  => gl::ARRAY_BUFFER,
-                    DeviceBufferDesc::Index(_)   => gl::ELEMENT_ARRAY_BUFFER,
-                    DeviceBufferDesc::Pixel(_)   => gl::PIXEL_UNPACK_BUFFER,
-                };
-            gl::BindBuffer(target, self.device_buffers[dev_buf.res_id()].gl_id as GLuint);
-            let ptr = gl::MapBufferRange(target, offset as GLintptr, pl.size() as GLsizeiptr, gl::MAP_WRITE_BIT as GLbitfield) as *mut u8;
-            Self::check_gl_error();
-
-            std::ptr::copy_nonoverlapping(pl.ptr() as *mut u8, ptr, pl.size());
-
-            assert_eq!(gl::UnmapBuffer(target), gl::TRUE as GLboolean);
-            Self::check_gl_error();
         }
     }
 
-    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Arc<dyn Payload>) {
-        // TODO: check payload size and format
-        let res_id  = dev_buf.res_id();
-        let gl_id   = self.textures[res_id].gl_id;
-        Self::upload_texture(gl_id, &dev_buf.desc().sampler_desc, Some(pl));
-    }
+
+
 
     fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
         unsafe {
             let rb = self.read_back_state() as *const ReadbackState as *mut ReadbackState;
             (&mut (*rb)).read_surface(self, surface, x, y, w, h)
-        }
-    }
-
-    fn clear_depth(&mut self, value: f32) {
-        unsafe {
-            gl::ClearBufferfv(gl::DEPTH as GLenum, 0, &value as *const _ as *const GLfloat);
-        }
-    }
-
-    fn clear_stencil(&mut self, value: u8) {
-        unsafe {
-
         }
     }
 }

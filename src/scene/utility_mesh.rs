@@ -883,6 +883,7 @@ impl UMRenderer {
 
     fn draw_chunks<T: Sized + Clone + Sync + Send + 'static>(
         &mut self,
+        pass: &mut Pass,
         pipeline: &PipelinePtr,
         pvm: &Mat4f,
         chunk_size: usize,
@@ -898,7 +899,7 @@ impl UMRenderer {
 
             let pl = elems[start_chnk_idx..start_chnk_idx + count].to_vec();
 
-            self.driver.update_device_buffer(&mut self.vb, 0, Arc::new(pl));
+            pass.update_device_buffer(&mut self.vb, 0, Arc::new(pl));
             let bindings = Bindings {
                 vertex_buffers: vec![self.vb.clone()],
                 index_buffer: None,
@@ -907,10 +908,10 @@ impl UMRenderer {
                 pixel_images: Vec::new(),
             };
 
-            self.driver.draw(
+            pass.draw(
                 pipeline,
                 &bindings,
-                pvm as *const _ as *const c_void,
+                Arc::new(GenPayload::from(pvm.clone())),
                 (count * count_mul) as u32,
                 1,
             );
@@ -918,32 +919,33 @@ impl UMRenderer {
             rem_elms -= count;
         }
     }
-    pub fn draw_segments(&mut self, pvm: &Mat4f, lines: &Vec<Segment>) {
+    
+    pub fn draw_segments(&mut self, pass: &mut Pass, pvm: &Mat4f, lines: &Vec<Segment>) {
         let chunk_size = self.max_verts / 2;
         let pipeline = self.wire_pipeline.clone();
-        self.draw_chunks(&pipeline, pvm, chunk_size, lines, 1);
+        self.draw_chunks(pass, &pipeline, pvm, chunk_size, lines, 1);
     }
 
-    pub fn draw_tris(&mut self, pvm: &Mat4f, tris: &Vec<Triangle>) {
+    pub fn draw_tris(&mut self, pass: &mut Pass, pvm: &Mat4f, tris: &Vec<Triangle>) {
         let chunk_size = self.max_verts / 3;
         let pipeline = self.solid_pipeline.clone();
-        self.draw_chunks(&pipeline, pvm, chunk_size, tris, 1);
+        self.draw_chunks(pass, &pipeline, pvm, chunk_size, tris, 1);
     }
 
-    pub fn draw_quads(&mut self, pvm: &Mat4f, quads: &Vec<Quad>) {
+    pub fn draw_quads(&mut self, pass: &mut Pass, pvm: &Mat4f, quads: &Vec<Quad>) {
         let chunk_size = self.max_verts / 6;
         let pipeline = self.solid_pipeline.clone();
-        self.draw_chunks(&pipeline, pvm, chunk_size, quads, 2);
+        self.draw_chunks(pass, &pipeline, pvm, chunk_size, quads, 2);
     }
 
-    pub fn draw_node(&mut self, pvm: &Mat4f, node: &UMNode) {
+    pub fn draw_node(&mut self, pass: &mut Pass, pvm: &Mat4f, node: &UMNode) {
         match node {
-            UMNode::Segments(segs) => self.draw_segments(pvm, segs),
-            UMNode::Tris(tris) => self.draw_tris(pvm, tris),
-            UMNode::Quads(quads) => self.draw_quads(pvm, quads),
+            UMNode::Segments(segs) => self.draw_segments(pass, pvm, segs),
+            UMNode::Tris(tris) => self.draw_tris(pass, pvm, tris),
+            UMNode::Quads(quads) => self.draw_quads(pass, pvm, quads),
             UMNode::Assembly(asms) => {
                 for n in asms {
-                    self.draw_node(pvm, n)
+                    self.draw_node(pass, pvm, n)
                 }
             }
         }

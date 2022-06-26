@@ -592,6 +592,21 @@ impl<T: Send + Sync> Payload for Vec<T> {
     fn size(&self) -> usize { ::core::mem::size_of::<T>() * self.len() }
 }
 
+pub struct GenPayload<T: Sized + Send + Sync> {
+    t: T,
+}
+
+impl<T: Sized + Send + Sync> Payload for GenPayload<T> {
+    fn ptr(&self) -> *const u8 { &self.t as *const T as *const u8 }
+    fn size(&self) -> usize { ::core::mem::size_of::<T>() }
+}
+
+impl<T: Sized + Send + Sync> GenPayload<T> {
+    pub fn from(t: T) -> Self {
+        Self { t }
+    }
+}
+
 // impl<T: Send + Sync> Payload for &[T] {
 //     fn ptr(&self) -> *const u8 { self.as_ptr() as *const u8 }
 //     fn size(&self) -> usize { ::core::mem::size_of::<T>() * self.len() }
@@ -1036,13 +1051,13 @@ pub type PipelinePtr= IntrusivePtr<Pipeline>;
 ////////////////////////////////////////////////////////////////////////////////
 /// Pass
 ////////////////////////////////////////////////////////////////////////////////
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum ColorPassAction {
     Clear(Color4b),
     Previous,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum DepthPassAction {
     Clear(f32),
     Previous,
@@ -1075,12 +1090,88 @@ unsafe impl Sync for FrameBufferDesc {}
 pub type FrameBuffer    = Resource<FrameBufferDesc>;
 pub type FrameBufferPtr = IntrusivePtr<FrameBuffer>;
 
+pub(crate) struct DrawCommand {
+    pub pipe: PipelinePtr,
+    pub bindings: Bindings,
+    pub uniforms: Arc<dyn Payload>,
+    pub prim_count: u32,
+    pub instance_count: u32
+}
+
+pub(crate) struct UpdateDeviceBufferCommand {
+    pub buffer: DeviceBufferPtr,
+    pub offset: usize,
+    pub payload: Arc<dyn Payload>,
+}
+
+pub(crate) struct UpdateTextureCommand {
+    pub tex: TexturePtr,
+    pub payload: Arc<dyn Payload>,
+}
+
+pub(crate) enum RenderPassCommand {
+    Viewport(u32, u32, u32, u32),
+    Scissor(u32, u32, u32, u32),
+    Draw(DrawCommand),
+    UpdateDeviceBuffer(UpdateDeviceBufferCommand),
+    UpdateTexture(UpdateTextureCommand),
+}
+
 pub struct Pass {
     pub width           : usize,
     pub height          : usize,
     pub frame_buffer    : Option<FrameBufferPtr>,
     pub color_actions   : [ColorPassAction; 4],
     pub depth_action    : DepthPassAction,
+
+    pub(crate) commands            : Vec<RenderPassCommand>,
+}
+
+impl Pass {
+    pub fn new(width           : usize,
+        height          : usize,
+        frame_buffer    : Option<FrameBufferPtr>,
+        color_actions   : [ColorPassAction; 4],
+        depth_action    : DepthPassAction) -> Self {
+        
+        Self { width, height, frame_buffer, color_actions, depth_action, commands: Vec::new() }
+    }
+
+    pub fn set_viewport(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        self.commands.push(RenderPassCommand::Viewport(x, y, w, h));
+    }
+
+    pub fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        self.commands.push(RenderPassCommand::Scissor(x, y, w, h))
+    }
+
+    pub fn draw(&mut self, pipe: &PipelinePtr, bindings: &Bindings, uniforms: Arc<dyn Payload>, prim_count: u32, instance_count: u32) {
+        self.commands.push(RenderPassCommand::Draw(DrawCommand { pipe: pipe.clone(), bindings: bindings.clone(), uniforms, prim_count, instance_count }));
+    }
+
+    pub fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: Arc<dyn Payload>) {
+        self.commands.push(RenderPassCommand::UpdateDeviceBuffer(UpdateDeviceBufferCommand { buffer: dev_buf.clone(), offset, payload: pl }));
+    }
+
+    pub fn update_texture(&mut self, tex: &mut TexturePtr, pl: Arc<dyn Payload>) {
+        self.commands.push(RenderPassCommand::UpdateTexture(UpdateTextureCommand { tex: tex.clone(), payload: pl }));
+    }
+
+    pub fn reset_command_queue(&mut self) {
+        self.commands.clear();
+    }
+
+    pub fn clone_with_no_commands(&self) -> Self {
+        Self {
+            commands: Vec::new(),
+            frame_buffer    : self.frame_buffer.clone(),
+            ..*self        
+        }
+    }
+
+    pub (crate) fn commands(&self) -> &Vec<RenderPassCommand> {
+        &self.commands
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1129,18 +1220,7 @@ pub trait Driver : IntrusiveCounter {
 
     fn delete_resource(&mut self, resource_type: &ResourceType, res_id: usize);
 
-    fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: Arc<dyn Payload>);
-    fn update_texture(&mut self, dev_buf: &mut TexturePtr, pl: Arc<dyn Payload>);
-
-    fn begin_pass(&mut self, pass: &Pass);
-    fn end_pass(&mut self);
-
-    fn set_viewport(&mut self, x: u32, y: u32, w: u32, h: u32);
-    fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32);
-    fn clear_depth(&mut self, value: f32);
-    fn clear_stencil(&mut self, value: u8);
-
-    fn draw(&mut self, pipe: &Pipeline, bindings: &Bindings, uniforms: *const c_void, prim_count: u32, instance_count: u32);
+    fn render_pass(&mut self, pass: Pass);
 
     fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload>;
 }

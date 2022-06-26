@@ -219,7 +219,7 @@ impl ScreenQuad {
         }
     }
 
-    pub fn render(&self, driver: &mut DriverPtr, tex: &TexturePtr) {
+    pub fn render(&self, pass: &mut Pass, tex: &TexturePtr) {
         let bindings = Bindings {
             vertex_buffers  : vec!{ self.vb.clone() },
             index_buffer    : Some(self.ib.clone()),
@@ -234,6 +234,6 @@ impl ScreenQuad {
                 OrigSurfaceType::Float  => &self.f_pipeline,
             };
 
-        driver.draw(pipeline, &bindings, core::ptr::null() as *const c_void, 2, 1);
+        pass.draw(pipeline, &bindings, Arc::new(Vec::<Vec3f>::new()), 2, 1);
     }
 }
