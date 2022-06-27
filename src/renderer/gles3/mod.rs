@@ -30,4 +30,4 @@
 mod readback;
 mod renderer;
 
-pub use renderer::get_driver;
+pub use readback::get_driver;

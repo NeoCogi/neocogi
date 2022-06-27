@@ -31,8 +31,10 @@ use rs_ctypes::*;
 use super::super::*;
 use super::super::gl::types::*;
 use crate::rs_math3d::*;
+use crate::renderer::gles3::*;
 
 use super::renderer::*;
+use std::io::Read;
 use std::sync::*;
 
 
@@ -57,13 +59,15 @@ crate::render_data! {
     }
 }
 
-pub(crate) struct ReadbackState {
+pub(crate) struct ReadbackDriver {
     u_fb        : FrameBufferPtr,
     f_fb        : FrameBufferPtr,
     u_pipeline  : PipelinePtr,          // unsigned intX pipeline
     f_pipeline  : PipelinePtr,          // floating point pipeline
     vb          : DeviceBufferPtr,
     ib          : DeviceBufferPtr,
+
+    gles_driver : DriverPtrInternal,
 }
 
 static COPY_VERTEX_SHADER : &'static str = "
@@ -109,8 +113,11 @@ void main() {
     fragColor = texture(uTexture, vUV);
 }";
 
-impl ReadbackState {
-    pub fn new(driver: &mut Gles3Driver) -> Self {
+impl ReadbackDriver {
+    pub fn new(driver: &mut DriverPtrInternal) -> Self {
+        let orig = driver.clone();
+        let mut drv_lock = driver.lock();
+        let driver = drv_lock.as_deref_mut().unwrap();
 
         let quad_verts  = vec! {
             QuadVertex { position: Vec2f::new(-1.0, -1.0), uv: Vec2f::new(0.0, 0.0) },
@@ -137,10 +144,12 @@ impl ReadbackState {
             f_fb                : Self::create_fb(driver, OrigSurfaceType::Float),
             u_pipeline          : Self::create_copy_pipeline(driver, OrigSurfaceType::UInt),
             f_pipeline          : Self::create_copy_pipeline(driver, OrigSurfaceType::Float),
+
+            gles_driver         : orig,
         }
     }
 
-    fn create_copy_shader(driver: &mut Gles3Driver, orig_surface_type: OrigSurfaceType) -> ShaderPtr {
+    fn create_copy_shader(driver: &mut dyn Driver, orig_surface_type: OrigSurfaceType) -> ShaderPtr {
         let shader_desc =
         ShaderDesc {
             vertex_shader       : String::from(COPY_VERTEX_SHADER),
@@ -161,7 +170,7 @@ impl ReadbackState {
         driver.create_shader(shader_desc).unwrap()
     }
 
-    fn create_copy_pipeline(driver: &mut Gles3Driver, orig_surface_type: OrigSurfaceType) -> PipelinePtr {
+    fn create_copy_pipeline(driver: &mut dyn Driver, orig_surface_type: OrigSurfaceType) -> PipelinePtr {
         let vertex_layout = VertexBufferLayout {
             buffer_id           : 0,
             vertex_attributes   : QuadVertex::get_attribute_descriptors(),
@@ -186,8 +195,8 @@ impl ReadbackState {
         driver.create_pipeline(model_pipeline_desc).unwrap()
     }
 
-    fn create_fb(driver: &mut Gles3Driver, orig_surface_type: OrigSurfaceType) -> FrameBufferPtr {
-        let caps                = driver.get_caps();
+    fn create_fb(driver: &mut dyn Driver, orig_surface_type: OrigSurfaceType) -> FrameBufferPtr {
+         let caps               = driver.get_caps();
         let width               = caps.max_2d_surface_dimension.width as usize;
         let height              = caps.max_2d_surface_dimension.height as usize;
 
@@ -210,7 +219,10 @@ impl ReadbackState {
         driver.create_frame_buffer(fb_desc).unwrap()
     }
 
-    fn render(&self, driver: &mut Gles3Driver, tex: TexturePtr, orig_surface_type: OrigSurfaceType) {
+    fn render(&mut self, pass: &mut Pass, tex: TexturePtr, orig_surface_type: OrigSurfaceType) {
+        let mut lock            = self.gles_driver.lock();
+        let mut driver          = lock.as_mut().unwrap();
+
         let bindings = Bindings {
             vertex_buffers  : vec!{ self.vb.clone() },
             index_buffer    : Some(self.ib.clone()),
@@ -225,7 +237,7 @@ impl ReadbackState {
                 OrigSurfaceType::Float  => &self.f_pipeline,
             };
 
-        driver.draw(pipeline, &bindings, core::ptr::null() as *const c_void, 2, 1);
+        pass.draw(pipeline, &bindings, Arc::new(GenPayload::from(Vec::<Vec3f>::new())), 2, 1);
     }
 
     fn texture_type(surface: &TexturePtr) -> OrigSurfaceType {
@@ -354,13 +366,17 @@ impl ReadbackState {
         }
     }
 
-    pub fn read_surface(&mut self, driver: &mut Gles3Driver, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
+    pub fn read_surface(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
         unsafe {
             let (fb, pipeline) = match Self::texture_type(surface) {
                 OrigSurfaceType::Float  => (&self.f_fb, &self.f_pipeline),
                 OrigSurfaceType::UInt   => (&self.u_fb, &self.u_pipeline)
             };
 
+            let mut l = self.gles_driver.lock();
+            let me2 = l.as_deref_mut().unwrap();
+            let driver = &mut *(me2 as *mut dyn Driver as *mut Gles3Driver); 
+    
             let fbb = driver.get_framebuffer_gl_id(fb.res_id());
             let mut current_fb = 0;
             gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut current_fb);
@@ -415,4 +431,99 @@ impl ReadbackState {
         }
     }
 
+}
+
+
+impl Driver for ReadbackDriver {
+    fn get_caps(&self) -> DriverCaps {
+        let lock = self.gles_driver.lock();
+        let driver = lock.unwrap();
+        driver.get_caps()
+    }
+    
+    fn create_device_buffer(&mut self, desc: DeviceBufferDesc) -> Option<DeviceBufferPtr> {
+        let mut lock = self.gles_driver.lock();
+        let driver = lock.as_mut().unwrap();
+        driver.create_device_buffer(desc)
+    }
+
+    fn create_texture(&mut self, desc: TextureDesc) -> Option<TexturePtr> {
+        let mut lock = self.gles_driver.lock();
+        let driver = lock.as_mut().unwrap();
+        driver.create_texture(desc)
+    }
+
+    fn create_render_target(&mut self, desc: RenderTargetDesc) -> Option<RenderTargetPtr> {
+        let mut lock = self.gles_driver.lock();
+        let driver = lock.as_mut().unwrap();
+        driver.create_render_target(desc)
+    }
+
+    fn create_shader(&mut self, desc: ShaderDesc) -> Option<ShaderPtr> {
+        let mut lock = self.gles_driver.lock();
+        let driver = lock.as_mut().unwrap();
+        driver.create_shader(desc)
+    }
+
+    fn create_pipeline(&mut self, desc: PipelineDesc) -> Option<PipelinePtr> {
+        let mut lock = self.gles_driver.lock();
+        let driver = lock.as_mut().unwrap();
+        driver.create_pipeline(desc)
+    }
+
+    fn create_frame_buffer(&mut self, desc: FrameBufferDesc) -> Option<FrameBufferPtr> {
+        let mut lock = self.gles_driver.lock();
+        let driver = lock.as_mut().unwrap();
+        driver.create_frame_buffer(desc)
+    }
+
+    fn delete_resource(&mut self, resource_type: &ResourceType, res_id: usize) {
+        let mut lock = self.gles_driver.lock();
+        let driver = lock.as_mut().unwrap();
+        driver.delete_resource(resource_type, res_id)
+    }
+
+    fn render_pass(&mut self, pass: &mut Pass) {
+        let mut lock = self.gles_driver.lock();
+        let driver = lock.as_mut().unwrap();
+        driver.render_pass(pass)
+    }
+
+    fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
+        self.read_surface(surface, x, y, w, h)
+    }
+}
+
+impl Drop for ReadbackDriver {
+    fn drop(&mut self) {
+        println!("ReadBackDriver dropped - All is good!")
+    }
+}
+
+pub fn get_driver() -> DriverPtr {
+    unsafe {
+        let mut range : [GLint; 2] = [0, 0];
+        let mut precision = 0;
+
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::HIGH_FLOAT, range.as_mut_ptr(), &mut precision);
+        println!("highp float range: {:?} - precision: {}", range, precision);
+
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::HIGH_INT, range.as_mut_ptr(), &mut precision);
+        println!("highp int range: {:?} - precision: {}", range, precision);
+
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::MEDIUM_FLOAT, range.as_mut_ptr(), &mut precision);
+        println!("mediump float range: {:?} - precision: {}", range, precision);
+
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::MEDIUM_INT, range.as_mut_ptr(), &mut precision);
+        println!("mediump int range: {:?} - precision: {}", range, precision);
+
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::LOW_FLOAT, range.as_mut_ptr(), &mut precision);
+        println!("lowp float range: {:?} - precision: {}", range, precision);
+
+        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::LOW_INT, range.as_mut_ptr(), &mut precision);
+        println!("lowp int range: {:?} - precision: {}", range, precision);
+
+    }
+    let mut drv = renderer::Gles3Driver::new();
+    DriverPtr::from(Arc::new(Mutex::new(ReadbackDriver::new(&mut drv))))
 }

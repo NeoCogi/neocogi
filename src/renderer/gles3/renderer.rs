@@ -33,9 +33,11 @@ use super::super::gl::types::*;
 use crate::rs_math3d::*;
 use super::readback::*;
 
+use std::any::Any;
 use std::collections::{VecDeque};
 use core::ops::{Index};
 use core::sync::atomic::*;
+use std::ops::DerefMut;
 use std::sync::*;
 
 fn color4b_to_color4f(col: Color4b) -> Vec4f {
@@ -502,15 +504,15 @@ pub(crate) struct Gles3Driver {
     pipelines       : ResourceContainer<GLPipeline>,
     framebuffers    : ResourceContainer<GLFrameBuffer>,
 
-    read_back_state : Option<ReadbackState>,
-
     rc              : AtomicIsize,
 
     caps            : DriverCaps,
+
+    self_ptr        : Option<Weak<Mutex<dyn Driver>>>,
 }
 
 impl Gles3Driver {
-    fn new() -> Self {
+    pub(crate) fn new() -> DriverPtrInternal {
         let mut max_rt_size    = 0;
         let mut max_tex_size   = 0;
 
@@ -520,34 +522,50 @@ impl Gles3Driver {
         }
 
         let min_surface_size    = std::cmp::min(4096, std::cmp::min(max_rt_size, max_tex_size));
-        Self {
-            device_buffers  : ResourceContainer::new(),
-            textures        : ResourceContainer::new(),
-            render_targets  : ResourceContainer::new(),
-            shaders         : ResourceContainer::new(),
-            pipelines       : ResourceContainer::new(),
-            framebuffers    : ResourceContainer::new(),
-            rc              : AtomicIsize::new(0),
+        let me : DriverPtrInternal = Arc::new_cyclic(|me| { 
+            let s = Self {
+                device_buffers  : ResourceContainer::new(),
+                textures        : ResourceContainer::new(),
+                render_targets  : ResourceContainer::new(),
+                shaders         : ResourceContainer::new(),
+                pipelines       : ResourceContainer::new(),
+                framebuffers    : ResourceContainer::new(),
+                rc              : AtomicIsize::new(0),
 
-            read_back_state : None,
+                //read_back_state : None,
 
-            caps            : DriverCaps {
-                max_2d_surface_dimension    : Dimensioni::new(min_surface_size, min_surface_size),
-            }
+                caps            : DriverCaps {
+                    max_2d_surface_dimension    : Dimensioni::new(min_surface_size, min_surface_size),
+                },
+
+                self_ptr        : None,
+
+            };
+            Mutex::new(s)
+        });
+
+        let me_clone = me.clone();
+        let mut l = me_clone.lock();
+        let me2 = l.as_mut().unwrap();
+        unsafe {
+            let me3 = &mut *(me2.deref_mut() as &mut dyn Driver as *mut dyn Driver as *mut Gles3Driver); 
+            me3.self_ptr = Some(Arc::downgrade(&me));
+            me3.initialize();
         }
+        me
     }
 
     pub fn get_framebuffer_gl_id(&self, fb_id: usize) -> GLuint {
         self.framebuffers[fb_id].gl_id
     }
 
-    fn initialize(mut self) -> DriverPtr {
-        self.read_back_state    = Some(ReadbackState::new(&mut self));
+    fn initialize(&mut self) {
+        //self.read_back_state    = Some(ReadbackState::new(self));
         unsafe {
             gl::Enable(gl::SCISSOR_TEST);
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
-            IntrusivePtr::from_raw_no_increment(IntrusivePtr::new(self).into_raw_mut() as *mut dyn Driver)
-        }
+        } 
+        assert_eq!(self.self_ptr.is_some(), true);
     }
 
     fn buffer_type_to_gl(bt: &DeviceBufferDesc) -> GLenum {
@@ -791,13 +809,6 @@ impl Gles3Driver {
         }
     }
 
-    fn read_back_state(&mut self) -> &ReadbackState {
-        match &self.read_back_state {
-            Some(rb) => &rb,
-            _ => panic!("readback is None")
-        }
-    }
-
     pub fn draw(&mut self, pipe: &Pipeline, bindings: &Bindings, uniforms: *const c_void, prim_count: u32, instance_count: u32) {
         unsafe {
             let gl_pipe = &self.pipelines[pipe.res_id()];
@@ -984,7 +995,7 @@ impl Gles3Driver {
 
 
 impl Driver for Gles3Driver {
-    fn get_caps(&self) -> &DriverCaps { &self.caps }
+    fn get_caps(&self) -> DriverCaps { self.caps }
 
     fn create_device_buffer(&mut self, desc: DeviceBufferDesc) -> Option<DeviceBufferPtr> {
         unsafe {
@@ -1003,7 +1014,7 @@ impl Driver for Gles3Driver {
             let gl_buff = GLDeviceBuffer { gl_id: buff, desc: Self::erase_buffer_data(&desc) };
             let idx = self.device_buffers.add(gl_buff);
 
-            let iptr : IntrusivePtr<dyn Driver>= IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver);
+            let iptr = self.self_ptr.clone().unwrap().upgrade().unwrap();
 
             Some(DeviceBufferPtr::new(DeviceBuffer::new(ResourceType::DeviceBuffer, idx, desc, Some(iptr))))
         }
@@ -1015,7 +1026,7 @@ impl Driver for Gles3Driver {
         let img = GLTexture { gl_id: idx };
         let idx = self.textures.add(img);
 
-        let iptr : IntrusivePtr<dyn Driver>= unsafe { IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver) };
+        let iptr = self.self_ptr.clone().unwrap().upgrade().unwrap();
 
         Some(TexturePtr::new(Texture::new(ResourceType::Texture, idx, new_desc, Some(iptr))))
     }
@@ -1025,7 +1036,7 @@ impl Driver for Gles3Driver {
         let img = GLRenderTarget { gl_id: idx };
         let idx = self.render_targets.add(img);
 
-        let iptr : IntrusivePtr<dyn Driver>= unsafe { IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver) };
+        let iptr = self.self_ptr.clone().unwrap().upgrade().unwrap();
 
         Some(RenderTargetPtr::new(RenderTarget::new(ResourceType::RenderTarget, idx, desc, Some(iptr))))
     }
@@ -1167,7 +1178,7 @@ impl Driver for Gles3Driver {
 
             let idx = self.shaders.add(gl_shader);
 
-            let iptr : IntrusivePtr<dyn Driver>= IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver);
+            let iptr = self.self_ptr.clone().unwrap().upgrade().unwrap();
 
             Some(ShaderPtr::new(Shader::new(ResourceType::Shader, idx, desc_copy2, Some(iptr))))
         }
@@ -1176,7 +1187,7 @@ impl Driver for Gles3Driver {
     fn create_pipeline(&mut self, desc: PipelineDesc) -> Option<PipelinePtr> {
         let idx = self.pipelines.add(GLPipeline { desc: desc.clone() });
 
-        let iptr : IntrusivePtr<dyn Driver>= unsafe { IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver) };
+        let iptr = self.self_ptr.clone().unwrap().upgrade().unwrap();
 
         Some(PipelinePtr::new(Pipeline::new(ResourceType::Pipeline, idx, desc, Some(iptr))))
     }
@@ -1230,7 +1241,7 @@ impl Driver for Gles3Driver {
 
             let idx = self.framebuffers.add(GLFrameBuffer { desc: desc.clone(), gl_id: res });
 
-            let iptr : IntrusivePtr<dyn Driver>= IntrusivePtr::from_raw_increment(self as *mut Self as *mut dyn Driver);
+            let iptr = self.self_ptr.clone().unwrap().upgrade().unwrap();
 
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
 
@@ -1372,22 +1383,9 @@ impl Driver for Gles3Driver {
 
 
     fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
-        unsafe {
-            let rb = self.read_back_state() as *const ReadbackState as *mut ReadbackState;
-            (&mut (*rb)).read_surface(self, surface, x, y, w, h)
-        }
+        panic!("unsupported: Use ReadBackDriver instead!")
     }
 }
-
-impl IntrusiveCounter for Gles3Driver {
-    fn increment(&mut self) { self.rc.fetch_add(1, Ordering::SeqCst); }
-    fn decrement(&mut self) -> isize {
-        self.rc.fetch_sub(1, Ordering::SeqCst)
-    }
-}
-
-unsafe impl Send for Gles3Driver {}
-unsafe impl Sync for Gles3Driver {}
 
 impl Drop for Gles3Driver {
     fn drop(&mut self) {
@@ -1395,29 +1393,3 @@ impl Drop for Gles3Driver {
     }
 }
 
-pub fn get_driver() -> DriverPtr {
-    unsafe {
-        let mut range : [GLint; 2] = [0, 0];
-        let mut precision = 0;
-
-        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::HIGH_FLOAT, range.as_mut_ptr(), &mut precision);
-        println!("highp float range: {:?} - precision: {}", range, precision);
-
-        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::HIGH_INT, range.as_mut_ptr(), &mut precision);
-        println!("highp int range: {:?} - precision: {}", range, precision);
-
-        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::MEDIUM_FLOAT, range.as_mut_ptr(), &mut precision);
-        println!("mediump float range: {:?} - precision: {}", range, precision);
-
-        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::MEDIUM_INT, range.as_mut_ptr(), &mut precision);
-        println!("mediump int range: {:?} - precision: {}", range, precision);
-
-        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::LOW_FLOAT, range.as_mut_ptr(), &mut precision);
-        println!("lowp float range: {:?} - precision: {}", range, precision);
-
-        gl::GetShaderPrecisionFormat(gl::FRAGMENT_SHADER, gl::LOW_INT, range.as_mut_ptr(), &mut precision);
-        println!("lowp int range: {:?} - precision: {}", range, precision);
-
-    }
-    Gles3Driver::new().initialize()
-}

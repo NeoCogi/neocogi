@@ -32,14 +32,14 @@ extern crate neocogi;
 use neocogi::glfw;
 use neocogi::glfw::{Action, Context, Key};
 
-use neocogi::*;
 use neocogi::rs_math3d::*;
+use neocogi::*;
 
 use neocogi::renderer::*;
 
 use std::sync::*;
 
-static VERTEX_SHADER : &'static str = "
+static VERTEX_SHADER: &'static str = "
 #version 300 es
 in  highp   vec4        position;
 in  highp   vec4        color;
@@ -49,7 +49,7 @@ void main() {
     v_color     = color;
 }";
 
-static PIXEL_SHADER : &'static str = "
+static PIXEL_SHADER: &'static str = "
 #version 300 es
 precision mediump float;
         in highp    vec4        v_color;
@@ -58,7 +58,6 @@ void main() {
     highp vec4 col  = v_color;
     color_buffer    = col;
 }";
-
 
 render_data! {
     vertex Vertex {
@@ -71,44 +70,42 @@ fn init_render_objects(driver: &mut DriverPtr) -> PipelinePtr {
     let mut model_attribs = Vec::new();
     model_attribs.push(Vertex::get_attribute_names());
 
-    let model_shader_desc =
-        ShaderDesc {
-            vertex_shader       : String::from(VERTEX_SHADER),
-            pixel_shader        : String::from(PIXEL_SHADER),
+    let model_shader_desc = ShaderDesc {
+        vertex_shader: String::from(VERTEX_SHADER),
+        pixel_shader: String::from(PIXEL_SHADER),
 
-            vertex_attributes   : model_attribs,
-            vertex_uniforms     : Vec::new(),
-            vertex_surfaces     : Vec::new(),
+        vertex_attributes: model_attribs,
+        vertex_uniforms: Vec::new(),
+        vertex_surfaces: Vec::new(),
 
-            pixel_uniforms      : Vec::new(),
-            pixel_surfaces      : Vec::new(),
-        };
+        pixel_uniforms: Vec::new(),
+        pixel_surfaces: Vec::new(),
+    };
 
     let model_program = driver.create_shader(model_shader_desc).unwrap();
 
     let vertex_layout = VertexBufferLayout {
-        buffer_id           : 0,
-        vertex_attributes   : Vertex::get_attribute_descriptors(),
-        stride              : Vertex::stride(),
-        divisor             : 0,
+        buffer_id: 0,
+        vertex_attributes: Vertex::get_attribute_descriptors(),
+        stride: Vertex::stride(),
+        divisor: 0,
     };
 
     let tri_pipeline_desc = PipelineDesc {
-        primitive_type      : PrimitiveType::Triangles,
-        shader              : model_program.clone(),
-        buffer_layouts      : vec! { vertex_layout.clone() },
-        uniform_descs       : Vec::new(),
-        index_type          : IndexType::None,
-        face_winding        : FaceWinding::CCW,
-        cull_mode           : CullMode::None,
-        depth_write         : true,
-        depth_test          : true,
-        blend               : BlendOp::None,
-        polygon_offset      : PolygonOffset::None,
+        primitive_type: PrimitiveType::Triangles,
+        shader: model_program.clone(),
+        buffer_layouts: vec![vertex_layout.clone()],
+        uniform_descs: Vec::new(),
+        index_type: IndexType::None,
+        face_winding: FaceWinding::CCW,
+        cull_mode: CullMode::None,
+        depth_write: true,
+        depth_test: true,
+        blend: BlendOp::None,
+        polygon_offset: PolygonOffset::None,
     };
 
     driver.create_pipeline(tri_pipeline_desc).unwrap()
-
 }
 
 fn main() {
@@ -126,8 +123,6 @@ fn main() {
     glfw.window_hint(glfw::WindowHint::Resizable(true));
     glfw.window_hint(glfw::WindowHint::Floating(true));
 
-
-
     let (mut window, events) = glfw
         .create_window(1024, 900, "Triangle", glfw::WindowMode::Windowed)
         .expect("Failed to create GLFW window.");
@@ -141,13 +136,26 @@ fn main() {
 
     let mut driver = renderer::get_driver();
 
-    let vertices = vec! {
-        Vertex { position: Vec4f::new(-0.5, -0.5, 0.0, 1.0), color: Vec4f::new(1.0, 0.0, 0.0, 1.0) },
-        Vertex { position: Vec4f::new(0.5, -0.5,  0.0, 1.0), color: Vec4f::new(0.0, 0.0, 1.0, 1.0) },
-        Vertex { position: Vec4f::new(0.0, 0.5,   0.0, 1.0), color: Vec4f::new(0.0, 1.0, 0.0, 1.0) },
-    };
+    let vertices = vec![
+        Vertex {
+            position: Vec4f::new(-0.5, -0.5, 0.0, 1.0),
+            color: Vec4f::new(1.0, 0.0, 0.0, 1.0),
+        },
+        Vertex {
+            position: Vec4f::new(0.5, -0.5, 0.0, 1.0),
+            color: Vec4f::new(0.0, 0.0, 1.0, 1.0),
+        },
+        Vertex {
+            position: Vec4f::new(0.0, 0.5, 0.0, 1.0),
+            color: Vec4f::new(0.0, 1.0, 0.0, 1.0),
+        },
+    ];
 
-    let mut vertex_buffer   = driver.create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(3 * std::mem::size_of::<Vertex>()))).unwrap();
+    let mut vertex_buffer = driver
+        .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(
+            3 * std::mem::size_of::<Vertex>(),
+        )))
+        .unwrap();
     let pipeline = init_render_objects(&mut driver);
 
     let mut quit = false;
@@ -168,11 +176,11 @@ fn main() {
         );
 
         let bindings = Bindings {
-            vertex_buffers  : vec!{ vertex_buffer.clone() },
-            index_buffer    : None,
+            vertex_buffers: vec![vertex_buffer.clone()],
+            index_buffer: None,
 
-            vertex_images   : Vec::new(),
-            pixel_images    : Vec::new(),
+            vertex_images: Vec::new(),
+            pixel_images: Vec::new(),
         };
 
         pass.update_device_buffer(&mut vertex_buffer, 0, Arc::new(vertices.to_vec()));
@@ -183,9 +191,10 @@ fn main() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
             match event {
-                glfw::WindowEvent::Key(glfw::Key::Escape, _, _, _) |
-                glfw::WindowEvent::Close  => quit = true,
-                _ => ()
+                glfw::WindowEvent::Key(glfw::Key::Escape, _, _, _) | glfw::WindowEvent::Close => {
+                    quit = true
+                }
+                _ => (),
             }
         }
 

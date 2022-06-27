@@ -34,74 +34,6 @@ use core::sync::atomic::*;
 use core::ops::{Deref, DerefMut};
 use std::sync::*;
 
-pub trait IntrusiveCounter : Sync + Send {
-    fn increment(&mut self);
-    fn decrement(&mut self) -> isize;
-}
-
-#[repr(C)]
-pub struct IntrusivePtr<T : IntrusiveCounter + ?Sized> {
-    object  : *mut T,
-    phantom : std::marker::PhantomData<T>,
-}
-
-unsafe impl<T: IntrusiveCounter> Send for IntrusivePtr<T> {}
-unsafe impl<T: IntrusiveCounter> Sync for IntrusivePtr<T> {}
-
-impl<T: IntrusiveCounter> IntrusivePtr<T> {
-    pub fn new(mut t: T) -> Self {
-        t.increment();
-        let b = Box::new(t);
-        let r = Box::into_raw(b);
-        let s = Self { object: r , phantom: std::marker::PhantomData::default() };
-        s
-    }
-}
-
-impl<T: IntrusiveCounter + ?Sized> IntrusivePtr<T> {
-    pub fn as_ref(&self) -> *const T { self.object }
-    pub(crate) unsafe fn into_raw_mut(self) -> *mut T { let obj = self.object; std::mem::forget(self); obj }
-    pub(crate) unsafe fn from_raw_no_increment(raw: *mut T) -> Self { Self { object: raw, phantom: std::marker::PhantomData::default() } }
-    pub(crate) unsafe fn from_raw_increment(raw: *mut T) -> Self { (*raw).increment(); Self { object: raw, phantom: std::marker::PhantomData::default() } }
-}
-
-impl<T: IntrusiveCounter + ?Sized> Drop for IntrusivePtr<T> {
-    fn drop(&mut self) {
-        unsafe {
-            let rc = (*self.object).decrement();
-            if rc == 1 {
-                Box::from_raw(self.object);
-            }
-        }
-    }
-}
-
-impl<T: IntrusiveCounter + ?Sized> Clone for IntrusivePtr<T> {
-    fn clone(&self) -> Self {
-        unsafe { (*self.object).increment() };
-        Self { object : self.object, phantom: std::marker::PhantomData::default() }
-    }
-}
-
-impl<T: IntrusiveCounter + ?Sized> Deref for IntrusivePtr<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { &(*self.object) }
-    }
-}
-
-impl<T: IntrusiveCounter + ?Sized> DerefMut for IntrusivePtr<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut (*self.object) }
-    }
-}
-
-impl<T: IntrusiveCounter + ?Sized> core::borrow::Borrow<T> for IntrusivePtr<T> {
-    fn borrow(&self) -> &T {
-        &**self
-    }
-}
 
 pub enum ResourceType {
     DeviceBuffer,
@@ -117,32 +49,22 @@ pub struct Resource<Desc> {
     res_type: ResourceType,
     res_id  : usize,
     desc    : Desc,
-    depends_on  : Option<IntrusivePtr<dyn Driver>>,   /// resources depend on drivers or other resources
+    depends_on  : Option<DriverPtrInternal>,   /// resources depend on drivers or other resources
     rc      : AtomicIsize,
 }
 
-unsafe impl<Desc> Send for Resource<Desc> {}
-unsafe impl<Desc> Sync for Resource<Desc> {}
-
 impl<Desc> Resource<Desc> {
-    pub(crate)  fn new(res_type: ResourceType, res_id: usize, desc: Desc, depends_on : Option<IntrusivePtr<dyn Driver>>) -> Self {
+    pub(crate)  fn new(res_type: ResourceType, res_id: usize, desc: Desc, depends_on : Option<DriverPtrInternal>) -> Self {
         Self { res_type: res_type, res_id : res_id, desc: desc, depends_on: depends_on, rc: AtomicIsize::new(0) }
     }
     pub(crate)  fn res_id(&self) -> usize { self.res_id }
     pub         fn desc(&self) -> &Desc { &self.desc }
 }
 
-impl<Desc> IntrusiveCounter for Resource<Desc> {
-    fn increment(&mut self) { self.rc.fetch_add(1, Ordering::SeqCst); }
-    fn decrement(&mut self) -> isize {
-        self.rc.fetch_sub(1, Ordering::SeqCst)
-    }
-}
-
 impl<Desc> Drop for Resource<Desc> {
     fn drop(&mut self) {
         match &mut self.depends_on {
-            Some(driver)    => driver.delete_resource(&self.res_type, self.res_id),
+            Some(driver)    => driver.lock().as_deref_mut().unwrap().delete_resource(&self.res_type, self.res_id),
             _ => panic!("No driver!")
         }
     }
@@ -672,7 +594,7 @@ impl DeviceBufferDesc {
 }
 
 pub type DeviceBuffer       = Resource<DeviceBufferDesc>;
-pub type DeviceBufferPtr    = IntrusivePtr<DeviceBuffer>;
+pub type DeviceBufferPtr    = Arc<DeviceBuffer>;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ImageDesc
@@ -875,10 +797,10 @@ pub struct RenderTargetDesc {
 }
 
 pub type Texture    = Resource<TextureDesc>;
-pub type TexturePtr = IntrusivePtr<Texture>;
+pub type TexturePtr = Arc<Texture>;
 
 pub type RenderTarget       = Resource<RenderTargetDesc>;
-pub type RenderTargetPtr    = IntrusivePtr<RenderTarget>;
+pub type RenderTargetPtr    = Arc<RenderTarget>;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ShaderDesc
@@ -900,7 +822,7 @@ unsafe impl Send for ShaderDesc {}
 unsafe impl Sync for ShaderDesc {}
 
 pub type Shader     = Resource<ShaderDesc>;
-pub type ShaderPtr  = IntrusivePtr<Shader>;
+pub type ShaderPtr  = Arc<Shader>;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Binding
@@ -1049,7 +971,7 @@ unsafe impl Send for PipelineDesc {}
 unsafe impl Sync for PipelineDesc {}
 
 pub type Pipeline   = Resource<PipelineDesc>;
-pub type PipelinePtr= IntrusivePtr<Pipeline>;
+pub type PipelinePtr= Arc<Pipeline>;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Pass
@@ -1091,7 +1013,7 @@ unsafe impl Send for FrameBufferDesc {}
 unsafe impl Sync for FrameBufferDesc {}
 
 pub type FrameBuffer    = Resource<FrameBufferDesc>;
-pub type FrameBufferPtr = IntrusivePtr<FrameBuffer>;
+pub type FrameBufferPtr = Arc<FrameBuffer>;
 
 pub(crate) struct DrawCommand {
     pub pipe: PipelinePtr,
@@ -1129,9 +1051,6 @@ pub struct Pass {
 
     pub(crate) commands            : Vec<RenderPassCommand>,
 }
-
-unsafe impl Send for Pass {}
-unsafe impl Sync for Pass {}
 
 impl Pass {
     pub fn new(width           : usize,
@@ -1208,6 +1127,7 @@ pub enum ReadbackResult {
 ////////////////////////////////////////////////////////////////////////////////
 /// Capabilities
 ////////////////////////////////////////////////////////////////////////////////
+#[derive(Copy, Clone)]
 pub struct DriverCaps {
     pub max_2d_surface_dimension    : Dimensioni,
 }
@@ -1215,8 +1135,8 @@ pub struct DriverCaps {
 ////////////////////////////////////////////////////////////////////////////////
 /// Driver
 ////////////////////////////////////////////////////////////////////////////////
-pub trait Driver : IntrusiveCounter {
-    fn get_caps(&self) -> &DriverCaps;
+pub trait Driver {
+    fn get_caps(&self) -> DriverCaps;
     fn create_device_buffer(&mut self, desc: DeviceBufferDesc) -> Option<DeviceBufferPtr>;
     fn create_texture(&mut self, desc: TextureDesc) -> Option<TexturePtr>;
     fn create_render_target(&mut self, desc: RenderTargetDesc) -> Option<RenderTargetPtr>;
@@ -1231,33 +1151,64 @@ pub trait Driver : IntrusiveCounter {
     fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload>;
 }
 
-pub type DriverPtr = IntrusivePtr<dyn Driver>;
+//
+// There is a very important reason for having this abstraction: Rust mutexes are not reentrant!!!
+// This would break mutability borrowing rules: many lock.muts would have multiple owners of mutability.
+// to remedy this, we need to abstract the lock and the automatic unlock within the same code block.
+// While we are using Driver trait, this should be transparent from the compiler point of view since, we 
+// are not using DriverPtr in dynamic way
+//
+pub(crate) type DriverPtrInternal = Arc<Mutex<dyn Driver>>;
 
+#[derive(Clone)]
+pub struct DriverPtr {
+    driver : DriverPtrInternal
+}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+impl DriverPtr {
+    pub fn from(driver: DriverPtrInternal) -> Self {
+        Self { driver }
+    }
+}
 
-    struct InTest {
-        s: String,
-        r: core::sync::atomic::AtomicIsize,
+impl Driver for DriverPtr {
+    fn get_caps(&self) -> DriverCaps {
+        self.driver.lock().as_deref_mut().unwrap().get_caps()
+    }
+    
+    fn create_device_buffer(&mut self, desc: DeviceBufferDesc) -> Option<DeviceBufferPtr> {
+        self.driver.lock().as_deref_mut().unwrap().create_device_buffer(desc)
     }
 
-    impl IntrusiveCounter for InTest {
-        fn increment(&mut self) { self.r.fetch_add(1, Ordering::SeqCst); }
-        fn decrement(&mut self) -> isize {
-            self.r.fetch_sub(1, Ordering::SeqCst)
-        }
+    fn create_texture(&mut self, desc: TextureDesc) -> Option<TexturePtr> {
+        self.driver.lock().as_deref_mut().unwrap().create_texture(desc)
     }
 
-    impl Drop for InTest {
-        fn drop(&mut self) {}
+    fn create_render_target(&mut self, desc: RenderTargetDesc) -> Option<RenderTargetPtr> {
+        self.driver.lock().as_deref_mut().unwrap().create_render_target(desc)
     }
 
-    #[test]
-    fn test_intrusive() {
-        let it = InTest { s: String::from("Hello World"), r : core::sync::atomic::AtomicIsize::new(0) };
-        let p = IntrusivePtr::new(it);
-        format!("r: {}", p.s);
+    fn create_shader(&mut self, desc: ShaderDesc) -> Option<ShaderPtr> {
+        self.driver.lock().as_deref_mut().unwrap().create_shader(desc)
+    }
+
+    fn create_pipeline(&mut self, desc: PipelineDesc) -> Option<PipelinePtr> {
+        self.driver.lock().as_deref_mut().unwrap().create_pipeline(desc)
+    }
+
+    fn create_frame_buffer(&mut self, desc: FrameBufferDesc) -> Option<FrameBufferPtr> {
+        self.driver.lock().as_deref_mut().unwrap().create_frame_buffer(desc)
+    }
+
+    fn delete_resource(&mut self, resource_type: &ResourceType, res_id: usize) {
+        self.driver.lock().as_deref_mut().unwrap().delete_resource(resource_type, res_id)
+    }
+
+    fn render_pass(&mut self, pass: &mut Pass) {
+        self.driver.lock().as_deref_mut().unwrap().render_pass(pass)
+    }
+
+    fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
+        self.driver.lock().as_deref_mut().unwrap().read_back(surface, x, y, w, h)
     }
 }

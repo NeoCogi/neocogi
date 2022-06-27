@@ -32,8 +32,8 @@ extern crate neocogi;
 use neocogi::glfw;
 use neocogi::glfw::{Action, Context, Key};
 
-use neocogi::*;
 use neocogi::rs_math3d::*;
+use neocogi::*;
 
 use neocogi::renderer::*;
 
@@ -55,8 +55,6 @@ fn main() {
     glfw.window_hint(glfw::WindowHint::Resizable(true));
     glfw.window_hint(glfw::WindowHint::Floating(true));
 
-
-
     let (mut window, events) = glfw
         .create_window(1024, 900, "Egui Test", glfw::WindowMode::Windowed)
         .expect("Failed to create GLFW window.");
@@ -73,7 +71,6 @@ fn main() {
     // initialize EGUI
     let mut egui_ctx = egui::Context::default();
     let mut painter = ui::Painter::new(&mut driver, &mut window, 1024, 900);
-
 
     let (width, height) = window.get_framebuffer_size();
     let native_pixels_per_point = window.get_content_scale().0;
@@ -100,19 +97,20 @@ fn main() {
         ));
         egui_input_state.egui_input.time = Some(start_time.elapsed().as_secs_f64());
 
-
         let egui_output = egui_ctx.run(egui_input_state.egui_input.take(), |egui_ctx| {
             egui::SidePanel::left("Test").show(&egui_ctx, |ui| {
                 if ui.button("click me!").clicked() {
                     println!("Clicked")
                 }
             });
-
         });
 
         //Handle cut, copy text from egui
         if !egui_output.platform_output.copied_text.is_empty() {
-            ui::copy_to_clipboard(&mut egui_input_state, egui_output.platform_output.copied_text);
+            ui::copy_to_clipboard(
+                &mut egui_input_state,
+                egui_output.platform_output.copied_text,
+            );
         }
 
         let paint_jobs = egui_ctx.tessellate(egui_output.shapes);
@@ -146,8 +144,9 @@ fn main() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
             match event {
-                glfw::WindowEvent::Key(glfw::Key::Escape, _, _, _) |
-                glfw::WindowEvent::Close  => quit = true,
+                glfw::WindowEvent::Key(glfw::Key::Escape, _, _, _) | glfw::WindowEvent::Close => {
+                    quit = true
+                }
                 _ => neocogi::ui::handle_event(event, &mut egui_input_state),
             }
         }
