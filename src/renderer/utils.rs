@@ -28,7 +28,6 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //
 use super::*;
-use rs_ctypes::*;
 use crate::rs_math3d::*;
 use std::sync::*;
 

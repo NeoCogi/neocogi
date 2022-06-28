@@ -27,15 +27,14 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-use rs_ctypes::*;
 use super::super::*;
 use super::super::gl::types::*;
 use crate::rs_math3d::*;
 use crate::renderer::gles3::*;
 
 use super::renderer::*;
-use std::io::Read;
 use std::sync::*;
+use std::ffi::c_void;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -219,52 +218,8 @@ impl ReadbackDriver {
         driver.create_frame_buffer(fb_desc).unwrap()
     }
 
-    fn render(&mut self, pass: &mut Pass, tex: TexturePtr, orig_surface_type: OrigSurfaceType) {
-        let mut lock            = self.gles_driver.lock();
-        let mut driver          = lock.as_mut().unwrap();
-
-        let bindings = Bindings {
-            vertex_buffers  : vec!{ self.vb.clone() },
-            index_buffer    : Some(self.ib.clone()),
-
-            vertex_images   : Vec::from([]),
-            pixel_images    : Vec::from([tex.clone()]),
-        };
-
-        let pipeline =
-            match orig_surface_type {
-                OrigSurfaceType::UInt   => &self.u_pipeline,
-                OrigSurfaceType::Float  => &self.f_pipeline,
-            };
-
-        pass.draw(pipeline, &bindings, Arc::new(GenPayload::from(Vec::<Vec3f>::new())), 2, 1);
-    }
-
     fn texture_type(surface: &TexturePtr) -> OrigSurfaceType {
         surface.desc().sampler_desc.pixel_format.to_orig_surface_type()
-    }
-
-    fn surface_class(surface: &TexturePtr) -> OrigSurfaceClass {
-        let desc = surface.desc();
-        match desc.sampler_desc.pixel_format {
-            PixelFormat::RGB8U      => OrigSurfaceClass::Color,
-            PixelFormat::RGBA8U     => OrigSurfaceClass::Color,
-            PixelFormat::R8U        => OrigSurfaceClass::Color,
-            PixelFormat::RGB32U     => OrigSurfaceClass::Color,
-            PixelFormat::RGBA32U    => OrigSurfaceClass::Color,
-            PixelFormat::R32U       => OrigSurfaceClass::Color,
-            PixelFormat::RGB32F     => OrigSurfaceClass::Color,
-            PixelFormat::RGBA32F    => OrigSurfaceClass::Color,
-            PixelFormat::R32F       => OrigSurfaceClass::Color,
-            PixelFormat::RGB8(_)    => OrigSurfaceClass::Color,
-            PixelFormat::RGBA8(_)   => OrigSurfaceClass::Color,
-            PixelFormat::R8(_)      => OrigSurfaceClass::Color,
-
-            PixelFormat::D16        => OrigSurfaceClass::Depth,
-            PixelFormat::D32        => OrigSurfaceClass::Depth,
-            PixelFormat::D24S8      => OrigSurfaceClass::Depth,
-            PixelFormat::D32S8      => OrigSurfaceClass::Depth,
-        }
     }
 
     fn pixel_format(surface: &TexturePtr) -> &PixelFormat {

@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 //
 // Copyright 2021-Present (c) Raja Lehtihet & Wael El Oraiby
 //
@@ -33,7 +31,6 @@ use crate::*;
 use super::*;
 use crate::ui::*;
 use crate::rs_math3d::*;
-use crate::renderer::*;
 
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -44,7 +41,6 @@ pub enum NavigationMode {
 
 pub struct View3D {
     camera              : Camera,
-    fov                 : f32,
     nav_mode            : NavigationMode,
     dimension           : Dimensioni,
     scroll              : f32,
@@ -58,7 +54,6 @@ impl View3D {
     pub fn new(camera: Camera, dimension: Dimensioni, bounds: Box3f) -> Self {
         let scroll = camera.distance();
         Self {
-            fov         : camera.fov(),
             camera      : camera,
             nav_mode    : NavigationMode::Orbit,
             dimension   : dimension,

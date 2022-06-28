@@ -27,18 +27,15 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-use rs_ctypes::*;
 use super::super::*;
 use super::super::gl::types::*;
 use crate::rs_math3d::*;
-use super::readback::*;
 
-use std::any::Any;
 use std::collections::{VecDeque};
 use core::ops::{Index};
-use core::sync::atomic::*;
 use std::ops::DerefMut;
 use std::sync::*;
+use std::ffi::c_void;
 
 fn color4b_to_color4f(col: Color4b) -> Vec4f {
     let r = col.x as f32 / 255.0;
@@ -504,8 +501,6 @@ pub(crate) struct Gles3Driver {
     pipelines       : ResourceContainer<GLPipeline>,
     framebuffers    : ResourceContainer<GLFrameBuffer>,
 
-    rc              : AtomicIsize,
-
     caps            : DriverCaps,
 
     self_ptr        : Option<Weak<Mutex<dyn Driver>>>,
@@ -522,7 +517,7 @@ impl Gles3Driver {
         }
 
         let min_surface_size    = std::cmp::min(4096, std::cmp::min(max_rt_size, max_tex_size));
-        let me : DriverPtrInternal = Arc::new_cyclic(|me| { 
+        let me : DriverPtrInternal = Arc::new_cyclic(|_| { 
             let s = Self {
                 device_buffers  : ResourceContainer::new(),
                 textures        : ResourceContainer::new(),
@@ -530,9 +525,6 @@ impl Gles3Driver {
                 shaders         : ResourceContainer::new(),
                 pipelines       : ResourceContainer::new(),
                 framebuffers    : ResourceContainer::new(),
-                rc              : AtomicIsize::new(0),
-
-                //read_back_state : None,
 
                 caps            : DriverCaps {
                     max_2d_surface_dimension    : Dimensioni::new(min_surface_size, min_surface_size),
@@ -650,13 +642,6 @@ impl Gles3Driver {
                         Some(b) => b.ptr() as *const c_void,
                         None => ::core::ptr::null()
                     };
-
-                    let (ptr2, len) = match &data {
-                        Some(b) => (b.ptr(), b.size()),
-                        None => (::core::ptr::null(), 0)
-                    };
-
-                    let sl = std::slice::from_raw_parts(ptr2, len);
 
                     gl::TexImage2D(gl::TEXTURE_2D,
                         0,
@@ -892,7 +877,9 @@ impl Gles3Driver {
                 }
             }
 
-            setup_uniforms(uniforms, gl_pipe.desc.uniform_descs.as_slice(), gl_prog.vertex_uniforms.as_slice());
+            let mut vertex_pixel_uniforms = gl_prog.vertex_uniforms.clone();
+            vertex_pixel_uniforms.append(&mut gl_prog.pixel_uniforms.clone());
+            setup_uniforms(uniforms, gl_pipe.desc.uniform_descs.as_slice(), vertex_pixel_uniforms.as_slice());
 
             for (i, t) in bindings.vertex_images.iter().enumerate() {
                 let location = gl_prog.vertex_surfaces[i].1;
@@ -921,7 +908,7 @@ impl Gles3Driver {
                             IndexType::UInt32 => gl::UNSIGNED_INT,
                         };
 
-                    gl::DrawElementsInstanced(gl_prim, gl_elem_count as GLsizei, itype, core::ptr::null() as *const rs_ctypes::c_void, instance_count as GLint);
+                    gl::DrawElementsInstanced(gl_prim, gl_elem_count as GLsizei, itype, core::ptr::null() as *const c_void, instance_count as GLint);
                 },
                 None => {
                     if gl_pipe.desc.index_type != IndexType::None {
@@ -1009,7 +996,7 @@ impl Driver for Gles3Driver {
                     None    => std::ptr::null(),
                 };
 
-            gl::BufferData(Self::buffer_type_to_gl(&desc), desc.size() as GLsizeiptr, buff_data as *const rs_ctypes::c_void, Self::buffer_usage_to_gl(&desc));
+            gl::BufferData(Self::buffer_type_to_gl(&desc), desc.size() as GLsizeiptr, buff_data as *const c_void, Self::buffer_usage_to_gl(&desc));
 
             let gl_buff = GLDeviceBuffer { gl_id: buff, desc: Self::erase_buffer_data(&desc) };
             let idx = self.device_buffers.add(gl_buff);
@@ -1382,7 +1369,7 @@ impl Driver for Gles3Driver {
 
 
 
-    fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
+    fn read_back(&mut self, _surface: &TexturePtr, _x: u32, _y: u32, _w: u32, _h: u32) -> Option<ReadbackPayload> {
         panic!("unsupported: Use ReadBackDriver instead!")
     }
 }

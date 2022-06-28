@@ -30,7 +30,7 @@
 extern crate neocogi;
 
 use neocogi::glfw;
-use neocogi::glfw::{Action, Context, Key};
+use neocogi::glfw::{Context};
 
 use neocogi::rs_math3d::*;
 use neocogi::*;
@@ -38,7 +38,6 @@ use neocogi::*;
 use neocogi::renderer::*;
 
 use neocogi::egui;
-use neocogi::egui::widgets::*;
 
 fn main() {
     // initialize GLFW3 with OpenGL ES 3.0
@@ -69,8 +68,8 @@ fn main() {
     let mut driver = renderer::get_driver();
 
     // initialize EGUI
-    let mut egui_ctx = egui::Context::default();
-    let mut painter = ui::Painter::new(&mut driver, &mut window, 1024, 900);
+    let egui_ctx = egui::Context::default();
+    let mut painter = ui::Painter::new(&mut driver, 1024, 900);
 
     let (width, height) = window.get_framebuffer_size();
     let native_pixels_per_point = window.get_content_scale().0;

@@ -27,11 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-use rs_ctypes::*;
 use rs_math3d::*;
-
-use core::sync::atomic::*;
-use core::ops::{Deref, DerefMut};
 use std::sync::*;
 
 
@@ -49,13 +45,12 @@ pub struct Resource<Desc> {
     res_type: ResourceType,
     res_id  : usize,
     desc    : Desc,
-    depends_on  : Option<DriverPtrInternal>,   /// resources depend on drivers or other resources
-    rc      : AtomicIsize,
+    depends_on  : Option<DriverPtrInternal>,   // resources depend on drivers or other resources
 }
 
 impl<Desc> Resource<Desc> {
     pub(crate)  fn new(res_type: ResourceType, res_id: usize, desc: Desc, depends_on : Option<DriverPtrInternal>) -> Self {
-        Self { res_type: res_type, res_id : res_id, desc: desc, depends_on: depends_on, rc: AtomicIsize::new(0) }
+        Self { res_type: res_type, res_id : res_id, desc: desc, depends_on: depends_on }
     }
     pub(crate)  fn res_id(&self) -> usize { self.res_id }
     pub         fn desc(&self) -> &Desc { &self.desc }
@@ -773,14 +768,12 @@ impl SamplerDesc {
     pub fn width(&self) -> usize {
         match self.image_type {
             SamplerType::Sampler2D(PixelChannel { size, wrap: _ }, _) => size,
-            _ => panic!("no width!")
         }
     }
 
     pub fn height(&self) -> usize {
         match self.image_type {
             SamplerType::Sampler2D(_, PixelChannel { size, wrap: _ }) => size,
-            _ => panic!("no height!")
         }
     }
 
@@ -1092,10 +1085,6 @@ impl Pass {
             frame_buffer    : self.frame_buffer.clone(),
             ..*self        
         }
-    }
-
-    pub (crate) fn commands(&self) -> &Vec<RenderPassCommand> {
-        &self.commands
     }
 }
 

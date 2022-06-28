@@ -62,7 +62,6 @@ use std::collections::HashMap;
 
 use ::egui::ClippedPrimitive;
 use ::egui::epaint::Primitive;
-use rs_ctypes::*;
 use std::sync::*;
 
 use ::egui::{
@@ -92,10 +91,6 @@ struct PaintTexture {
 
     /// Lazily uploaded
     texture: Option<TexturePtr>,
-
-    /// For user textures there is a choice between
-    /// Linear (default) and Nearest.
-    filtering: bool,
 
     /// User textures can be modified and this flag
     /// is used to indicate if pixel data for the
@@ -153,7 +148,6 @@ pub struct Painter {
 impl Painter {
     pub fn new(
         drv: &mut DriverPtr,
-        window: &mut glfw::Window,
         canvas_width: u32,
         canvas_height: u32,
     ) -> Painter {
@@ -216,7 +210,6 @@ impl Painter {
         &mut self,
         size: (usize, usize),
         srgba_pixels: &[Color32],
-        filtering: bool,
     ) -> ::egui::TextureId {
         assert_eq!(size.0 * size.1, srgba_pixels.len());
 
@@ -230,7 +223,6 @@ impl Painter {
             size,
             pixels,
             texture: None,
-            filtering,
             dirty: true,
         });
         egui::TextureId::User(id)
@@ -281,10 +273,6 @@ impl Painter {
 
             /// Lazily uploaded
             texture: Some(tex),
-
-            /// For user textures there is a choice between
-            /// Linear (default) and Nearest.
-            filtering: true,
 
             /// User textures can be modified and this flag
             /// is used to indicate if pixel data for the
@@ -344,10 +332,6 @@ impl Painter {
 
             /// Lazily uploaded
             texture: Some(ptex),
-
-            /// For user textures there is a choice between
-            /// Linear (default) and Nearest.
-            filtering: true,
 
             /// User textures can be modified and this flag
             /// is used to indicate if pixel data for the
@@ -455,8 +439,9 @@ impl Painter {
 
             let r = Recti::new(clip_min_x,
                 self.canvas_height as i32 - clip_max_y,
-                (clip_max_x - clip_min_x),
-                (clip_max_y - clip_min_y));
+                clip_max_x - clip_min_x,
+                clip_max_y - clip_min_y
+            );
 
             //scissor Y coordinate is from the bottom
             pass.set_scissor (

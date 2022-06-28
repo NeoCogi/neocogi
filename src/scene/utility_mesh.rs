@@ -30,7 +30,6 @@
 use crate::renderer::*;
 use crate::rs_math3d::*;
 use crate::*;
-use std::ffi::c_void;
 use std::ops::*;
 use std::sync::*;
 

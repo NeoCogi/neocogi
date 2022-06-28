@@ -182,7 +182,7 @@ impl Camera {
         let rot_matrix  = Quatf::mat4(&self.rotation);
         let cam_pos     = self.target + transform_vec3(&rot_matrix, &pos) * self.distance;
         let cam_up      = transform_vec3(&rot_matrix, &up);
-        let cam_dir     = Vec3f::normalize(&(self.target - cam_pos));
+        //let cam_dir     = Vec3f::normalize(&(self.target - cam_pos));
 
         self.view        = lookat(&cam_pos, &self.target, &cam_up);
         self.projection = perspective(self.fov, self.aspect, self.near_plane, self.far_plane);
