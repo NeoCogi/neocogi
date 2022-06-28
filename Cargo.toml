@@ -1,6 +1,6 @@
 [package]
 name = "neocogi"
-version = "0.1.10"
+version = "0.2.0"
 edition = "2018"
 license = "BSD-3-Clause"
 authors = ["Raja Lehtihet <raja.lehtihet@gmail.com>", "Wael El Oraiby <wael.eloraiby@gmail.com>"]
@@ -11,7 +11,7 @@ repository = "https://github.com/NeoCogi/neocogi"
 [dependencies]
 rs-math3d = "0.9.16"
 rs-ctypes = "0.1.1"
-glfw = { version="0.44.0", default-features=false, optional=true }
+glfw = { version="0.45.0", default-features=false, optional=true }
 egui = { version = "0.18.1", default-features=false, optional=true }
 
 [build-dependencies]
