@@ -570,8 +570,6 @@ pub struct DeviceBufferMapping {
     pub buff    : DeviceBufferPtr,
 }
 
-
-
 pub enum DeviceBufferDesc {
     Vertex(Usage),
     Index(Usage),
@@ -1153,6 +1151,9 @@ pub(crate) type DriverPtrInternal = Arc<Mutex<dyn Driver>>;
 pub struct DriverPtr {
     driver : DriverPtrInternal
 }
+
+unsafe impl Send for DriverPtr {}
+unsafe impl Sync for DriverPtr {}
 
 impl DriverPtr {
     pub fn from(driver: DriverPtrInternal) -> Self {
