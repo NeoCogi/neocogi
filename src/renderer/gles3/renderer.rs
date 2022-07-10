@@ -517,7 +517,7 @@ impl Gles3Driver {
         }
 
         let min_surface_size    = std::cmp::min(4096, std::cmp::min(max_rt_size, max_tex_size));
-        let me : DriverPtrInternal = Arc::new_cyclic(|_| { 
+        let me : DriverPtrInternal = Arc::new_cyclic(|_| {
             let s = Self {
                 device_buffers  : ResourceContainer::new(),
                 textures        : ResourceContainer::new(),
@@ -540,7 +540,7 @@ impl Gles3Driver {
         let mut l = me_clone.lock();
         let me2 = l.as_mut().unwrap();
         unsafe {
-            let me3 = &mut *(me2.deref_mut() as &mut dyn Driver as *mut dyn Driver as *mut Gles3Driver); 
+            let me3 = &mut *(me2.deref_mut() as &mut dyn Driver as *mut dyn Driver as *mut Gles3Driver);
             me3.self_ptr = Some(Arc::downgrade(&me));
             me3.initialize();
         }
@@ -556,7 +556,7 @@ impl Gles3Driver {
         unsafe {
             gl::Enable(gl::SCISSOR_TEST);
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
-        } 
+        }
         assert_eq!(self.self_ptr.is_some(), true);
     }
 
@@ -847,8 +847,14 @@ impl Gles3Driver {
             gl::DepthMask(if gl_pipe.desc.depth_write { gl::TRUE } else { gl::FALSE } as GLboolean);
 
             match gl_pipe.desc.polygon_offset {
-                PolygonOffset::None => gl::PolygonOffset(0.0, 0.0),
-                PolygonOffset::FactorUnits(factor, units) => gl::PolygonOffset(factor, units),
+                PolygonOffset::None => {
+                    gl::Disable(gl::POLYGON_OFFSET_FILL);
+                    gl::PolygonOffset(0.0, 0.0)
+                },
+                PolygonOffset::FactorUnits(factor, units) => {
+                    gl::Enable(gl::POLYGON_OFFSET_FILL);
+                    gl::PolygonOffset(factor, units)
+                },
             }
 
             gl::UseProgram(gl_prog.gl_id);
@@ -922,6 +928,14 @@ impl Gles3Driver {
                 for v in l {
                     gl::DisableVertexAttribArray(v.1);
                 }
+            }
+
+            match gl_pipe.desc.polygon_offset {
+                PolygonOffset::None => (),
+                PolygonOffset::FactorUnits(_, _) => {
+                    gl::Disable(gl::POLYGON_OFFSET_FILL);
+                    gl::PolygonOffset(0.0, 0.0)
+                },
             }
         }
     }
@@ -1355,7 +1369,7 @@ impl Driver for Gles3Driver {
                 match &mut cmd {
                     RenderPassCommand::Viewport(x, y, w, h) => self.set_viewport(*x, *y, *w, *h),
                     RenderPassCommand::Scissor(x, y, w, h) => self.set_scissor(*x, *y, *w, *h),
-                    RenderPassCommand::Draw(cmd) => self.draw(&cmd.pipe, &cmd.bindings, 
+                    RenderPassCommand::Draw(cmd) => self.draw(&cmd.pipe, &cmd.bindings,
                             cmd.uniforms.ptr() as *const _, cmd.prim_count, cmd.instance_count),
                     RenderPassCommand::UpdateDeviceBuffer(cmd) => self.update_device_buffer(&mut cmd.buffer, cmd.offset, cmd.payload.clone()),
                     RenderPassCommand::UpdateTexture(cmd) => self.update_texture(&mut cmd.tex, cmd.payload.clone()),
@@ -1379,4 +1393,3 @@ impl Drop for Gles3Driver {
         println!("Gles3Driver dropped - All is good!")
     }
 }
-
