@@ -1,3 +1,5 @@
+use rs_math3d::vector::FloatVector;
+
 //
 // Copyright 2021-Present (c) Raja Lehtihet & Wael El Oraiby
 //
@@ -54,7 +56,7 @@ pub struct Camera {
 
 impl Camera {
     fn project_to_track_ball(pt: &Vec2f, r: f32) -> f32 {
-        let d = Vec2f::length(&pt);
+        let d = pt.length();
         if d < r * 0.70710678118654752440 {
             // inside the sphere
             (r * r - d * d).sqrt()
@@ -66,7 +68,7 @@ impl Camera {
     }
 
     pub fn tracball_rotate(&self, viewport: Dimensioni, from: &Vec2f, to: &Vec2f) -> Self {
-        if Vec2f::length(&(*to - *from)).abs() == 0.0 {
+        if (*to - *from).length().abs() == 0.0 {
             return *self;
         }
 
@@ -75,7 +77,7 @@ impl Camera {
         let start       = from;
         let end         = to;   // do we need to divide by aspect ?
 
-        if Vec2f::length(&start) > TRACKBALL_SIZE || Vec2f::length(&end) > TRACKBALL_SIZE {
+        if start.length() > TRACKBALL_SIZE || end.length() > TRACKBALL_SIZE {
             return *self;
         }
 

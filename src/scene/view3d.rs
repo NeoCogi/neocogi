@@ -92,6 +92,7 @@ impl View3D {
                 let distance        = self.scroll;
                 let aspect          = (self.dimension.width as f32) / (self.dimension.height as f32);
                 self.camera   = Camera::new(self.camera.target(), distance, self.camera.rotation(), self.camera.fov(), aspect, self.camera.near_plane(), self.camera.far_plane());
+                self.pointer_state.reset_button_state();
                 UpdateResult::Handled
             }
 

@@ -9,7 +9,7 @@ repository = "https://github.com/NeoCogi/neocogi"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rs-math3d = "0.9.16"
+rs-math3d = { version = "0.9.20" }
 glfw = { version="0.45.0", default-features=false, optional=true }
 egui = { version = "0.18.1", default-features=false, optional=true }
 pfds = "0.3.3"

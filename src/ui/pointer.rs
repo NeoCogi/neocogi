@@ -1,3 +1,5 @@
+use rs_math3d::vector::FloatVector;
+
 //
 // Copyright 2021-Present (c) Raja Lehtihet & Wael El Oraiby
 //
@@ -66,7 +68,7 @@ impl State {
     }
 
     pub fn event(&self) -> Event {
-        let diff = Vec2f::length(&(self.curr_pos - self.prev_pos));
+        let diff = (self.curr_pos - self.prev_pos).length();
         match (&self.prev_state, &self.curr_state, diff) {
             (ButtonState::Released,     ButtonState::Released, x) if x == 0.0 => Event::None,
             (ButtonState::Released,     ButtonState::Released, _)       => Event::Move(self.prev_pos, self.curr_pos),
@@ -83,5 +85,9 @@ impl State {
         self.prev_state = self.curr_state;
         self.curr_pos   = pos;
         self.curr_state = st;
+    }
+
+    pub fn reset_button_state(&mut self) {
+        self.curr_state = ButtonState::None;
     }
 }
