@@ -32,7 +32,6 @@ use super::*;
 use crate::ui::*;
 use crate::rs_math3d::*;
 
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NavigationMode {
     Pan,
@@ -40,66 +39,72 @@ pub enum NavigationMode {
 }
 
 pub struct View3D {
-    camera              : Camera,
-    nav_mode            : NavigationMode,
-    dimension           : Dimensioni,
-    scroll              : f32,
-    bounds              : Box3f,
-    pvm                 : Mat4f,
+    camera: Camera,
+    nav_mode: NavigationMode,
+    dimension: Dimensioni,
+    scroll: f32,
+    bounds: Box3f,
+    pvm: Mat4f,
 
-    pointer_state       : pointer::State,
+    pointer_state: pointer::State,
 }
 
 impl View3D {
     pub fn new(camera: Camera, dimension: Dimensioni, bounds: Box3f) -> Self {
         let scroll = camera.distance();
         Self {
-            camera      : camera,
-            nav_mode    : NavigationMode::Orbit,
-            dimension   : dimension,
+            camera,
+            nav_mode: NavigationMode::Orbit,
+            dimension,
             scroll,
-            bounds      : bounds,
-            pvm         : camera.projection_matrix() * camera.view_matrix(),
+            bounds,
+            pvm: camera.projection_matrix() * camera.view_matrix(),
 
-            pointer_state   : pointer::State::new(),
+            pointer_state: pointer::State::new(),
         }
-
     }
 
     fn update(&mut self) -> UpdateResult {
         // TODO: do proper computation of the far plane
         let far_plane = self.bounds.extent().length() * 100.0;
         self.camera = self.camera.with_far_plane(far_plane);
-        let handled =
-        match (&self.nav_mode, self.pointer_state.event()) {
+        let handled = match (&self.nav_mode, self.pointer_state.event()) {
             (NavigationMode::Orbit, pointer::Event::Drag(prev, _, curr, _)) => {
                 let p = Vec2f::new(prev.x, prev.y);
                 let c = Vec2f::new(curr.x, curr.y);
                 self.camera = self.camera.tracball_rotate(self.dimension, &p, &c);
                 UpdateResult::Handled
-            },
+            }
 
             (NavigationMode::Pan, pointer::Event::Drag(prev, _, curr, _)) => {
                 let p = Vec2f::new(prev.x, prev.y);
                 let c = Vec2f::new(curr.x, curr.y);
                 self.camera = self.camera.pan(self.dimension, &p, &c);
                 UpdateResult::Handled
-            },
+            }
 
             (_, pointer::Event::Scroll(v)) => {
                 self.scroll += v;
                 self.scroll = f32::max(0.5, self.scroll);
-                let distance        = self.scroll;
-                let aspect          = (self.dimension.width as f32) / (self.dimension.height as f32);
-                self.camera   = Camera::new(self.camera.target(), distance, self.camera.rotation(), self.camera.fov(), aspect, self.camera.near_plane(), self.camera.far_plane());
+                let distance = self.scroll;
+                let aspect = (self.dimension.width as f32) / (self.dimension.height as f32);
+                self.camera = Camera::new(
+                    self.camera.target(),
+                    distance,
+                    self.camera.rotation(),
+                    self.camera.fov(),
+                    aspect,
+                    self.camera.near_plane(),
+                    self.camera.far_plane(),
+                );
                 self.pointer_state.reset_button_state();
                 UpdateResult::Handled
             }
 
-            _ => UpdateResult::Unhandled
+            _ => UpdateResult::Unhandled,
         };
 
-        self.pvm    = self.camera.projection_matrix() * self.camera.view_matrix();
+        self.pvm = self.camera.projection_matrix() * self.camera.view_matrix();
         handled
     }
 
@@ -109,24 +114,30 @@ impl View3D {
     }
 
     pub fn set_dimension(&mut self, dimension: Dimensioni) {
-        self.dimension  = dimension;
-        let aspect      = (self.dimension.width as f32) / (self.dimension.height as f32);
-        self.camera     = self.camera.with_aspect(aspect);
+        self.dimension = dimension;
+        let aspect = (self.dimension.width as f32) / (self.dimension.height as f32);
+        self.camera = self.camera.with_aspect(aspect);
         self.update();
     }
 
-    pub fn get_navigation_mode(&self) -> NavigationMode { self.nav_mode }
+    pub fn get_navigation_mode(&self) -> NavigationMode {
+        self.nav_mode
+    }
     pub fn set_navigation_mode(&mut self, nav_mode: NavigationMode) {
         if nav_mode != self.nav_mode {
-            self.nav_mode   = nav_mode;
-            self.pointer_state  = pointer::State::new();
-            self.update();  // idem potent in this case
+            self.nav_mode = nav_mode;
+            self.pointer_state = pointer::State::new();
+            self.update(); // idem potent in this case
         }
     }
 
-    pub fn pointer_event(&self) -> pointer::Event { self.pointer_state.event() }
+    pub fn pointer_event(&self) -> pointer::Event {
+        self.pointer_state.event()
+    }
 
-    pub fn pvm(&self) -> Mat4f { self.pvm }
+    pub fn pvm(&self) -> Mat4f {
+        self.pvm
+    }
 
     pub fn projection_matrix(&self) -> Mat4f {
         self.camera.projection_matrix()
