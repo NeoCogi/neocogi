@@ -54,9 +54,9 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 //
-mod painter;
-mod input;
 mod clipboard;
+mod input;
+mod painter;
 pub mod pointer;
 
 pub use painter::*;

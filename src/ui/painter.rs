@@ -133,10 +133,37 @@ const FS_SRC: &str = r#"
     }
 "#;
 
-const MAX_ELEM_COUNT : usize = 65536 * 4;
+const MAX_ELEM_COUNT: usize = 65536 * 4;
+
+pub struct CallbackFn {
+    paint: Box<PaintFn>,
+}
+
+type PaintFn = Fn(&egui::PaintCallbackInfo, &mut Pass) + Sync + Send;
+
+impl Default for CallbackFn {
+    fn default() -> Self {
+        CallbackFn { paint: Box::new(|_, _| ()) }
+    }
+}
+
+impl CallbackFn {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the paint callback
+    pub fn paint<F>(mut self, paint: F) -> Self
+    where
+        F: Fn(&egui::PaintCallbackInfo, &mut Pass) + Sync + Send + 'static,
+    {
+        self.paint = Box::new(paint) as _;
+        self
+    }
+}
 
 pub struct Painter {
-    driver  : DriverPtr,
+    driver: DriverPtr,
     pipeline: PipelinePtr,
     vertex_buffer: DeviceBufferPtr,
     canvas_width: u32,
@@ -146,50 +173,47 @@ pub struct Painter {
 }
 
 impl Painter {
-    pub fn new(
-        drv: &mut DriverPtr,
-        canvas_width: u32,
-        canvas_height: u32,
-    ) -> Painter {
+    pub fn new(drv: &mut DriverPtr, canvas_width: u32, canvas_height: u32) -> Painter {
+        let program = drv
+            .create_shader(ShaderDesc {
+                vertex_shader: String::from(VS_SRC),
+                pixel_shader: String::from(FS_SRC),
 
-        let program = drv.create_shader(ShaderDesc {
-            vertex_shader       : String::from(VS_SRC),
-            pixel_shader        : String::from(FS_SRC),
+                vertex_attributes: vec![Vertex::get_attribute_names()],
+                vertex_uniforms: Uniforms::get_uniform_names(),
+                vertex_surfaces: vec![],
 
-            vertex_attributes   : vec!{
-               Vertex::get_attribute_names(),
-            },
-            vertex_uniforms     : Uniforms::get_uniform_names(),
-            vertex_surfaces     : vec!{},
-
-            pixel_uniforms      : vec!{},
-            pixel_surfaces      : vec!{ String::from("u_sampler") }
-        }).unwrap();
+                pixel_uniforms: vec![],
+                pixel_surfaces: vec![String::from("u_sampler")],
+            })
+            .unwrap();
 
         let vertex_layout = VertexBufferLayout {
-            buffer_id           : 0,
-            vertex_attributes   : Vertex::get_attribute_descriptors(),
-            stride              : Vertex::stride(),
-            divisor             : 0,
+            buffer_id: 0,
+            vertex_attributes: Vertex::get_attribute_descriptors(),
+            stride: Vertex::stride(),
+            divisor: 0,
         };
 
         let pipeline_desc = PipelineDesc {
-            primitive_type      : PrimitiveType::Triangles,
-            shader              : program,
-            buffer_layouts      : vec! { vertex_layout.clone() },
-            uniform_descs       : Uniforms::get_uniform_descriptors(),
-            index_type          : IndexType::None,
-            face_winding        : FaceWinding::CCW,
-            cull_mode           : CullMode::None,
-            depth_write         : true,
-            depth_test          : false,
-            blend               : BlendOp::Add(Blend::default()),
-            polygon_offset      : PolygonOffset::None,
+            primitive_type: PrimitiveType::Triangles,
+            shader: program,
+            buffer_layouts: vec![vertex_layout.clone()],
+            uniform_descs: Uniforms::get_uniform_descriptors(),
+            index_type: IndexType::None,
+            face_winding: FaceWinding::CCW,
+            cull_mode: CullMode::None,
+            depth_write: true,
+            depth_test: false,
+            blend: BlendOp::Add(Blend::default()),
+            polygon_offset: PolygonOffset::None,
         };
 
         let pipeline = drv.create_pipeline(pipeline_desc).unwrap();
 
-        let vertex_buffer   = drv.create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(MAX_ELEM_COUNT * std::mem::size_of::<Vertex>()))).unwrap();
+        let vertex_buffer = drv
+            .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(MAX_ELEM_COUNT * std::mem::size_of::<Vertex>())))
+            .unwrap();
         Painter {
             driver: drv.clone(),
             pipeline,
@@ -202,15 +226,11 @@ impl Painter {
     }
 
     pub fn set_canvas_size(&mut self, width: u32, height: u32) {
-        self.canvas_width   = width;
-        self.canvas_height  = height;
+        self.canvas_width = width;
+        self.canvas_height = height;
     }
 
-    pub fn new_user_texture(
-        &mut self,
-        size: (usize, usize),
-        srgba_pixels: &[Color32],
-    ) -> ::egui::TextureId {
+    pub fn new_user_texture(&mut self, size: (usize, usize), srgba_pixels: &[Color32]) -> ::egui::TextureId {
         assert_eq!(size.0 * size.1, srgba_pixels.len());
 
         let mut pixels: Vec<Color4b> = Vec::with_capacity(srgba_pixels.len());
@@ -219,17 +239,19 @@ impl Painter {
         }
 
         let id = self.user_textures.len() as u64;
-        self.user_textures.insert(id, PaintTexture {
-            size,
-            pixels,
-            texture: None,
-            dirty: true,
-        });
+        self.user_textures.insert(
+            id,
+            PaintTexture {
+                size,
+                pixels,
+                texture: None,
+                dirty: true,
+            },
+        );
         egui::TextureId::User(id)
     }
 
     fn upload_egui_texture(&mut self, tex_id: u64, texture: &egui::ImageData) {
-
         let pixels: Vec<Color4b> = match &texture {
             egui::ImageData::Color(image) => {
                 assert_eq!(
@@ -237,17 +259,11 @@ impl Painter {
                     image.pixels.len(),
                     "Mismatch between texture size and texel count"
                 );
-                image.pixels
-                .iter()
-                .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
-                .collect()
+                image.pixels.iter().map(|c| color4b(c.r(), c.g(), c.b(), c.a())).collect()
             }
             egui::ImageData::Font(image) => {
                 let gamma = 1.0;
-                image
-                    .srgba_pixels(gamma)
-                    .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
-                    .collect()
+                image.srgba_pixels(gamma).map(|c| color4b(c.r(), c.g(), c.b(), c.a())).collect()
             }
         };
 
@@ -255,13 +271,13 @@ impl Painter {
 
         println!("uploading egui texture: {}x{}", texture.width(), texture.height());
 
-        let tex_desc    = TextureDesc {
-            sampler_desc    : SamplerDesc::default(texture.width(), texture.height())
-                .with_pixel_format(PixelFormat::RGBA8(MinMagFilter::default()
-                    .with_mag_filter(Filter::Linear)
-                    .with_min_filter(Filter::Linear)))
+        let tex_desc = TextureDesc {
+            sampler_desc: SamplerDesc::default(texture.width(), texture.height())
+                .with_pixel_format(PixelFormat::RGBA8(
+                    MinMagFilter::default().with_mag_filter(Filter::Linear).with_min_filter(Filter::Linear),
+                ))
                 .with_wrap_mode(WrapMode::ClampToEdge),
-            payload         : Some(Arc::new(pixels))
+            payload: Some(Arc::new(pixels)),
         };
 
         let tex = self.driver.create_texture(tex_desc).unwrap();
@@ -288,24 +304,18 @@ impl Painter {
 
         let tex = self.egui_textures.get_mut(&tex_id).unwrap();
         let pixels = &mut tex.pixels;
-        let d : Vec<Color4b> = match &delta {
+        let d: Vec<Color4b> = match &delta {
             egui::ImageData::Color(image) => {
                 assert_eq!(
                     image.width() * image.height(),
                     image.pixels.len(),
                     "Mismatch between texture size and texel count"
                 );
-                image.pixels
-                .iter()
-                .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
-                .collect()
+                image.pixels.iter().map(|c| color4b(c.r(), c.g(), c.b(), c.a())).collect()
             }
             egui::ImageData::Font(image) => {
                 let gamma = 1.0;
-                image
-                    .srgba_pixels(gamma)
-                    .map(|c| color4b(c.r(), c.g(), c.b(), c.a()))
-                    .collect()
+                image.srgba_pixels(gamma).map(|c| color4b(c.r(), c.g(), c.b(), c.a())).collect()
             }
         };
         for y in 0..delta.size()[1] {
@@ -314,13 +324,13 @@ impl Painter {
             }
         }
 
-        let tex_desc    = TextureDesc {
-            sampler_desc    : SamplerDesc::default(tex.size.0, tex.size.1)
-                .with_pixel_format(PixelFormat::RGBA8(MinMagFilter::default()
-                    .with_mag_filter(Filter::Linear)
-                    .with_min_filter(Filter::Linear)))
+        let tex_desc = TextureDesc {
+            sampler_desc: SamplerDesc::default(tex.size.0, tex.size.1)
+                .with_pixel_format(PixelFormat::RGBA8(
+                    MinMagFilter::default().with_mag_filter(Filter::Linear).with_min_filter(Filter::Linear),
+                ))
                 .with_wrap_mode(WrapMode::ClampToEdge),
-            payload         : Some(Arc::new(pixels.clone()))
+            payload: Some(Arc::new(pixels.clone())),
         };
 
         let ptex = self.driver.create_texture(tex_desc).unwrap();
@@ -339,7 +349,6 @@ impl Painter {
             dirty: false,
         };
         self.egui_textures.insert(tex_id, pt);
-
     }
 
     fn upload_user_textures(&mut self, pass: &mut Pass) {
@@ -350,9 +359,11 @@ impl Painter {
 
             let pixels = std::mem::take(&mut user_texture.pixels);
 
-            let tex_desc    = TextureDesc {
-                sampler_desc    : SamplerDesc::default(user_texture.size.0, user_texture.size.1).with_pixel_format(PixelFormat::RGBA8(MinMagFilter::default().with_mag_filter(Filter::Linear).with_min_filter(Filter::Linear))),
-                payload         : Some(Arc::new(pixels))
+            let tex_desc = TextureDesc {
+                sampler_desc: SamplerDesc::default(user_texture.size.0, user_texture.size.1).with_pixel_format(PixelFormat::RGBA8(
+                    MinMagFilter::default().with_mag_filter(Filter::Linear).with_min_filter(Filter::Linear),
+                )),
+                payload: Some(Arc::new(pixels)),
             };
 
             if user_texture.texture.is_none() {
@@ -369,9 +380,7 @@ impl Painter {
 
     fn get_texture(&self, texture_id: ::egui::TextureId) -> TexturePtr {
         match texture_id {
-            ::egui::TextureId::Managed(id) => {
-                self.egui_textures[&id].texture.as_ref().unwrap().clone()
-            },
+            ::egui::TextureId::Managed(id) => self.egui_textures[&id].texture.as_ref().unwrap().clone(),
 
             ::egui::TextureId::User(id) => {
                 let texture = self.user_textures[&id].texture.clone();
@@ -391,29 +400,20 @@ impl Painter {
 
                 let mut user_tex = self.user_textures[&id].clone();
                 user_tex.pixels = tex_pixels;
-                user_tex.dirty  = true;
+                user_tex.dirty = true;
                 self.user_textures.insert(id, user_tex);
-
             }
         }
     }
 
-    pub fn paint_jobs(
-        &mut self,
-        pass: &mut Pass,
-        meshes: Vec<ClippedPrimitive>,
-        egui_texture: &egui::TexturesDelta,
-        pixels_per_point: f32,
-    ) {
+    pub fn paint_jobs(&mut self, pass: &mut Pass, meshes: Vec<ClippedPrimitive>, egui_texture: &egui::TexturesDelta, pixels_per_point: f32) {
         for (id, delta) in &egui_texture.set {
             match id {
-                egui::TextureId::Managed(id) => {
-                    match &delta.pos {
-                        None => self.upload_egui_texture(*id, &delta.image),
-                        Some(p) => self.update_egui_texture(*id, Vec2i::new(p[0] as _, p[1] as _), &delta.image),
-                    }
+                egui::TextureId::Managed(id) => match &delta.pos {
+                    None => self.upload_egui_texture(*id, &delta.image),
+                    Some(p) => self.update_egui_texture(*id, Vec2i::new(p[0] as _, p[1] as _), &delta.image),
                 },
-                _ => ()
+                _ => (),
             }
         }
 
@@ -423,7 +423,6 @@ impl Painter {
         let screen_size_points = screen_size_pixels / pixels_per_point;
 
         for ClippedPrimitive { clip_rect, primitive } in meshes {
-
             let clip_min_x = pixels_per_point * clip_rect.min.x;
             let clip_min_y = pixels_per_point * clip_rect.min.y;
             let clip_max_x = pixels_per_point * clip_rect.max.x;
@@ -437,26 +436,22 @@ impl Painter {
             let clip_max_x = clip_max_x.round() as i32;
             let clip_max_y = clip_max_y.round() as i32;
 
-            let r = Recti::new(clip_min_x,
+            let r = Recti::new(
+                clip_min_x,
                 self.canvas_height as i32 - clip_max_y,
                 clip_max_x - clip_min_x,
-                clip_max_y - clip_min_y
+                clip_max_y - clip_min_y,
             );
 
             //scissor Y coordinate is from the bottom
-            pass.set_scissor (
-                r.x as u32,
-                r.y as u32,
-                r.width as u32,
-                r.height as u32,
-            );
+            pass.set_scissor(r.x as u32, r.y as u32, r.width as u32, r.height as u32);
 
             match primitive {
                 Primitive::Mesh(mesh) => {
                     if mesh.vertices.len() > 0 {
                         self.paint_mesh(pass, &mesh, Vec2f::new(screen_size_points.x, screen_size_points.y));
                     }
-                },
+                }
                 Primitive::Callback(cb) => {
                     // Transform callback rect to physical pixels:
                     let rect_min_x = pixels_per_point * cb.rect.min.x;
@@ -474,7 +469,12 @@ impl Painter {
                     let rect_max_x = rect_max_x.round() as u32;
                     let rect_max_y = rect_max_y.round() as u32;
 
-                    let r = Recti::new(rect_min_x as i32, rect_min_y as i32, (rect_max_x - rect_min_x) as i32, (rect_max_y - rect_min_y) as i32);
+                    let r = Recti::new(
+                        rect_min_x as i32,
+                        rect_min_y as i32,
+                        (rect_max_x - rect_min_x) as i32,
+                        (rect_max_y - rect_min_y) as i32,
+                    );
 
                     pass.set_viewport(r.x as _, r.y as _, r.width as _, r.height as _);
 
@@ -487,10 +487,9 @@ impl Painter {
                         screen_size_px: [screen_size_pixels.x as u32, screen_size_pixels.y as u32],
                     };
 
-                    cb.call(&info, pass);
+                    (cb.callback.downcast_ref::<CallbackFn>().unwrap().paint)(&info, pass);
 
                     pass.set_viewport(0, 0, self.canvas_width, self.canvas_height);
-
                 }
             }
         }
@@ -499,25 +498,26 @@ impl Painter {
             match id {
                 egui::TextureId::Managed(id) => {
                     self.egui_textures.remove(id);
-                },
-                _ => ()
+                }
+                _ => (),
             }
         }
     }
 
     fn paint_mesh(&mut self, pass: &mut Pass, mesh: &Mesh, screen_size: Vec2f) {
         debug_assert!(mesh.is_valid());
-        let vertices : Vec<Vertex> =
-            mesh.indices
+        let vertices: Vec<Vertex> = mesh
+            .indices
             .iter()
             .map(|idx| {
                 let v = mesh.vertices[*idx as usize];
                 Vertex {
-                    a_pos   : Vec2f::new(v.pos.x, v.pos.y),
-                    s_rgba  : color4b(v.color[0], v.color[1], v.color[2], v.color[3]),
-                    a_tc    : Vec2f::new(v.uv.x, v.uv.y),
+                    a_pos: Vec2f::new(v.pos.x, v.pos.y),
+                    s_rgba: color4b(v.color[0], v.color[1], v.color[2], v.color[3]),
+                    a_tc: Vec2f::new(v.uv.x, v.uv.y),
                 }
-            }).collect();
+            })
+            .collect();
 
         let max_part_size = 3 * 4096;
         let index_count = mesh.indices.len();
@@ -533,11 +533,11 @@ impl Painter {
                 pass.update_device_buffer(&mut self.vertex_buffer, 0, Arc::new(vs));
 
                 let bindings = Bindings {
-                    vertex_buffers  : vec!{ self.vertex_buffer.clone() },
-                    index_buffer    : None,
+                    vertex_buffers: vec![self.vertex_buffer.clone()],
+                    index_buffer: None,
 
-                    vertex_images   : Vec::new(),
-                    pixel_images    : Vec::from([self.get_texture(mesh.texture_id)]),
+                    vertex_images: Vec::new(),
+                    pixel_images: Vec::from([self.get_texture(mesh.texture_id)]),
                 };
 
                 let u = Uniforms { u_screen_size: screen_size };
