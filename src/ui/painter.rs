@@ -27,47 +27,14 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-//
-// Copyright (c) 2021 cohaereo
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
-//
 use crate::*;
 use crate::rs_math3d::*;
 use crate::renderer::*;
 
 use std::collections::HashMap;
-
-use ::egui::ClippedPrimitive;
-use ::egui::epaint::Primitive;
 use std::sync::*;
+use super::*;
 
-use ::egui::{
-    epaint::{Color32, Mesh},
-    vec2,
-};
 
 render_data! {
     vertex Vertex {
@@ -135,41 +102,16 @@ const FS_SRC: &str = r#"
 
 const MAX_ELEM_COUNT: usize = 65536 * 4;
 
-pub struct CallbackFn {
-    paint: Box<PaintFn>,
-}
-
-type PaintFn = Fn(&egui::PaintCallbackInfo, &mut Pass) + Sync + Send;
-
-impl Default for CallbackFn {
-    fn default() -> Self {
-        CallbackFn { paint: Box::new(|_, _| ()) }
-    }
-}
-
-impl CallbackFn {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the paint callback
-    pub fn paint<F>(mut self, paint: F) -> Self
-    where
-        F: Fn(&egui::PaintCallbackInfo, &mut Pass) + Sync + Send + 'static,
-    {
-        self.paint = Box::new(paint) as _;
-        self
-    }
-}
-
 pub struct Painter {
     driver: DriverPtr,
     pipeline: PipelinePtr,
     vertex_buffer: DeviceBufferPtr,
     canvas_width: u32,
     canvas_height: u32,
-    egui_textures: HashMap<u64, PaintTexture>,
-    user_textures: HashMap<u64, PaintTexture>,
+    ui_texture: TexturePtr,
+
+    vertices: Vec<Vertex>,
+    indices: Vec<u16>,
 }
 
 impl Painter {
@@ -220,8 +162,9 @@ impl Painter {
             canvas_width,
             canvas_height,
             vertex_buffer,
-            egui_textures: Default::default(),
-            user_textures: Default::default(),
+            ui_texture: Default::default(),
+            vertices: Vec::new(),
+            indices: Vec::new(),
         }
     }
 
@@ -230,195 +173,99 @@ impl Painter {
         self.canvas_height = height;
     }
 
-    pub fn new_user_texture(&mut self, size: (usize, usize), srgba_pixels: &[Color32]) -> ::egui::TextureId {
-        assert_eq!(size.0 * size.1, srgba_pixels.len());
-
-        let mut pixels: Vec<Color4b> = Vec::with_capacity(srgba_pixels.len());
-        for srgba in srgba_pixels {
-            pixels.push(color4b(srgba.r(), srgba.g(), srgba.b(), srgba.a()));
+    fn push_quad_vertices(&mut self, v0: &Vertex, v1: &Vertex, v2: &Vertex, v3: &Vertex) {
+        if self.verts.len() + 4 >= 65536 || self.indices.len() + 6 >= 65536 {
+            self.flush(gl);
         }
 
-        let id = self.user_textures.len() as u64;
-        self.user_textures.insert(
-            id,
-            PaintTexture {
-                size,
-                pixels,
-                texture: None,
-                dirty: true,
-            },
-        );
-        egui::TextureId::User(id)
+        let is = self.verts.len() as u16;
+        self.indices.push(is + 0);
+        self.indices.push(is + 1);
+        self.indices.push(is + 2);
+        self.indices.push(is + 2);
+        self.indices.push(is + 3);
+        self.indices.push(is + 0);
+
+        self.verts.push(v0.clone());
+        self.verts.push(v1.clone());
+        self.verts.push(v2.clone());
+        self.verts.push(v3.clone());
     }
 
-    fn upload_egui_texture(&mut self, tex_id: u64, texture: &egui::ImageData) {
-        let pixels: Vec<Color4b> = match &texture {
-            egui::ImageData::Color(image) => {
-                assert_eq!(
-                    image.width() * image.height(),
-                    image.pixels.len(),
-                    "Mismatch between texture size and texel count"
-                );
-                image.pixels.iter().map(|c| color4b(c.r(), c.g(), c.b(), c.a())).collect()
-            }
-            egui::ImageData::Font(image) => {
-                let gamma = 1.0;
-                image.srgba_pixels(gamma).map(|c| color4b(c.r(), c.g(), c.b(), c.a())).collect()
-            }
-        };
+    pub fn push_rect(&mut self, dst: Recti, src: Recti, color: Color4b) {
+        let x = src.x as f32 / ATLAS_WIDTH as f32;
+        let y = src.y as f32 / ATLAS_HEIGHT as f32;
+        let w = src.w as f32 / ATLAS_WIDTH as f32;
+        let h = src.h as f32 / ATLAS_HEIGHT as f32;
 
-        let pclone = pixels.clone();
+        let mut v0 = Vertex::default();
+        let mut v1 = Vertex::default();
+        let mut v2 = Vertex::default();
+        let mut v3 = Vertex::default();
 
-        println!("uploading egui texture: {}x{}", texture.width(), texture.height());
+        // tex coordinates
+        v0.tex.x = x;
+        v0.tex.y = y;
+        v1.tex.x = x + w;
+        v1.tex.y = y;
+        v2.tex.x = x + w;
+        v2.tex.y = y + h;
+        v3.tex.x = x;
+        v3.tex.y = y + h;
 
-        let tex_desc = TextureDesc {
-            sampler_desc: SamplerDesc::default(texture.width(), texture.height())
-                .with_pixel_format(PixelFormat::RGBA8(
-                    MinMagFilter::default().with_mag_filter(Filter::Linear).with_min_filter(Filter::Linear),
-                ))
-                .with_wrap_mode(WrapMode::ClampToEdge),
-            payload: Some(Arc::new(pixels)),
-        };
+        // position
+        v0.pos.x = dst.x as f32;
+        v0.pos.y = dst.y as f32;
+        v1.pos.x = dst.x as f32 + dst.w as f32;
+        v1.pos.y = dst.y as f32;
+        v2.pos.x = dst.x as f32 + dst.w as f32;
+        v2.pos.y = dst.y as f32 + dst.h as f32;
+        v3.pos.x = dst.x as f32;
+        v3.pos.y = dst.y as f32 + dst.h as f32;
 
-        let tex = self.driver.create_texture(tex_desc).unwrap();
-        let pt = PaintTexture {
-            size: (texture.width(), texture.height()),
+        // color
+        v0.color = color4b(color.r, color.g, color.b, color.a);
+        v1.color = v0.color;
+        v2.color = v0.color;
+        v3.color = v0.color;
 
-            /// Pending upload (will be emptied later).
-            pixels: pclone,
-
-            /// Lazily uploaded
-            texture: Some(tex),
-
-            /// User textures can be modified and this flag
-            /// is used to indicate if pixel data for the
-            /// texture has been updated.
-            dirty: false,
-        };
-        self.egui_textures.insert(tex_id, pt);
+        self.push_quad_vertices(&v0, &v1, &v2, &v3);
     }
 
-    fn update_egui_texture(&mut self, tex_id: u64, pos: Vec2i, delta: &egui::ImageData) {
-        // TODO
-        println!("TODO: update egui texture! {:?}", delta.size());
-
-        let tex = self.egui_textures.get_mut(&tex_id).unwrap();
-        let pixels = &mut tex.pixels;
-        let d: Vec<Color4b> = match &delta {
-            egui::ImageData::Color(image) => {
-                assert_eq!(
-                    image.width() * image.height(),
-                    image.pixels.len(),
-                    "Mismatch between texture size and texel count"
-                );
-                image.pixels.iter().map(|c| color4b(c.r(), c.g(), c.b(), c.a())).collect()
-            }
-            egui::ImageData::Font(image) => {
-                let gamma = 1.0;
-                image.srgba_pixels(gamma).map(|c| color4b(c.r(), c.g(), c.b(), c.a())).collect()
-            }
-        };
-        for y in 0..delta.size()[1] {
-            for x in 0..delta.size()[0] {
-                pixels[tex.size.0 * (y + pos.y as usize) + x + pos.x as usize] = d[delta.size()[0] * y + x];
-            }
-        }
-
-        let tex_desc = TextureDesc {
-            sampler_desc: SamplerDesc::default(tex.size.0, tex.size.1)
-                .with_pixel_format(PixelFormat::RGBA8(
-                    MinMagFilter::default().with_mag_filter(Filter::Linear).with_min_filter(Filter::Linear),
-                ))
-                .with_wrap_mode(WrapMode::ClampToEdge),
-            payload: Some(Arc::new(pixels.clone())),
-        };
-
-        let ptex = self.driver.create_texture(tex_desc).unwrap();
-        let pt = PaintTexture {
-            size: tex.size,
-
-            /// Pending upload (will be emptied later).
-            pixels: tex.pixels.clone(),
-
-            /// Lazily uploaded
-            texture: Some(ptex),
-
-            /// User textures can be modified and this flag
-            /// is used to indicate if pixel data for the
-            /// texture has been updated.
-            dirty: false,
-        };
-        self.egui_textures.insert(tex_id, pt);
+    pub fn draw_rect(&mut self, rect: Recti, color: Color4b) {
+        self.push_rect(rect, ATLAS[ATLAS_WHITE as usize], color);
     }
 
-    fn upload_user_textures(&mut self, pass: &mut Pass) {
-        for (_, user_texture) in &mut self.user_textures {
-            if !user_texture.texture.is_none() && !user_texture.dirty {
-                continue;
-            }
-
-            let pixels = std::mem::take(&mut user_texture.pixels);
-
-            let tex_desc = TextureDesc {
-                sampler_desc: SamplerDesc::default(user_texture.size.0, user_texture.size.1).with_pixel_format(PixelFormat::RGBA8(
-                    MinMagFilter::default().with_mag_filter(Filter::Linear).with_min_filter(Filter::Linear),
-                )),
-                payload: Some(Arc::new(pixels)),
-            };
-
-            if user_texture.texture.is_none() {
-                println!("uploading user texture");
-
-                let tex = self.driver.create_texture(tex_desc).unwrap();
-                user_texture.texture = Some(tex);
-            } else {
-                pass.update_texture(&mut user_texture.texture.as_mut().unwrap(), tex_desc.payload.unwrap())
-            }
-            user_texture.dirty = false;
-        }
-    }
-
-    fn get_texture(&self, texture_id: ::egui::TextureId) -> TexturePtr {
-        match texture_id {
-            ::egui::TextureId::Managed(id) => self.egui_textures[&id].texture.as_ref().unwrap().clone(),
-
-            ::egui::TextureId::User(id) => {
-                let texture = self.user_textures[&id].texture.clone();
-                texture.expect("Should have been uploaded")
+    pub fn draw_text(&mut self, text: &str, pos: Vec2i, color: Color4b) {
+        let mut dst = Rect { x: pos.x, y: pos.y, w: 0, h: 0 };
+        for p in text.chars() {
+            if (p as usize) < 127 {
+                let chr = usize::min(p as usize, 127);
+                let src = ATLAS[ATLAS_FONT as usize + chr];
+                dst.w = src.w;
+                dst.h = src.h;
+                self.push_rect(dst, src, color);
+                dst.x += dst.w;
             }
         }
     }
 
-    pub fn update_user_texture_data(&mut self, texture_id: ::egui::TextureId, pixels: &[Color32]) {
-        match texture_id {
-            ::egui::TextureId::Managed(_) => {}
-            ::egui::TextureId::User(id) => {
-                let mut tex_pixels = Vec::with_capacity(pixels.len() * 4);
-                for p in pixels {
-                    tex_pixels.push(color4b(p.r(), p.g(), p.b(), p.a()));
-                }
-
-                let mut user_tex = self.user_textures[&id].clone();
-                user_tex.pixels = tex_pixels;
-                user_tex.dirty = true;
-                self.user_textures.insert(id, user_tex);
-            }
-        }
+    pub fn draw_icon(&mut self, id: Icon, r: Recti, color: Color4b) {
+        let src = ATLAS[id as usize];
+        let x = r.x + (r.w - src.w) / 2;
+        let y = r.y + (r.h - src.h) / 2;
+        self.push_rect(rect(x, y, src.w, src.h), src, color);
     }
 
-    pub fn paint_jobs(&mut self, pass: &mut Pass, meshes: Vec<ClippedPrimitive>, egui_texture: &egui::TexturesDelta, pixels_per_point: f32) {
-        for (id, delta) in &egui_texture.set {
-            match id {
-                egui::TextureId::Managed(id) => match &delta.pos {
-                    None => self.upload_egui_texture(*id, &delta.image),
-                    Some(p) => self.update_egui_texture(*id, Vec2i::new(p[0] as _, p[1] as _), &delta.image),
-                },
-                _ => (),
-            }
-        }
+    pub fn get_char_width(&self, _font: FontId, c: char) -> usize {
+        ATLAS[ATLAS_FONT as usize + c as usize].w as usize
+    }
 
-        self.upload_user_textures(pass);
+    pub fn get_font_height(&self, _font: FontId) -> usize {
+        18
+    }
 
+    pub fn paint(&mut self, pass: &mut Pass, ctx: &mut super::Context) {
         let screen_size_pixels = vec2(self.canvas_width as f32, self.canvas_height as f32);
         let screen_size_points = screen_size_pixels / pixels_per_point;
 
@@ -504,21 +351,7 @@ impl Painter {
         }
     }
 
-    fn paint_mesh(&mut self, pass: &mut Pass, mesh: &Mesh, screen_size: Vec2f) {
-        debug_assert!(mesh.is_valid());
-        let vertices: Vec<Vertex> = mesh
-            .indices
-            .iter()
-            .map(|idx| {
-                let v = mesh.vertices[*idx as usize];
-                Vertex {
-                    a_pos: Vec2f::new(v.pos.x, v.pos.y),
-                    s_rgba: color4b(v.color[0], v.color[1], v.color[2], v.color[3]),
-                    a_tc: Vec2f::new(v.uv.x, v.uv.y),
-                }
-            })
-            .collect();
-
+    fn paint_mesh(&mut self, pass: &mut Pass, vertices: &Vec<Vertex>, indices: &Vec<u16>, screen_size: Vec2f) {
         let max_part_size = 3 * 4096;
         let index_count = mesh.indices.len();
         let parts = mesh.indices.len() / max_part_size;

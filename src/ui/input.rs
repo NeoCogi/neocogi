@@ -58,21 +58,11 @@
 #![allow(clippy::single_match)]
 
 // Re-export dependencies.
-use crate::*;
-use crate::egui::*;
+use super::*;
 
-#[cfg(not(feature = "clipboard"))]
-
-use super::clipboard::{
-    ClipboardContext, // TODO: remove
-    ClipboardProvider,
-};
-
-pub struct EguiInputState {
-    pub pointer_pos: Pos2,
-    pub clipboard: Option<ClipboardContext>,
-    pub egui_input: RawInput,
-    pub modifiers: Modifiers,
+pub struct InputState {
+    pub pointer_pos: Vec2i,
+    pub modifiers: KeyMod ,
     current_pixels_per_point: f32,
 }
 
@@ -83,7 +73,6 @@ impl EguiInputState {
             clipboard: init_clipboard(),
             egui_input,
             modifiers: Modifiers::default(),
-            current_pixels_per_point: 1.0,
         }
     }
 }
