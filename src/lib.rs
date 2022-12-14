@@ -1,18 +1,17 @@
-
-#[cfg(feature="renderer")]
+#[cfg(feature = "renderer")]
 pub mod renderer;
 
-#[cfg(feature="ui")]
+#[cfg(feature = "ui")]
 pub mod ui;
 
 pub mod rs_math3d {
     pub use rs_math3d::*;
 }
 
-#[cfg(feature="scene")]
+#[cfg(feature = "scene")]
 pub mod scene;
 
-#[cfg(feature="ui")]
+#[cfg(feature = "ui")]
 pub extern crate glfw;
 
 pub enum UpdateResult {

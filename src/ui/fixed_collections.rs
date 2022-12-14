@@ -27,9 +27,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-use core::ops::{IndexMut, Index, AddAssign};
-use core::str::Chars;
 use core::cmp::Ordering;
+use core::ops::{AddAssign, Index, IndexMut};
+use core::str::Chars;
 
 pub trait IVec<T: Default + Copy> {
     fn push(&mut self, t: T) -> (&mut T, usize);
@@ -56,6 +56,7 @@ pub trait IVec<T: Default + Copy> {
     }
 }
 
+#[inline(always)]
 pub fn quick_sort_by<T, F: Fn(&T, &T) -> Ordering>(arr: &mut [T], f: F) {
     let len = arr.len();
     if len == 0 {
@@ -181,7 +182,10 @@ impl<T: Default + Copy, const N: usize> IndexMut<usize> for FixedVec<T, N> {
 
 impl<T: Default + Copy, const N: usize> Default for FixedVec<T, N> {
     fn default() -> Self {
-        Self { idx: 0, items: [T::default(); N] }
+        Self {
+            idx: 0,
+            items: [T::default(); N],
+        }
     }
 }
 
@@ -236,7 +240,11 @@ pub trait IString {
 
             let mut number_ascii = [0u8; 32];
             let number_ptr = number_ascii.as_mut_ptr();
-            libc::sprintf(number_ptr as *mut libc::c_char, fmt_ascii.as_ptr() as *const libc::c_char, v as f64);
+            libc::sprintf(
+                number_ptr as *mut libc::c_char,
+                fmt_ascii.as_ptr() as *const libc::c_char,
+                v as f64,
+            );
             for c in 0..number_ascii.len() {
                 if number_ascii[c] != 0 {
                     self.push(number_ascii[c] as char);
@@ -260,7 +268,11 @@ pub trait IString {
 
             let mut number_ascii = [0u8; 32];
             let number_ptr = number_ascii.as_mut_ptr();
-            libc::sprintf(number_ptr as *mut libc::c_char, fmt_ascii.as_ptr() as *const libc::c_char, v);
+            libc::sprintf(
+                number_ptr as *mut libc::c_char,
+                fmt_ascii.as_ptr() as *const libc::c_char,
+                v,
+            );
             for c in 0..number_ascii.len() {
                 if number_ascii[c] != 0 {
                     self.push(number_ascii[c] as char);
@@ -280,7 +292,10 @@ pub struct FixedString<const N: usize> {
 
 impl<const N: usize> FixedString<N> {
     pub fn new() -> Self {
-        Self { char_count: 0, vec: FixedVec::default() }
+        Self {
+            char_count: 0,
+            vec: FixedVec::default(),
+        }
     }
 }
 

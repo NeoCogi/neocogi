@@ -58,12 +58,13 @@ pub use fixed_collections::*;
 mod atlas;
 pub use atlas::*;
 
-pub mod pointer;
-pub mod painter;
 pub mod input;
+pub mod painter;
+pub mod pointer;
 
-use rs_math3d::{Vec2i, Recti, Rect, Color4b, color4b};
+pub use painter::*;
 
+use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 
 use bitflags::*;
 
@@ -109,7 +110,9 @@ impl<const N: usize> Pool<N> {
 
 impl<const N: usize> Default for Pool<N> {
     fn default() -> Self {
-        Self { vec: [PoolItem::default(); N] }
+        Self {
+            vec: [PoolItem::default(); N],
+        }
     }
 }
 
@@ -504,7 +507,12 @@ impl Default for LayoutPosition {
     }
 }
 
-static UNCLIPPED_RECT: Recti = Recti { x: 0, y: 0, width: 0x1000000, height: 0x1000000 };
+static UNCLIPPED_RECT: Recti = Recti {
+    x: 0,
+    y: 0,
+    width: 0x1000000,
+    height: 0x1000000,
+};
 
 impl Default for Style {
     fn default() -> Self {
@@ -569,11 +577,18 @@ pub fn rect_overlaps_vec2(r: Recti, p: Vec2i) -> bool {
 
 pub fn draw_frame(ctx: &mut Context, rect: Recti, colorid: ControlColor) {
     ctx.draw_rect(rect, ctx.style.colors[colorid as usize]);
-    if colorid == ControlColor::ScrollBase || colorid == ControlColor::ScrollThumb || colorid == ControlColor::TitleBG {
+    if colorid == ControlColor::ScrollBase
+        || colorid == ControlColor::ScrollThumb
+        || colorid == ControlColor::TitleBG
+    {
         return;
     }
-    if ctx.style.colors[ControlColor::Border as usize].w != 0 { // alpha
-        ctx.draw_box(expand_rect(rect, 1), ctx.style.colors[ControlColor::Border as usize]);
+    if ctx.style.colors[ControlColor::Border as usize].w != 0 {
+        // alpha
+        ctx.draw_box(
+            expand_rect(rect, 1),
+            ctx.style.colors[ControlColor::Border as usize],
+        );
     }
 }
 
@@ -647,8 +662,9 @@ impl Context {
         self.scroll_delta = vec2(0, 0);
         self.last_mouse_pos = self.mouse_pos;
         let n = self.root_list.len();
+        let containers = &self.containers;
         quick_sort_by(self.root_list.as_slice_mut(), |a, b| {
-            self.containers[*a].zindex.cmp(&self.containers[*b].zindex)
+            containers[*a].zindex.cmp(&containers[*b].zindex)
         });
 
         for i in 0..n {
@@ -662,22 +678,46 @@ impl Context {
                     Command::Jump { .. } => true,
                     _ => false,
                 });
-                let dst_idx = self.containers[self.root_list[i as usize]].head_idx.unwrap() + 1;
-                *cmd = Command::Jump { dst_idx: Some(dst_idx) };
+                let dst_idx = self.containers[self.root_list[i as usize]]
+                    .head_idx
+                    .unwrap()
+                    + 1;
+                *cmd = Command::Jump {
+                    dst_idx: Some(dst_idx),
+                };
                 assert!(dst_idx < self.command_list.len());
             } else {
                 let prev = &self.containers[self.root_list[i - 1]];
                 self.command_list[prev.tail_idx.unwrap()] = Command::Jump {
-                    dst_idx: Some(self.containers[self.root_list[i as usize]].head_idx.unwrap() + 1),
+                    dst_idx: Some(
+                        self.containers[self.root_list[i as usize]]
+                            .head_idx
+                            .unwrap()
+                            + 1,
+                    ),
                 };
             }
             if i == n - 1 {
-                assert!(self.containers[self.root_list[i as usize]].tail_idx.unwrap() < self.command_list.len());
-                assert!(match self.command_list[self.containers[self.root_list[i as usize]].tail_idx.unwrap()] {
-                    Command::Jump { .. } => true,
-                    _ => false,
-                });
-                self.command_list[self.containers[self.root_list[i as usize]].tail_idx.unwrap()] = Command::Jump { dst_idx: Some(self.command_list.len()) };
+                assert!(
+                    self.containers[self.root_list[i as usize]]
+                        .tail_idx
+                        .unwrap()
+                        < self.command_list.len()
+                );
+                assert!(
+                    match self.command_list[self.containers[self.root_list[i as usize]]
+                        .tail_idx
+                        .unwrap()]
+                    {
+                        Command::Jump { .. } => true,
+                        _ => false,
+                    }
+                );
+                self.command_list[self.containers[self.root_list[i as usize]]
+                    .tail_idx
+                    .unwrap()] = Command::Jump {
+                    dst_idx: Some(self.command_list.len()),
+                };
                 // the snake eats its tail
             }
         }
@@ -749,10 +789,18 @@ impl Context {
 
     pub fn check_clip(&mut self, r: Recti) -> Clip {
         let cr = self.get_clip_rect();
-        if r.x > cr.x + cr.width || r.x + r.width < cr.x || r.y > cr.y + cr.height || r.y + r.height < cr.y {
+        if r.x > cr.x + cr.width
+            || r.x + r.width < cr.x
+            || r.y > cr.y + cr.height
+            || r.y + r.height < cr.y
+        {
             return Clip::All;
         }
-        if r.x >= cr.x && r.x + r.width <= cr.x + cr.width && r.y >= cr.y && r.y + r.height <= cr.y + cr.height {
+        if r.x >= cr.x
+            && r.x + r.width <= cr.x + cr.width
+            && r.y >= cr.y
+            && r.y + r.height <= cr.y + cr.height
+        {
             return Clip::None;
         }
         return Clip::Part;
@@ -760,8 +808,18 @@ impl Context {
 
     fn push_layout(&mut self, body: Recti, scroll: Vec2i) {
         let mut layout: Layout = Layout {
-            body: Recti { x: 0, y: 0, width: 0, height: 0 },
-            next: Recti { x: 0, y: 0, width: 0, height: 0 },
+            body: Recti {
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+            },
+            next: Recti {
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+            },
             position: Vec2i { x: 0, y: 0 },
             size: Vec2i { x: 0, y: 0 },
             max: Vec2i { x: 0, y: 0 },
@@ -772,7 +830,12 @@ impl Context {
             next_type: LayoutPosition::None,
             indent: 0,
         };
-        layout.body = Rect::new(body.x - scroll.x, body.y - scroll.y, body.width, body.height);
+        layout.body = Rect::new(
+            body.x - scroll.x,
+            body.y - scroll.y,
+            body.width,
+            body.height,
+        );
         layout.max = vec2(-0x1000000, -0x1000000);
         self.layout_stack.push(layout);
         self.layout_row(&[0], 0);
@@ -935,13 +998,21 @@ impl Context {
 
     pub fn draw_box(&mut self, r: Recti, color: Color4b) {
         self.draw_rect(Rect::new(r.x + 1, r.y, r.width - 2, 1), color);
-        self.draw_rect(Rect::new(r.x + 1, r.y + r.height - 1, r.width - 2, 1), color);
+        self.draw_rect(
+            Rect::new(r.x + 1, r.y + r.height - 1, r.width - 2, 1),
+            color,
+        );
         self.draw_rect(Rect::new(r.x, r.y, 1, r.height), color);
         self.draw_rect(Rect::new(r.x + r.width - 1, r.y, 1, r.height), color);
     }
 
     pub fn draw_text(&mut self, font: FontId, str: &str, pos: Vec2i, color: Color4b) {
-        let rect = Rect::new(pos.x, pos.y, self.get_text_width(font, str), self.get_text_height(font, str));
+        let rect = Rect::new(
+            pos.x,
+            pos.y,
+            self.get_text_width(font, str),
+            self.get_text_height(font, str),
+        );
         let clipped = self.check_clip(rect);
         match clipped {
             Clip::All => return,
@@ -1051,7 +1122,8 @@ impl Context {
             let litems = layout.items;
             let lsize_y = layout.size.y;
             let mut undefined_widths = [0; 16];
-            undefined_widths[0..litems as usize].copy_from_slice(&layout.widths[0..litems as usize]);
+            undefined_widths[0..litems as usize]
+                .copy_from_slice(&layout.widths[0..litems as usize]);
             if layout.item_index == layout.items {
                 Self::layout_row_for_layout(layout, &undefined_widths[0..litems as usize], lsize_y);
             }
@@ -1085,8 +1157,16 @@ impl Context {
         };
         res.x += layout.body.x;
         res.y += layout.body.y;
-        layout.max.x = if layout.max.x > res.x + res.width { layout.max.x } else { res.x + res.width };
-        layout.max.y = if layout.max.y > res.y + res.height { layout.max.y } else { res.y + res.height };
+        layout.max.x = if layout.max.x > res.x + res.width {
+            layout.max.x
+        } else {
+            res.x + res.width
+        };
+        layout.max.y = if layout.max.y > res.y + res.height {
+            layout.max.y
+        } else {
+            res.y + res.height
+        };
         self.last_rect = res;
         return self.last_rect;
     }
@@ -1099,7 +1179,10 @@ impl Context {
                     if self.container_stack[len - i - 1] == hover_root {
                         return true;
                     }
-                    if self.containers[self.container_stack[len - i - 1]].head_idx.is_some() {
+                    if self.containers[self.container_stack[len - i - 1]]
+                        .head_idx
+                        .is_some()
+                    {
                         break;
                     }
                 }
@@ -1109,7 +1192,13 @@ impl Context {
         }
     }
 
-    pub fn draw_control_frame(&mut self, id: Id, rect: Recti, mut colorid: ControlColor, opt: WidgetOption) {
+    pub fn draw_control_frame(
+        &mut self,
+        id: Id,
+        rect: Recti,
+        mut colorid: ControlColor,
+        opt: WidgetOption,
+    ) {
         if opt.has_no_frame() {
             return;
         }
@@ -1122,7 +1211,13 @@ impl Context {
         (self.draw_frame).expect("non-null function pointer")(self, rect, colorid);
     }
 
-    pub fn draw_control_text(&mut self, str: &str, rect: Recti, colorid: ControlColor, opt: WidgetOption) {
+    pub fn draw_control_text(
+        &mut self,
+        str: &str,
+        rect: Recti,
+        colorid: ControlColor,
+        opt: WidgetOption,
+    ) {
         let mut pos: Vec2i = Vec2i { x: 0, y: 0 };
         let font = self.style.font;
         let tw = self.get_text_width(font, str);
@@ -1140,7 +1235,9 @@ impl Context {
     }
 
     pub fn mouse_over(&mut self, rect: Recti) -> bool {
-        rect_overlaps_vec2(rect, self.mouse_pos) && rect_overlaps_vec2(self.get_clip_rect(), self.mouse_pos) && self.in_hover_root()
+        rect_overlaps_vec2(rect, self.mouse_pos)
+            && rect_overlaps_vec2(self.get_clip_rect(), self.mouse_pos)
+            && self.in_hover_root()
     }
 
     pub fn update_control(&mut self, id: Id, rect: Recti, opt: WidgetOption) {
@@ -1256,14 +1353,24 @@ impl Context {
         }
         self.draw_control_frame(id, box_0, ControlColor::Base, WidgetOption::NONE);
         if *state {
-            self.draw_icon(Icon::Check, box_0, self.style.colors[ControlColor::Text as usize]);
+            self.draw_icon(
+                Icon::Check,
+                box_0,
+                self.style.colors[ControlColor::Text as usize],
+            );
         }
         r = Rect::new(r.x + box_0.width, r.y, r.width - box_0.width, r.height);
         self.draw_control_text(label, r, ControlColor::Text, WidgetOption::NONE);
         return res;
     }
 
-    pub fn textbox_raw(&mut self, buf: &mut dyn IString, id: Id, r: Recti, opt: WidgetOption) -> ResourceState {
+    pub fn textbox_raw(
+        &mut self,
+        buf: &mut dyn IString,
+        id: Id,
+        r: Recti,
+        opt: WidgetOption,
+    ) -> ResourceState {
         let mut res = ResourceState::NONE;
         self.update_control(id, r, opt | WidgetOption::HOLD_FOCUS);
         if self.focus == Some(id) {
@@ -1292,7 +1399,12 @@ impl Context {
             let textw = self.get_text_width(font, buf.as_str());
             let texth = self.get_text_height(font, buf.as_str());
             let ofx = r.width - self.style.padding - textw - 1;
-            let textx = r.x + (if ofx < self.style.padding { ofx } else { self.style.padding });
+            let textx = r.x
+                + (if ofx < self.style.padding {
+                    ofx
+                } else {
+                    self.style.padding
+                });
             let texty = r.y + (r.height - texth) / 2;
             self.push_clip_rect(r);
             self.draw_text(font, buf.as_str(), vec2(textx, texty), color);
@@ -1323,7 +1435,12 @@ impl Context {
                     i += 1;
                 }
                 ascii[i] = '\0' as u8;
-                let v = unsafe { libc::strtod(ascii.as_ptr() as *const libc::c_char, ptr::null_mut() as *mut *mut libc::c_char) };
+                let v = unsafe {
+                    libc::strtod(
+                        ascii.as_ptr() as *const libc::c_char,
+                        ptr::null_mut() as *mut *mut libc::c_char,
+                    )
+                };
                 *value = v as Real;
                 self.number_edit = None;
             } else {
@@ -1339,7 +1456,15 @@ impl Context {
         return self.textbox_raw(buf, id, r, opt);
     }
 
-    pub fn slider_ex(&mut self, value: &mut Real, low: Real, high: Real, step: Real, fmt: &str, opt: WidgetOption) -> ResourceState {
+    pub fn slider_ex(
+        &mut self,
+        value: &mut Real,
+        low: Real,
+        high: Real,
+        step: Real,
+        fmt: &str,
+        opt: WidgetOption,
+    ) -> ResourceState {
         let mut res = ResourceState::NONE;
         let last = *value;
         let mut v = last;
@@ -1377,7 +1502,13 @@ impl Context {
         return res;
     }
 
-    pub fn number_ex(&mut self, value: &mut Real, step: Real, fmt: &str, opt: WidgetOption) -> ResourceState {
+    pub fn number_ex(
+        &mut self,
+        value: &mut Real,
+        step: Real,
+        fmt: &str,
+        opt: WidgetOption,
+    ) -> ResourceState {
         let mut res = ResourceState::NONE;
         let id: Id = self.get_id_from_ptr(value);
         let base = self.layout_next();
@@ -1404,7 +1535,11 @@ impl Context {
         let idx = self.treenode_pool.get(id);
         self.layout_row(&[-1], 0);
         let mut active = idx.is_some() as i32;
-        let expanded = if opt.is_expanded() { (active == 0) as i32 } else { active };
+        let expanded = if opt.is_expanded() {
+            (active == 0) as i32
+        } else {
+            active
+        };
         let mut r = self.layout_next();
         self.update_control(id, r, WidgetOption::NONE);
         active ^= (self.mouse_pressed.is_left() && self.focus == Some(id)) as i32;
@@ -1420,20 +1555,32 @@ impl Context {
 
         if is_treenode {
             if self.hover == Some(id) {
-                (self.draw_frame).expect("non-null function pointer")(self, r, ControlColor::ButtonHover);
+                (self.draw_frame).expect("non-null function pointer")(
+                    self,
+                    r,
+                    ControlColor::ButtonHover,
+                );
             }
         } else {
             self.draw_control_frame(id, r, ControlColor::Button, WidgetOption::NONE);
         }
         self.draw_icon(
-            if expanded != 0 { Icon::Expanded } else { Icon::Collapsed },
+            if expanded != 0 {
+                Icon::Expanded
+            } else {
+                Icon::Collapsed
+            },
             Rect::new(r.x, r.y, r.height, r.height),
             self.style.colors[ControlColor::Text as usize],
         );
         r.x += r.height - self.style.padding;
         r.width -= r.height - self.style.padding;
         self.draw_control_text(label, r, ControlColor::Text, WidgetOption::NONE);
-        return if expanded != 0 { ResourceState::ACTIVE } else { ResourceState::NONE };
+        return if expanded != 0 {
+            ResourceState::ACTIVE
+        } else {
+            ResourceState::NONE
+        };
     }
 
     pub fn header_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
@@ -1481,9 +1628,14 @@ impl Context {
             if self.focus == Some(id) && self.mouse_down.is_left() {
                 self.containers[cnt_id].scroll.y += self.mouse_delta.y * cs.y / base.height;
             }
-            self.containers[cnt_id].scroll.y = Self::clamp(self.containers[cnt_id].scroll.y, 0, maxscroll);
+            self.containers[cnt_id].scroll.y =
+                Self::clamp(self.containers[cnt_id].scroll.y, 0, maxscroll);
 
-            (self.draw_frame).expect("non-null function pointer")(self, base, ControlColor::ScrollBase);
+            (self.draw_frame).expect("non-null function pointer")(
+                self,
+                base,
+                ControlColor::ScrollBase,
+            );
             let mut thumb = base;
             thumb.height = if self.style.thumb_size > base.height * body.height / cs.y {
                 self.style.thumb_size
@@ -1491,7 +1643,11 @@ impl Context {
                 base.height * body.height / cs.y
             };
             thumb.y += self.containers[cnt_id].scroll.y * (base.height - thumb.height) / maxscroll;
-            (self.draw_frame).expect("non-null function pointer")(self, thumb, ControlColor::ScrollThumb);
+            (self.draw_frame).expect("non-null function pointer")(
+                self,
+                thumb,
+                ControlColor::ScrollThumb,
+            );
             if self.mouse_over(body) {
                 self.scroll_target = Some(cnt_id);
             }
@@ -1508,17 +1664,27 @@ impl Context {
             if self.focus == Some(id_0) && self.mouse_down.is_left() {
                 self.containers[cnt_id].scroll.x += self.mouse_delta.x * cs.x / base_0.width;
             }
-            self.containers[cnt_id].scroll.x = Self::clamp(self.containers[cnt_id].scroll.x, 0, maxscroll_0);
+            self.containers[cnt_id].scroll.x =
+                Self::clamp(self.containers[cnt_id].scroll.x, 0, maxscroll_0);
 
-            (self.draw_frame).expect("non-null function pointer")(self, base_0, ControlColor::ScrollBase);
+            (self.draw_frame).expect("non-null function pointer")(
+                self,
+                base_0,
+                ControlColor::ScrollBase,
+            );
             let mut thumb_0 = base_0;
             thumb_0.width = if self.style.thumb_size > base_0.width * body.width / cs.x {
                 self.style.thumb_size
             } else {
                 base_0.width * body.width / cs.x
             };
-            thumb_0.x += self.containers[cnt_id].scroll.x * (base_0.width - thumb_0.width) / maxscroll_0;
-            (self.draw_frame).expect("non-null function pointer")(self, thumb_0, ControlColor::ScrollThumb);
+            thumb_0.x +=
+                self.containers[cnt_id].scroll.x * (base_0.width - thumb_0.width) / maxscroll_0;
+            (self.draw_frame).expect("non-null function pointer")(
+                self,
+                thumb_0,
+                ControlColor::ScrollThumb,
+            );
             if self.mouse_over(body) {
                 self.scroll_target = Some(cnt_id);
             }
@@ -1533,7 +1699,10 @@ impl Context {
         if !opt.has_no_scroll() {
             self.scrollbars(cnt_idx, &mut body);
         }
-        self.push_layout(expand_rect(body, -self.style.padding), self.containers[cnt_idx].scroll);
+        self.push_layout(
+            expand_rect(body, -self.style.padding),
+            self.containers[cnt_idx].scroll,
+        );
         self.containers[cnt_idx].body = body;
     }
 
@@ -1543,7 +1712,9 @@ impl Context {
         self.root_list.push(cnt);
         self.containers[cnt].head_idx = Some(self.push_jump(None));
         if rect_overlaps_vec2(self.containers[cnt].rect, self.mouse_pos)
-            && (self.next_hover_root.is_none() || self.containers[cnt].zindex > self.containers[self.next_hover_root.unwrap()].zindex)
+            && (self.next_hover_root.is_none()
+                || self.containers[cnt].zindex
+                    > self.containers[self.next_hover_root.unwrap()].zindex)
         {
             self.next_hover_root = Some(cnt);
         }
@@ -1553,12 +1724,19 @@ impl Context {
     fn end_root_container(&mut self) {
         let cnt = self.get_current_container();
         self.containers[cnt].tail_idx = Some(self.push_jump(None));
-        self.command_list[self.containers[cnt].head_idx.unwrap()] = Command::Jump { dst_idx: Some(self.command_list.len()) };
+        self.command_list[self.containers[cnt].head_idx.unwrap()] = Command::Jump {
+            dst_idx: Some(self.command_list.len()),
+        };
         self.pop_clip_rect();
         self.pop_container();
     }
 
-    pub fn begin_window_ex(&mut self, title: &str, mut r: Recti, opt: WidgetOption) -> ResourceState {
+    pub fn begin_window_ex(
+        &mut self,
+        title: &str,
+        mut r: Recti,
+        opt: WidgetOption,
+    ) -> ResourceState {
         let id = self.get_id_from_str(title);
         let cnt_id = self.get_container_index_intern(id, opt);
         if cnt_id.is_none() || !self.containers[cnt_id.unwrap()].open {
@@ -1596,7 +1774,11 @@ impl Context {
                 let id = self.get_id_from_str("!close");
                 let r = Rect::new(tr.x + tr.width - tr.height, tr.y, tr.height, tr.height);
                 tr.width -= r.width;
-                self.draw_icon(Icon::Close, r, self.style.colors[ControlColor::TitleText as usize]);
+                self.draw_icon(
+                    Icon::Close,
+                    r,
+                    self.style.colors[ControlColor::TitleText as usize],
+                );
                 self.update_control(id, r, opt);
                 if self.mouse_pressed.is_left() && Some(id) == self.focus {
                     self.containers[cnt_id.unwrap()].open = false;
@@ -1610,22 +1792,28 @@ impl Context {
             let r_0 = Recti::new(r.x + r.width - sz, r.y + r.height - sz, sz, sz);
             self.update_control(id_2, r_0, opt);
             if Some(id_2) == self.focus && self.mouse_down.is_left() {
-                self.containers[cnt_id.unwrap()].rect.width = if 96 > self.containers[cnt_id.unwrap()].rect.width + self.mouse_delta.x {
-                    96
-                } else {
-                    self.containers[cnt_id.unwrap()].rect.width + self.mouse_delta.x
-                };
-                self.containers[cnt_id.unwrap()].rect.height = if 64 > self.containers[cnt_id.unwrap()].rect.height + self.mouse_delta.y {
-                    64
-                } else {
-                    self.containers[cnt_id.unwrap()].rect.height + self.mouse_delta.y
-                };
+                self.containers[cnt_id.unwrap()].rect.width =
+                    if 96 > self.containers[cnt_id.unwrap()].rect.width + self.mouse_delta.x {
+                        96
+                    } else {
+                        self.containers[cnt_id.unwrap()].rect.width + self.mouse_delta.x
+                    };
+                self.containers[cnt_id.unwrap()].rect.height =
+                    if 64 > self.containers[cnt_id.unwrap()].rect.height + self.mouse_delta.y {
+                        64
+                    } else {
+                        self.containers[cnt_id.unwrap()].rect.height + self.mouse_delta.y
+                    };
             }
         }
         if opt.is_auto_sizing() {
             let r_1 = self.get_layout().body;
-            self.containers[cnt_id.unwrap()].rect.width = self.containers[cnt_id.unwrap()].content_size.x + (self.containers[cnt_id.unwrap()].rect.width - r_1.width);
-            self.containers[cnt_id.unwrap()].rect.height = self.containers[cnt_id.unwrap()].content_size.y + (self.containers[cnt_id.unwrap()].rect.height - r_1.height);
+            self.containers[cnt_id.unwrap()].rect.width =
+                self.containers[cnt_id.unwrap()].content_size.x
+                    + (self.containers[cnt_id.unwrap()].rect.width - r_1.width);
+            self.containers[cnt_id.unwrap()].rect.height =
+                self.containers[cnt_id.unwrap()].content_size.y
+                    + (self.containers[cnt_id.unwrap()].rect.height - r_1.height);
         }
 
         if opt.is_popup() && !self.mouse_pressed.is_none() && self.hover_root != cnt_id {
@@ -1650,8 +1838,12 @@ impl Context {
     }
 
     pub fn begin_popup(&mut self, name: &str) -> ResourceState {
-        let opt =
-            WidgetOption::POPUP | WidgetOption::AUTO_SIZE | WidgetOption::NO_RESIZE | WidgetOption::NO_SCROLL | WidgetOption::NO_TITLE | WidgetOption::CLOSED;
+        let opt = WidgetOption::POPUP
+            | WidgetOption::AUTO_SIZE
+            | WidgetOption::NO_RESIZE
+            | WidgetOption::NO_SCROLL
+            | WidgetOption::NO_TITLE
+            | WidgetOption::CLOSED;
         return self.begin_window_ex(name, Rect::new(0, 0, 0, 0), opt);
     }
 
@@ -1665,7 +1857,11 @@ impl Context {
         let rect = self.layout_next();
         self.containers[cnt_id.unwrap()].rect = rect;
         if !opt.has_no_frame() {
-            (self.draw_frame).expect("non-null function pointer")(self, rect, ControlColor::PanelBG);
+            (self.draw_frame).expect("non-null function pointer")(
+                self,
+                rect,
+                ControlColor::PanelBG,
+            );
         }
 
         self.container_stack.push(cnt_id.unwrap());

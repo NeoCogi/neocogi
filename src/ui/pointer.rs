@@ -50,40 +50,44 @@ pub enum Event {
 
 #[derive(Debug, Copy, Clone)]
 pub struct State {
-    curr_pos    : Vec2f,
-    curr_state  : ButtonState,
+    curr_pos: Vec2f,
+    curr_state: ButtonState,
 
-    prev_pos    : Vec2f,
-    prev_state  : ButtonState,
+    prev_pos: Vec2f,
+    prev_state: ButtonState,
 }
 
 impl State {
     pub fn new() -> Self {
         Self {
-            curr_pos    : Vec2f::new(-1.0, -1.0),
-            curr_state  : ButtonState::None,
-            prev_pos    : Vec2f::new(-1.0, -1.0),
-            prev_state  : ButtonState::None,
+            curr_pos: Vec2f::new(-1.0, -1.0),
+            curr_state: ButtonState::None,
+            prev_pos: Vec2f::new(-1.0, -1.0),
+            prev_state: ButtonState::None,
         }
     }
 
     pub fn event(&self) -> Event {
         let diff = (self.curr_pos - self.prev_pos).length();
         match (&self.prev_state, &self.curr_state, diff) {
-            (ButtonState::Released,     ButtonState::Released, x) if x == 0.0 => Event::None,
-            (ButtonState::Released,     ButtonState::Released, _)       => Event::Move(self.prev_pos, self.curr_pos),
-            (ButtonState::Released,     ButtonState::Pressed(p), _)     => Event::Click(self.curr_pos, *p),
-            (ButtonState::Pressed(pp),  ButtonState::Pressed(cp), _)    => Event::Drag(self.prev_pos, *pp, self.curr_pos, *cp),
-            (ButtonState::Pressed(_),   ButtonState::Released, _)       => Event::None,
-            (_,                         ButtonState::Scroll(s), _)      => Event::Scroll(*s),
-            (_,                         _, _)                           => Event::None,
+            (ButtonState::Released, ButtonState::Released, x) if x == 0.0 => Event::None,
+            (ButtonState::Released, ButtonState::Released, _) => {
+                Event::Move(self.prev_pos, self.curr_pos)
+            }
+            (ButtonState::Released, ButtonState::Pressed(p), _) => Event::Click(self.curr_pos, *p),
+            (ButtonState::Pressed(pp), ButtonState::Pressed(cp), _) => {
+                Event::Drag(self.prev_pos, *pp, self.curr_pos, *cp)
+            }
+            (ButtonState::Pressed(_), ButtonState::Released, _) => Event::None,
+            (_, ButtonState::Scroll(s), _) => Event::Scroll(*s),
+            (_, _, _) => Event::None,
         }
     }
 
     pub fn update(&mut self, pos: Vec2f, st: ButtonState) {
-        self.prev_pos   = self.curr_pos;
+        self.prev_pos = self.curr_pos;
         self.prev_state = self.curr_state;
-        self.curr_pos   = pos;
+        self.curr_pos = pos;
         self.curr_state = st;
     }
 

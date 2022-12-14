@@ -34,18 +34,34 @@ use std::sync::*;
 ///
 /// create a frame buffer with only color & depth render targets
 ///
-pub fn create_color_depth_frame_buffer(driver: &mut DriverPtr, width: usize, height: usize) -> Option<FrameBufferPtr> {
-    let color_tex_desc      = SamplerDesc::default(width, height).with_pixel_format(PixelFormat::RGBA8(MinMagFilter::default()));
-    let color_buffer_desc   = TextureDesc { sampler_desc: color_tex_desc, payload: None };
-    let color_buffer        = driver.create_texture(color_buffer_desc).unwrap();
+pub fn create_color_depth_frame_buffer(
+    driver: &mut DriverPtr,
+    width: usize,
+    height: usize,
+) -> Option<FrameBufferPtr> {
+    let color_tex_desc = SamplerDesc::default(width, height)
+        .with_pixel_format(PixelFormat::RGBA8(MinMagFilter::default()));
+    let color_buffer_desc = TextureDesc {
+        sampler_desc: color_tex_desc,
+        payload: None,
+    };
+    let color_buffer = driver.create_texture(color_buffer_desc).unwrap();
 
-    let depth_tex_desc      = SamplerDesc::default(width, height).with_pixel_format(PixelFormat::D32);
-    let depth_buffer_desc   = RenderTargetDesc { sampler_desc: depth_tex_desc, sample_count: 0 };
-    let depth_buffer        = driver.create_render_target(depth_buffer_desc).unwrap();
+    let depth_tex_desc = SamplerDesc::default(width, height).with_pixel_format(PixelFormat::D32);
+    let depth_buffer_desc = RenderTargetDesc {
+        sampler_desc: depth_tex_desc,
+        sample_count: 0,
+    };
+    let depth_buffer = driver.create_render_target(depth_buffer_desc).unwrap();
 
-    let fb_desc             = FrameBufferDesc {
-        color_attachements: [Some(SurfaceAttachment::Texture(color_buffer)), None, None, None],
-        depth_stencil_attachement: SurfaceAttachment::RenderTarget(depth_buffer)
+    let fb_desc = FrameBufferDesc {
+        color_attachements: [
+            Some(SurfaceAttachment::Texture(color_buffer)),
+            None,
+            None,
+            None,
+        ],
+        depth_stencil_attachement: SurfaceAttachment::RenderTarget(depth_buffer),
     };
 
     driver.create_frame_buffer(fb_desc)
@@ -54,26 +70,42 @@ pub fn create_color_depth_frame_buffer(driver: &mut DriverPtr, width: usize, hei
 ///
 /// create a frame buffer with color, normal & depth render targets
 ///
-pub fn create_color_normal_depth_frame_buffer(driver: &mut DriverPtr, width: usize, height: usize) -> Option<FrameBufferPtr> {
-    let normal_tex_desc     = SamplerDesc::default(width, height).with_pixel_format(PixelFormat::RGBA32F);
-    let normal_buffer_desc  = TextureDesc { sampler_desc: normal_tex_desc, payload: None };
-    let normal_buffer       = driver.create_texture(normal_buffer_desc).unwrap();
+pub fn create_color_normal_depth_frame_buffer(
+    driver: &mut DriverPtr,
+    width: usize,
+    height: usize,
+) -> Option<FrameBufferPtr> {
+    let normal_tex_desc =
+        SamplerDesc::default(width, height).with_pixel_format(PixelFormat::RGBA32F);
+    let normal_buffer_desc = TextureDesc {
+        sampler_desc: normal_tex_desc,
+        payload: None,
+    };
+    let normal_buffer = driver.create_texture(normal_buffer_desc).unwrap();
 
-    let color_tex_desc      = SamplerDesc::default(width, height).with_pixel_format(PixelFormat::RGBA8(MinMagFilter::default()));
-    let color_buffer_desc   = TextureDesc { sampler_desc: color_tex_desc, payload: None };
-    let color_buffer        = driver.create_texture(color_buffer_desc).unwrap();
+    let color_tex_desc = SamplerDesc::default(width, height)
+        .with_pixel_format(PixelFormat::RGBA8(MinMagFilter::default()));
+    let color_buffer_desc = TextureDesc {
+        sampler_desc: color_tex_desc,
+        payload: None,
+    };
+    let color_buffer = driver.create_texture(color_buffer_desc).unwrap();
 
-    let depth_tex_desc      = SamplerDesc::default(width, height).with_pixel_format(PixelFormat::D32);
-    let depth_buffer_desc   = RenderTargetDesc { sampler_desc: depth_tex_desc, sample_count: 0 };
-    let depth_buffer        = driver.create_render_target(depth_buffer_desc).unwrap();
+    let depth_tex_desc = SamplerDesc::default(width, height).with_pixel_format(PixelFormat::D32);
+    let depth_buffer_desc = RenderTargetDesc {
+        sampler_desc: depth_tex_desc,
+        sample_count: 0,
+    };
+    let depth_buffer = driver.create_render_target(depth_buffer_desc).unwrap();
 
-    let fb_desc             = FrameBufferDesc {
+    let fb_desc = FrameBufferDesc {
         color_attachements: [
             Some(SurfaceAttachment::Texture(color_buffer)),
             Some(SurfaceAttachment::Texture(normal_buffer)),
             None,
-            None],
-        depth_stencil_attachement: SurfaceAttachment::RenderTarget(depth_buffer)
+            None,
+        ],
+        depth_stencil_attachement: SurfaceAttachment::RenderTarget(depth_buffer),
     };
     driver.create_frame_buffer(fb_desc)
 }
@@ -86,18 +118,22 @@ crate::render_data! {
 }
 
 pub struct ScreenQuad {
-    vb          : DeviceBufferPtr,
-    ib          : DeviceBufferPtr,
-    u_pipeline  : PipelinePtr,
-    f_pipeline  : PipelinePtr,
+    vb: DeviceBufferPtr,
+    ib: DeviceBufferPtr,
+    u_pipeline: PipelinePtr,
+    f_pipeline: PipelinePtr,
 }
 
 impl ScreenQuad {
-    pub fn get_vb(&self) -> &DeviceBufferPtr { &self.vb }
-    pub fn get_ib(&self) -> &DeviceBufferPtr { &self.ib }
+    pub fn get_vb(&self) -> &DeviceBufferPtr {
+        &self.vb
+    }
+    pub fn get_ib(&self) -> &DeviceBufferPtr {
+        &self.ib
+    }
 }
 
-static COPY_VERTEX_SHADER : &'static str = "
+static COPY_VERTEX_SHADER: &'static str = "
 #version 300 es
 precision highp float;
 in          vec2        position;
@@ -110,7 +146,7 @@ void main() {
     vUV = uv;
 }";
 
-static COPY_UINT_PIXEL_SHADER : &'static str = "
+static COPY_UINT_PIXEL_SHADER: &'static str = "
 #version 300 es
 precision highp float;
 precision highp usampler2D;
@@ -127,7 +163,7 @@ void main() {
     fragColor = col;
 }";
 
-static COPY_FLOAT_PIXEL_SHADER : &'static str = "
+static COPY_FLOAT_PIXEL_SHADER: &'static str = "
 #version 300 es
 precision highp float;
 precision highp usampler2D;
@@ -142,67 +178,75 @@ void main() {
     fragColor = texture(uTexture, vUV);
 }";
 
-
 impl ScreenQuad {
     fn create_copy_shader(driver: &mut DriverPtr, orig_surface_type: OrigSurfaceType) -> ShaderPtr {
-        let shader_desc =
-        ShaderDesc {
-            vertex_shader       : String::from(COPY_VERTEX_SHADER),
-            pixel_shader        : String::from(
-                match orig_surface_type {
-                    OrigSurfaceType::UInt => COPY_UINT_PIXEL_SHADER,
-                    OrigSurfaceType::Float => COPY_FLOAT_PIXEL_SHADER,
-                }),
+        let shader_desc = ShaderDesc {
+            vertex_shader: String::from(COPY_VERTEX_SHADER),
+            pixel_shader: String::from(match orig_surface_type {
+                OrigSurfaceType::UInt => COPY_UINT_PIXEL_SHADER,
+                OrigSurfaceType::Float => COPY_FLOAT_PIXEL_SHADER,
+            }),
 
-            vertex_attributes   : vec!{ QuadVertex::get_attribute_names() },
-            vertex_uniforms     : Vec::new(),
-            vertex_surfaces     : Vec::new(),
+            vertex_attributes: vec![QuadVertex::get_attribute_names()],
+            vertex_uniforms: Vec::new(),
+            vertex_surfaces: Vec::new(),
 
-            pixel_uniforms      : Vec::new(),
-            pixel_surfaces      : Vec::from([String::from("uTexture")]),
+            pixel_uniforms: Vec::new(),
+            pixel_surfaces: Vec::from([String::from("uTexture")]),
         };
 
         driver.create_shader(shader_desc).unwrap()
     }
 
-    fn create_copy_pipeline(driver: &mut DriverPtr, orig_surface_type: OrigSurfaceType) -> PipelinePtr {
+    fn create_copy_pipeline(
+        driver: &mut DriverPtr,
+        orig_surface_type: OrigSurfaceType,
+    ) -> PipelinePtr {
         let vertex_layout = VertexBufferLayout {
-            buffer_id           : 0,
-            vertex_attributes   : QuadVertex::get_attribute_descriptors(),
-            stride              : QuadVertex::stride(),
-            divisor             : 0,
+            buffer_id: 0,
+            vertex_attributes: QuadVertex::get_attribute_descriptors(),
+            stride: QuadVertex::stride(),
+            divisor: 0,
         };
 
         let model_pipeline_desc = PipelineDesc {
-            primitive_type      : PrimitiveType::Triangles,
-            shader              : Self::create_copy_shader(driver, orig_surface_type),
-            buffer_layouts      : vec! { vertex_layout },
-            uniform_descs       : vec! {},
-            index_type          : IndexType::UInt32,
-            face_winding        : FaceWinding::CCW,
-            cull_mode           : CullMode::Winding,
-            depth_write         : true,
-            depth_test          : true,
-            blend               : BlendOp::None,
-            polygon_offset      : PolygonOffset::None,
+            primitive_type: PrimitiveType::Triangles,
+            shader: Self::create_copy_shader(driver, orig_surface_type),
+            buffer_layouts: vec![vertex_layout],
+            uniform_descs: vec![],
+            index_type: IndexType::UInt32,
+            face_winding: FaceWinding::CCW,
+            cull_mode: CullMode::Winding,
+            depth_write: true,
+            depth_test: true,
+            blend: BlendOp::None,
+            polygon_offset: PolygonOffset::None,
         };
 
         driver.create_pipeline(model_pipeline_desc).unwrap()
     }
 
     pub fn new(driver: &mut DriverPtr) -> Self {
+        let quad_verts = vec![
+            QuadVertex {
+                position: Vec2f::new(-1.0, -1.0),
+                uv: Vec2f::new(0.0, 0.0),
+            },
+            QuadVertex {
+                position: Vec2f::new(1.0, -1.0),
+                uv: Vec2f::new(1.0, 0.0),
+            },
+            QuadVertex {
+                position: Vec2f::new(1.0, 1.0),
+                uv: Vec2f::new(1.0, 1.0),
+            },
+            QuadVertex {
+                position: Vec2f::new(-1.0, 1.0),
+                uv: Vec2f::new(0.0, 1.0),
+            },
+        ];
 
-        let quad_verts  = vec! {
-            QuadVertex { position: Vec2f::new(-1.0, -1.0), uv: Vec2f::new(0.0, 0.0) },
-            QuadVertex { position: Vec2f::new( 1.0, -1.0), uv: Vec2f::new(1.0, 0.0) },
-            QuadVertex { position: Vec2f::new( 1.0,  1.0), uv: Vec2f::new(1.0, 1.0) },
-            QuadVertex { position: Vec2f::new(-1.0,  1.0), uv: Vec2f::new(0.0, 1.0) },
-        };
-
-        let quad_index  : Vec<u32> = vec! {
-            0, 1, 2,
-            2, 3, 0,
-        };
+        let quad_index: Vec<u32> = vec![0, 1, 2, 2, 3, 0];
 
         let vb_desc = DeviceBufferDesc::Vertex(Usage::Static(Arc::new(quad_verts)));
         let vb = driver.create_device_buffer(vb_desc).unwrap();
@@ -220,18 +264,17 @@ impl ScreenQuad {
 
     pub fn render(&self, pass: &mut Pass, tex: &TexturePtr) {
         let bindings = Bindings {
-            vertex_buffers  : vec!{ self.vb.clone() },
-            index_buffer    : Some(self.ib.clone()),
+            vertex_buffers: vec![self.vb.clone()],
+            index_buffer: Some(self.ib.clone()),
 
-            vertex_images   : Vec::from([]),
-            pixel_images    : Vec::from([tex.clone()]),
+            vertex_images: Vec::from([]),
+            pixel_images: Vec::from([tex.clone()]),
         };
 
-        let pipeline    =
-            match tex.desc().sampler_desc.pixel_format.to_orig_surface_type() {
-                OrigSurfaceType::UInt   => &self.u_pipeline,
-                OrigSurfaceType::Float  => &self.f_pipeline,
-            };
+        let pipeline = match tex.desc().sampler_desc.pixel_format.to_orig_surface_type() {
+            OrigSurfaceType::UInt => &self.u_pipeline,
+            OrigSurfaceType::Float => &self.f_pipeline,
+        };
 
         pass.draw(pipeline, &bindings, Arc::new(Vec::<Vec3f>::new()), 2, 1);
     }

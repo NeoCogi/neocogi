@@ -2,10 +2,9 @@ use std::env;
 
 extern crate gl_generator;
 
-use gl_generator::{Registry, Api, Profile, Fallbacks, StaticGenerator};
+use gl_generator::{Api, Fallbacks, Profile, Registry, StaticGenerator};
 use std::fs::File;
 use std::path::Path;
-
 
 fn main() {
     let dest = env::var("OUT_DIR").unwrap();
@@ -17,11 +16,11 @@ fn main() {
 
     let target = env::var("TARGET");
     match target {
-         Ok(s) if s.contains("wasm32") => (),
-         _ => {
-            println!("cargo:rustc-link-lib=glfw");  // the "-l" flag
-            println!("cargo:rustc-link-lib=c");     // the "-l" flag
+        Ok(s) if s.contains("wasm32") => (),
+        _ => {
+            println!("cargo:rustc-link-lib=glfw"); // the "-l" flag
+            println!("cargo:rustc-link-lib=c"); // the "-l" flag
             println!("cargo:rustc-link-lib=GLESv2"); // the "-l" flag
-         }
+        }
     }
 }

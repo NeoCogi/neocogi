@@ -144,7 +144,10 @@ impl Segment {
                     position: *start,
                     color: *color,
                 },
-                Vertex { position: *end, color: *color },
+                Vertex {
+                    position: *end,
+                    color: *color,
+                },
             ],
         }
     }
@@ -190,9 +193,18 @@ impl Triangle {
     pub fn new(v0: &Vec3f, v1: &Vec3f, v2: &Vec3f, color: &Color4b) -> Self {
         Self {
             verts: [
-                Vertex { position: *v0, color: *color },
-                Vertex { position: *v1, color: *color },
-                Vertex { position: *v2, color: *color },
+                Vertex {
+                    position: *v0,
+                    color: *color,
+                },
+                Vertex {
+                    position: *v1,
+                    color: *color,
+                },
+                Vertex {
+                    position: *v2,
+                    color: *color,
+                },
             ],
         }
     }
@@ -228,7 +240,12 @@ impl std::ops::Mul<Triangle> for Mat4f {
         let v0 = self.clone() * rhs.verts[0];
         let v1 = self.clone() * rhs.verts[1];
         let v2 = self.clone() * rhs.verts[2];
-        Triangle::new(&v0.position, &v1.position, &v2.position, &rhs.verts[0].color)
+        Triangle::new(
+            &v0.position,
+            &v1.position,
+            &v2.position,
+            &rhs.verts[0].color,
+        )
     }
 }
 
@@ -242,12 +259,30 @@ impl Quad {
     pub fn new(v0: &Vec3f, v1: &Vec3f, v2: &Vec3f, v3: &Vec3f, color: &Color4b) -> Self {
         Self {
             verts: [
-                Vertex { position: *v0, color: *color },
-                Vertex { position: *v1, color: *color },
-                Vertex { position: *v2, color: *color },
-                Vertex { position: *v2, color: *color },
-                Vertex { position: *v3, color: *color },
-                Vertex { position: *v0, color: *color },
+                Vertex {
+                    position: *v0,
+                    color: *color,
+                },
+                Vertex {
+                    position: *v1,
+                    color: *color,
+                },
+                Vertex {
+                    position: *v2,
+                    color: *color,
+                },
+                Vertex {
+                    position: *v2,
+                    color: *color,
+                },
+                Vertex {
+                    position: *v3,
+                    color: *color,
+                },
+                Vertex {
+                    position: *v0,
+                    color: *color,
+                },
             ],
         }
     }
@@ -291,7 +326,13 @@ impl std::ops::Mul<Quad> for Mat4f {
         let v1 = self.clone() * rhs.verts[1];
         let v2 = self.clone() * rhs.verts[2];
         let v3 = self.clone() * rhs.verts[4];
-        Quad::new(&v0.position, &v1.position, &v2.position, &v3.position, &rhs.verts[0].color)
+        Quad::new(
+            &v0.position,
+            &v1.position,
+            &v2.position,
+            &v3.position,
+            &rhs.verts[0].color,
+        )
     }
 }
 
@@ -397,7 +438,13 @@ impl UMNode {
         Self::Segments(segs)
     }
 
-    fn disk_tris(center: &Vec3f, normal: &Vec3f, color: &Color4b, seg_count: usize, tris: &mut Vec<Triangle>) {
+    fn disk_tris(
+        center: &Vec3f,
+        normal: &Vec3f,
+        color: &Color4b,
+        seg_count: usize,
+        tris: &mut Vec<Triangle>,
+    ) {
         let step = 2.0 * std::f32::consts::PI / (seg_count as f32);
         let scale = normal.length();
         let [_, y_axis, x_axis] = basis_from_unit(&normal);
@@ -426,7 +473,13 @@ impl UMNode {
         Self::Tris(tris)
     }
 
-    pub fn cone(center: &Vec3f, normal: &Vec3f, height: f32, color: &Color4b, seg_count: usize) -> Self {
+    pub fn cone(
+        center: &Vec3f,
+        normal: &Vec3f,
+        height: f32,
+        color: &Color4b,
+        seg_count: usize,
+    ) -> Self {
         let scale = normal.length();
 
         let mut tris = Vec::new();
@@ -448,7 +501,12 @@ impl UMNode {
 
             let p1 = (x_axis * c + y_axis * s) * scale + *center;
 
-            tris.push(Triangle::new(&(*center + Vec3f::normalize(normal) * height), &p0, &p1, color));
+            tris.push(Triangle::new(
+                &(*center + Vec3f::normalize(normal) * height),
+                &p0,
+                &p1,
+                color,
+            ));
         }
 
         Self::Tris(tris)
@@ -465,7 +523,13 @@ impl UMNode {
     //      |        |        |
     //   v3 +--------+--------+ v2
 
-    fn plane_quad(center: &Vec3f, x_axis: &Vec3f, y_axis: &Vec3f, color: &Color4b, quads: &mut Vec<Quad>) {
+    fn plane_quad(
+        center: &Vec3f,
+        x_axis: &Vec3f,
+        y_axis: &Vec3f,
+        color: &Color4b,
+        quads: &mut Vec<Quad>,
+    ) {
         let v0 = *center - *x_axis + *y_axis;
         let v1 = *center + *x_axis + *y_axis;
         let v2 = *center + *x_axis - *y_axis;
@@ -560,7 +624,12 @@ impl UMNode {
     pub fn arrow_sphere(start: &Vec3f, end: &Vec3f, sphere_pct: f32, color: &Color4b) -> Self {
         let seg = *end - *start;
         let tip_start = *start + seg * (1.0 - sphere_pct * 0.5);
-        let tris = Self::sphere(&((tip_start + *end) * 0.5), sphere_pct * seg.length() / 2.0, 3, color);
+        let tris = Self::sphere(
+            &((tip_start + *end) * 0.5),
+            sphere_pct * seg.length() / 2.0,
+            3,
+            color,
+        );
 
         let lines = vec![Segment::new(start, end, color)];
 
@@ -769,7 +838,12 @@ impl UMRenderer {
             primitive_type: PrimitiveType::Triangles,
             shader: model_program.clone(),
             buffer_layouts: vec![vertex_layout.clone()],
-            uniform_descs: vec![UniformDataDesc::new(String::from("pvm"), UniformDataType::Float4x4, 1, 0)],
+            uniform_descs: vec![UniformDataDesc::new(
+                String::from("pvm"),
+                UniformDataType::Float4x4,
+                1,
+                0,
+            )],
             index_type: IndexType::None,
             face_winding: FaceWinding::CCW,
             cull_mode: CullMode::None,
@@ -785,7 +859,12 @@ impl UMRenderer {
             primitive_type: PrimitiveType::Lines,
             shader: model_program.clone(),
             buffer_layouts: vec![vertex_layout.clone()],
-            uniform_descs: vec![UniformDataDesc::new(String::from("pvm"), UniformDataType::Float4x4, 1, 0)],
+            uniform_descs: vec![UniformDataDesc::new(
+                String::from("pvm"),
+                UniformDataType::Float4x4,
+                1,
+                0,
+            )],
             index_type: IndexType::None,
             face_winding: FaceWinding::CCW,
             cull_mode: CullMode::None,
@@ -836,7 +915,13 @@ impl UMRenderer {
                 pixel_images: Vec::new(),
             };
 
-            pass.draw(pipeline, &bindings, Arc::new(GenPayload::from(pvm.clone())), (count * count_mul) as u32, 1);
+            pass.draw(
+                pipeline,
+                &bindings,
+                Arc::new(GenPayload::from(pvm.clone())),
+                (count * count_mul) as u32,
+                1,
+            );
             i += 1;
             rem_elms -= count;
         }

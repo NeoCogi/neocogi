@@ -27,14 +27,13 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-use crate::*;
-use crate::rs_math3d::*;
 use crate::renderer::*;
+use crate::rs_math3d::*;
+use crate::*;
 
+use super::*;
 use std::collections::HashMap;
 use std::sync::*;
-use super::*;
-
 
 render_data! {
     vertex Vertex {
@@ -46,6 +45,16 @@ render_data! {
 
     uniforms Uniforms {
         u_screen_size   : Vec2f,
+    }
+}
+
+impl Default for Vertex {
+    fn default() -> Self {
+        Self {
+            a_pos: Vec2f::new(0.0, 0.0),
+            a_tc: Vec2f::new(0.0, 0.0),
+            s_rgba: color4b(0, 0, 0, 0),
+        }
     }
 }
 
@@ -95,17 +104,20 @@ const FS_SRC: &str = r#"
     layout(location = 0) out lowp vec4 f_color;
 
     void main() {
-        highp vec4 tcol = texture(u_sampler, v_tc);
+        highp vec4 tcol = texture(u_sampler, v_tc).rrrr;
         f_color = tcol * v_rgba;
     }
 "#;
 
-const MAX_ELEM_COUNT: usize = 65536 * 4;
+const MAX_VERTEX_COUNT: usize = 65536;
+const MAX_INDEX_COUNT: usize = 65536;
 
 pub struct Painter {
     driver: DriverPtr,
     pipeline: PipelinePtr,
     vertex_buffer: DeviceBufferPtr,
+    index_buffer: DeviceBufferPtr,
+
     canvas_width: u32,
     canvas_height: u32,
     ui_texture: TexturePtr,
@@ -142,7 +154,7 @@ impl Painter {
             shader: program,
             buffer_layouts: vec![vertex_layout.clone()],
             uniform_descs: Uniforms::get_uniform_descriptors(),
-            index_type: IndexType::None,
+            index_type: IndexType::UInt16,
             face_winding: FaceWinding::CCW,
             cull_mode: CullMode::None,
             depth_write: true,
@@ -154,15 +166,37 @@ impl Painter {
         let pipeline = drv.create_pipeline(pipeline_desc).unwrap();
 
         let vertex_buffer = drv
-            .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(MAX_ELEM_COUNT * std::mem::size_of::<Vertex>())))
+            .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(
+                MAX_VERTEX_COUNT * std::mem::size_of::<Vertex>(),
+            )))
             .unwrap();
+
+        let index_buffer = drv
+            .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(
+                MAX_INDEX_COUNT * std::mem::size_of::<u16>(),
+            )))
+            .unwrap();
+
+        let tex_desc = TextureDesc {
+            sampler_desc: SamplerDesc::default(ATLAS_WIDTH as usize, ATLAS_HEIGHT as usize)
+                .with_pixel_format(PixelFormat::R8(
+                    MinMagFilter::default()
+                        .with_mag_filter(Filter::Nearest)
+                        .with_min_filter(Filter::Nearest),
+                ))
+                .with_wrap_mode(WrapMode::ClampToEdge),
+            payload: Some(Arc::new(ATLAS_TEXTURE.to_vec())),
+        };
+
+        let ui_texture = drv.create_texture(tex_desc).unwrap();
         Painter {
             driver: drv.clone(),
             pipeline,
             canvas_width,
             canvas_height,
             vertex_buffer,
-            ui_texture: Default::default(),
+            index_buffer,
+            ui_texture,
             vertices: Vec::new(),
             indices: Vec::new(),
         }
@@ -173,12 +207,19 @@ impl Painter {
         self.canvas_height = height;
     }
 
-    fn push_quad_vertices(&mut self, v0: &Vertex, v1: &Vertex, v2: &Vertex, v3: &Vertex) {
-        if self.verts.len() + 4 >= 65536 || self.indices.len() + 6 >= 65536 {
-            self.flush(gl);
+    fn push_quad_vertices(
+        &mut self,
+        pass: &mut Pass,
+        v0: &Vertex,
+        v1: &Vertex,
+        v2: &Vertex,
+        v3: &Vertex,
+    ) {
+        if self.vertices.len() + 4 >= MAX_VERTEX_COUNT || self.indices.len() + 6 >= MAX_INDEX_COUNT {
+            self.flush(pass);
         }
 
-        let is = self.verts.len() as u16;
+        let is = self.vertices.len() as u16;
         self.indices.push(is + 0);
         self.indices.push(is + 1);
         self.indices.push(is + 2);
@@ -186,17 +227,17 @@ impl Painter {
         self.indices.push(is + 3);
         self.indices.push(is + 0);
 
-        self.verts.push(v0.clone());
-        self.verts.push(v1.clone());
-        self.verts.push(v2.clone());
-        self.verts.push(v3.clone());
+        self.vertices.push(v0.clone());
+        self.vertices.push(v1.clone());
+        self.vertices.push(v2.clone());
+        self.vertices.push(v3.clone());
     }
 
-    pub fn push_rect(&mut self, dst: Recti, src: Recti, color: Color4b) {
+    pub fn push_rect(&mut self, pass: &mut Pass, dst: Recti, src: Recti, color: Color4b) {
         let x = src.x as f32 / ATLAS_WIDTH as f32;
         let y = src.y as f32 / ATLAS_HEIGHT as f32;
-        let w = src.w as f32 / ATLAS_WIDTH as f32;
-        let h = src.h as f32 / ATLAS_HEIGHT as f32;
+        let w = src.width as f32 / ATLAS_WIDTH as f32;
+        let h = src.height as f32 / ATLAS_HEIGHT as f32;
 
         let mut v0 = Vertex::default();
         let mut v1 = Vertex::default();
@@ -204,61 +245,73 @@ impl Painter {
         let mut v3 = Vertex::default();
 
         // tex coordinates
-        v0.tex.x = x;
-        v0.tex.y = y;
-        v1.tex.x = x + w;
-        v1.tex.y = y;
-        v2.tex.x = x + w;
-        v2.tex.y = y + h;
-        v3.tex.x = x;
-        v3.tex.y = y + h;
+        v0.a_tc.x = x;
+        v0.a_tc.y = y;
+        v1.a_tc.x = x + w;
+        v1.a_tc.y = y;
+        v2.a_tc.x = x + w;
+        v2.a_tc.y = y + h;
+        v3.a_tc.x = x;
+        v3.a_tc.y = y + h;
 
         // position
-        v0.pos.x = dst.x as f32;
-        v0.pos.y = dst.y as f32;
-        v1.pos.x = dst.x as f32 + dst.w as f32;
-        v1.pos.y = dst.y as f32;
-        v2.pos.x = dst.x as f32 + dst.w as f32;
-        v2.pos.y = dst.y as f32 + dst.h as f32;
-        v3.pos.x = dst.x as f32;
-        v3.pos.y = dst.y as f32 + dst.h as f32;
+        v0.a_pos.x = dst.x as f32;
+        v0.a_pos.y = dst.y as f32;
+        v1.a_pos.x = dst.x as f32 + dst.width as f32;
+        v1.a_pos.y = dst.y as f32;
+        v2.a_pos.x = dst.x as f32 + dst.width as f32;
+        v2.a_pos.y = dst.y as f32 + dst.height as f32;
+        v3.a_pos.x = dst.x as f32;
+        v3.a_pos.y = dst.y as f32 + dst.height as f32;
 
         // color
-        v0.color = color4b(color.r, color.g, color.b, color.a);
-        v1.color = v0.color;
-        v2.color = v0.color;
-        v3.color = v0.color;
+        v0.s_rgba = color4b(color.x, color.y, color.z, color.w);
+        v1.s_rgba = v0.s_rgba;
+        v2.s_rgba = v0.s_rgba;
+        v3.s_rgba = v0.s_rgba;
 
-        self.push_quad_vertices(&v0, &v1, &v2, &v3);
+        self.push_quad_vertices(pass, &v0, &v1, &v2, &v3);
     }
 
-    pub fn draw_rect(&mut self, rect: Recti, color: Color4b) {
-        self.push_rect(rect, ATLAS[ATLAS_WHITE as usize], color);
+    pub fn draw_rect(&mut self, pass: &mut Pass, rect: Recti, color: Color4b) {
+        self.push_rect(pass, rect, ATLAS[ATLAS_WHITE as usize], color);
     }
 
-    pub fn draw_text(&mut self, text: &str, pos: Vec2i, color: Color4b) {
-        let mut dst = Rect { x: pos.x, y: pos.y, w: 0, h: 0 };
+    pub fn draw_text(&mut self, pass: &mut Pass, text: &str, pos: Vec2i, color: Color4b) {
+        let mut dst = Rect::new(pos.x, pos.y, 0, 0);
         for p in text.chars() {
             if (p as usize) < 127 {
                 let chr = usize::min(p as usize, 127);
                 let src = ATLAS[ATLAS_FONT as usize + chr];
-                dst.w = src.w;
-                dst.h = src.h;
-                self.push_rect(dst, src, color);
-                dst.x += dst.w;
+                dst.width = src.width;
+                dst.height = src.height;
+                self.push_rect(pass, dst, src, color);
+                dst.x += dst.width;
             }
         }
     }
 
-    pub fn draw_icon(&mut self, id: Icon, r: Recti, color: Color4b) {
+    pub fn draw_icon(&mut self, pass: &mut Pass, id: Icon, r: Recti, color: Color4b) {
         let src = ATLAS[id as usize];
-        let x = r.x + (r.w - src.w) / 2;
-        let y = r.y + (r.h - src.h) / 2;
-        self.push_rect(rect(x, y, src.w, src.h), src, color);
+        let x = r.x + (r.width - src.width) / 2;
+        let y = r.y + (r.height - src.height) / 2;
+        self.push_rect(pass, Rect::new(x, y, src.width, src.height), src, color);
+    }
+
+    pub fn set_clip_rect(&mut self, pass: &mut Pass, width: u32, height: u32, rect: Recti) {
+        self.canvas_width = width as u32;
+        self.canvas_height = height as u32;
+        self.flush(pass);
+        pass.set_scissor(
+            rect.x as u32,
+            (height as i32 - (rect.y + rect.height)) as u32,
+            rect.width as u32,
+            rect.height as u32,
+        );
     }
 
     pub fn get_char_width(&self, _font: FontId, c: char) -> usize {
-        ATLAS[ATLAS_FONT as usize + c as usize].w as usize
+        ATLAS[ATLAS_FONT as usize + c as usize].width as usize
     }
 
     pub fn get_font_height(&self, _font: FontId) -> usize {
@@ -266,116 +319,68 @@ impl Painter {
     }
 
     pub fn paint(&mut self, pass: &mut Pass, ctx: &mut super::Context) {
-        let screen_size_pixels = vec2(self.canvas_width as f32, self.canvas_height as f32);
-        let screen_size_points = screen_size_pixels / pixels_per_point;
+        pass.set_viewport(0, 0, self.canvas_width, self.canvas_height);
 
-        for ClippedPrimitive { clip_rect, primitive } in meshes {
-            let clip_min_x = pixels_per_point * clip_rect.min.x;
-            let clip_min_y = pixels_per_point * clip_rect.min.y;
-            let clip_max_x = pixels_per_point * clip_rect.max.x;
-            let clip_max_y = pixels_per_point * clip_rect.max.y;
-            let clip_min_x = clip_min_x.clamp(0.0, screen_size_pixels.x);
-            let clip_min_y = clip_min_y.clamp(0.0, screen_size_pixels.y);
-            let clip_max_x = clip_max_x.clamp(clip_min_x, screen_size_pixels.x);
-            let clip_max_y = clip_max_y.clamp(clip_min_y, screen_size_pixels.y);
-            let clip_min_x = clip_min_x.round() as i32;
-            let clip_min_y = clip_min_y.round() as i32;
-            let clip_max_x = clip_max_x.round() as i32;
-            let clip_max_y = clip_max_y.round() as i32;
-
-            let r = Recti::new(
-                clip_min_x,
-                self.canvas_height as i32 - clip_max_y,
-                clip_max_x - clip_min_x,
-                clip_max_y - clip_min_y,
-            );
-
-            //scissor Y coordinate is from the bottom
-            pass.set_scissor(r.x as u32, r.y as u32, r.width as u32, r.height as u32);
-
-            match primitive {
-                Primitive::Mesh(mesh) => {
-                    if mesh.vertices.len() > 0 {
-                        self.paint_mesh(pass, &mesh, Vec2f::new(screen_size_points.x, screen_size_points.y));
+        let mut cmd_id = 0;
+        loop {
+            match ctx.mu_next_command(cmd_id) {
+                Some((command, id)) => {
+                    match command {
+                        Command::Text {
+                            str_start,
+                            str_len,
+                            pos,
+                            color,
+                            ..
+                        } => {
+                            let str = &ctx.text_stack[str_start..str_start + str_len];
+                            self.draw_text(pass, str, pos, color);
+                        }
+                        Command::Rect { rect, color } => {
+                            self.draw_rect(pass, rect, color);
+                        }
+                        Command::Icon { id, rect, color } => {
+                            self.draw_icon(pass, id, rect, color);
+                        }
+                        Command::Clip { rect } => {
+                            self.set_clip_rect(pass, self.canvas_width, self.canvas_height, rect);
+                        }
+                        _ => {}
                     }
+                    cmd_id = id;
                 }
-                Primitive::Callback(cb) => {
-                    // Transform callback rect to physical pixels:
-                    let rect_min_x = pixels_per_point * cb.rect.min.x;
-                    let rect_min_y = pixels_per_point * cb.rect.min.y;
-                    let rect_max_x = pixels_per_point * cb.rect.max.x;
-                    let rect_max_y = pixels_per_point * cb.rect.max.y;
-
-                    let rect_min_x = rect_min_x.clamp(0.0, screen_size_pixels.x);
-                    let rect_min_y = rect_min_y.clamp(0.0, screen_size_pixels.y);
-                    let rect_max_x = rect_max_x.clamp(rect_min_x, screen_size_pixels.x);
-                    let rect_max_y = rect_max_y.clamp(rect_min_y, screen_size_pixels.y);
-
-                    let rect_min_x = rect_min_x.round() as u32;
-                    let rect_min_y = rect_min_y.round() as u32;
-                    let rect_max_x = rect_max_x.round() as u32;
-                    let rect_max_y = rect_max_y.round() as u32;
-
-                    let r = Recti::new(
-                        rect_min_x as i32,
-                        rect_min_y as i32,
-                        (rect_max_x - rect_min_x) as i32,
-                        (rect_max_y - rect_min_y) as i32,
-                    );
-
-                    pass.set_viewport(r.x as _, r.y as _, r.width as _, r.height as _);
-
-                    let viewport = egui::Rect::from_min_size(egui::Pos2::new(r.x as f32, r.y as f32), egui::Vec2::new(r.width as f32, r.height as f32));
-
-                    let info = egui::PaintCallbackInfo {
-                        viewport,
-                        clip_rect: clip_rect,
-                        pixels_per_point,
-                        screen_size_px: [screen_size_pixels.x as u32, screen_size_pixels.y as u32],
-                    };
-
-                    (cb.callback.downcast_ref::<CallbackFn>().unwrap().paint)(&info, pass);
-
-                    pass.set_viewport(0, 0, self.canvas_width, self.canvas_height);
-                }
+                None => break,
             }
         }
 
-        for id in &egui_texture.free {
-            match id {
-                egui::TextureId::Managed(id) => {
-                    self.egui_textures.remove(id);
-                }
-                _ => (),
-            }
-        }
+        self.flush(pass);
     }
 
-    fn paint_mesh(&mut self, pass: &mut Pass, vertices: &Vec<Vertex>, indices: &Vec<u16>, screen_size: Vec2f) {
-        let max_part_size = 3 * 4096;
-        let index_count = mesh.indices.len();
-        let parts = mesh.indices.len() / max_part_size;
+    fn flush(&mut self, pass: &mut Pass) {
+        if self.vertices.len() != 0 && self.indices.len() != 0 {
+            pass.update_device_buffer(&mut self.vertex_buffer, 0, Arc::new(self.vertices.clone()));
+            pass.update_device_buffer(&mut self.index_buffer, 0, Arc::new(self.indices.clone()));
 
-        for i in 0..parts + 1 {
-            let remaining_count = index_count - i * max_part_size;
-            if remaining_count > 0 {
-                let part_index_count = usize::min(remaining_count, max_part_size);
-                let vs = vertices[i * max_part_size..i * max_part_size + part_index_count].to_vec();
+            let bindings = Bindings {
+                vertex_buffers: vec![self.vertex_buffer.clone()],
+                index_buffer: Some(self.index_buffer.clone()),
 
-                let tri_count = vs.len() / 3;
-                pass.update_device_buffer(&mut self.vertex_buffer, 0, Arc::new(vs));
+                vertex_images: Vec::new(),
+                pixel_images: Vec::from([self.ui_texture.clone()]),
+            };
 
-                let bindings = Bindings {
-                    vertex_buffers: vec![self.vertex_buffer.clone()],
-                    index_buffer: None,
-
-                    vertex_images: Vec::new(),
-                    pixel_images: Vec::from([self.get_texture(mesh.texture_id)]),
-                };
-
-                let u = Uniforms { u_screen_size: screen_size };
-                pass.draw(&self.pipeline, &bindings, Arc::new(GenPayload::from(u)), tri_count as u32, 1);
-            }
+            let u = Uniforms {
+                u_screen_size: Vec2f::new(self.canvas_width as f32, self.canvas_height as f32),
+            };
+            pass.draw(
+                &self.pipeline,
+                &bindings,
+                Arc::new(GenPayload::from(u)),
+                (self.indices.len() / 3) as u32,
+                1,
+            );
         }
+        self.vertices.clear();
+        self.indices.clear();
     }
 }

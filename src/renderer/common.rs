@@ -30,7 +30,6 @@
 use rs_math3d::*;
 use std::sync::*;
 
-
 pub enum ResourceType {
     DeviceBuffer,
     Texture,
@@ -43,24 +42,42 @@ pub enum ResourceType {
 #[repr(C)]
 pub struct Resource<Desc> {
     res_type: ResourceType,
-    res_id  : usize,
-    desc    : Desc,
-    depends_on  : Option<DriverPtrInternal>,   // resources depend on drivers or other resources
+    res_id: usize,
+    desc: Desc,
+    depends_on: Option<DriverPtrInternal>, // resources depend on drivers or other resources
 }
 
 impl<Desc> Resource<Desc> {
-    pub(crate)  fn new(res_type: ResourceType, res_id: usize, desc: Desc, depends_on : Option<DriverPtrInternal>) -> Self {
-        Self { res_type: res_type, res_id : res_id, desc: desc, depends_on: depends_on }
+    pub(crate) fn new(
+        res_type: ResourceType,
+        res_id: usize,
+        desc: Desc,
+        depends_on: Option<DriverPtrInternal>,
+    ) -> Self {
+        Self {
+            res_type: res_type,
+            res_id: res_id,
+            desc: desc,
+            depends_on: depends_on,
+        }
     }
-    pub(crate)  fn res_id(&self) -> usize { self.res_id }
-    pub         fn desc(&self) -> &Desc { &self.desc }
+    pub(crate) fn res_id(&self) -> usize {
+        self.res_id
+    }
+    pub fn desc(&self) -> &Desc {
+        &self.desc
+    }
 }
 
 impl<Desc> Drop for Resource<Desc> {
     fn drop(&mut self) {
         match &mut self.depends_on {
-            Some(driver)    => driver.lock().as_deref_mut().unwrap().delete_resource(&self.res_type, self.res_id),
-            _ => panic!("No driver!")
+            Some(driver) => driver
+                .lock()
+                .as_deref_mut()
+                .unwrap()
+                .delete_resource(&self.res_type, self.res_id),
+            _ => panic!("No driver!"),
         }
     }
 }
@@ -75,118 +92,171 @@ pub trait AttributeDataTypeGetter {
 
 // i8 type
 impl AttributeDataTypeGetter for i8 {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::SByte }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::SByte
+    }
 }
 
 impl AttributeDataTypeGetter for Vector2<i8> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::SByte2 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::SByte2
+    }
 }
 
 impl AttributeDataTypeGetter for Vector3<i8> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::SByte3 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::SByte3
+    }
 }
 
 impl AttributeDataTypeGetter for Vector4<i8> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::SByte4 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::SByte4
+    }
 }
 
 // u8 type
 impl AttributeDataTypeGetter for u8 {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Byte }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Byte
+    }
 }
 
 impl AttributeDataTypeGetter for Vector2<u8> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Byte2 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Byte2
+    }
 }
 
 impl AttributeDataTypeGetter for Vector3<u8> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Byte3 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Byte3
+    }
 }
 
 impl AttributeDataTypeGetter for Vector4<u8> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Byte4 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Byte4
+    }
 }
 
 // s16 type
 impl AttributeDataTypeGetter for i16 {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Short }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Short
+    }
 }
 
 impl AttributeDataTypeGetter for Vector2<i16> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Short2 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Short2
+    }
 }
 
 impl AttributeDataTypeGetter for Vector3<i16> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Short3 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Short3
+    }
 }
 
 impl AttributeDataTypeGetter for Vector4<i16> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Short4 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Short4
+    }
 }
 
 // f32 type
 impl AttributeDataTypeGetter for f32 {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Float }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Float
+    }
 }
 
 impl AttributeDataTypeGetter for Vector2<f32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Float2 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Float2
+    }
 }
 
 impl AttributeDataTypeGetter for Vector3<f32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Float3 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Float3
+    }
 }
 
 impl AttributeDataTypeGetter for Vector4<f32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Float4 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Float4
+    }
 }
 
 // i32 type
 impl AttributeDataTypeGetter for i32 {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Int }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Int
+    }
 }
 
 impl AttributeDataTypeGetter for Vector2<i32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Int2 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Int2
+    }
 }
 
 impl AttributeDataTypeGetter for Vector3<i32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Int3 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Int3
+    }
 }
 
 impl AttributeDataTypeGetter for Vector4<i32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Int4 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Int4
+    }
 }
 
 // u32 type
 impl AttributeDataTypeGetter for u32 {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::UInt }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::UInt
+    }
 }
 
 impl AttributeDataTypeGetter for Vector2<u32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::UInt2 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::UInt2
+    }
 }
 
 impl AttributeDataTypeGetter for Vector3<u32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::UInt3 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::UInt3
+    }
 }
 
 impl AttributeDataTypeGetter for Vector4<u32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::UInt4 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::UInt4
+    }
 }
-
 
 // matrix type
 impl AttributeDataTypeGetter for Matrix2<f32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Float2x2 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Float2x2
+    }
 }
 
 impl AttributeDataTypeGetter for Matrix3<f32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Float3x3 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Float3x3
+    }
 }
 
 impl AttributeDataTypeGetter for Matrix4<f32> {
-    fn get_attribute_type() -> VertexFormat { VertexFormat::Float4x4 }
+    fn get_attribute_type() -> VertexFormat {
+        VertexFormat::Float4x4
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -198,63 +268,93 @@ pub trait UniformDataTypeGetter {
 }
 
 impl UniformDataTypeGetter for u32 {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::UInt }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::UInt
+    }
 }
 
 impl UniformDataTypeGetter for Vector2<u32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::UInt2 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::UInt2
+    }
 }
 
 impl UniformDataTypeGetter for Vector3<u32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::UInt3 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::UInt3
+    }
 }
 
 impl UniformDataTypeGetter for Vector4<u32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::UInt4 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::UInt4
+    }
 }
 
 impl UniformDataTypeGetter for i32 {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Int }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Int
+    }
 }
 
 impl UniformDataTypeGetter for Vector2<i32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Int2 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Int2
+    }
 }
 
 impl UniformDataTypeGetter for Vector3<i32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Int3 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Int3
+    }
 }
 
 impl UniformDataTypeGetter for Vector4<i32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Int4 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Int4
+    }
 }
 
 impl UniformDataTypeGetter for f32 {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Float }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Float
+    }
 }
 
 impl UniformDataTypeGetter for Vector2<f32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Float2 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Float2
+    }
 }
 
 impl UniformDataTypeGetter for Vector3<f32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Float3 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Float3
+    }
 }
 
 impl UniformDataTypeGetter for Vector4<f32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Float4 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Float4
+    }
 }
 
 impl UniformDataTypeGetter for Matrix2<f32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Float2x2 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Float2x2
+    }
 }
 
 impl UniformDataTypeGetter for Matrix3<f32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Float3x3 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Float3x3
+    }
 }
 
 impl UniformDataTypeGetter for Matrix4<f32> {
-    fn get_uniform_type() -> UniformDataType { UniformDataType::Float4x4 }
+    fn get_uniform_type() -> UniformDataType {
+        UniformDataType::Float4x4
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -262,11 +362,12 @@ impl UniformDataTypeGetter for Matrix4<f32> {
 ////////////////////////////////////////////////////////////////////////////////
 #[macro_export]
 macro_rules! offset_of {
-    ($Struct:path, $field:ident) => ({
+    ($Struct:path, $field:ident) => {{
         // Using a separate function to minimize unhygienic hazards
         // (e.g. unsafety of #[repr(packed)] field borrows).
         // Uncomment `const` when `const fn`s can juggle pointers.
-        /*const*/ fn offset() -> usize {
+        /*const*/
+        fn offset() -> usize {
             let u = std::mem::MaybeUninit::<$Struct>::uninit();
             // Use pattern-matching to avoid accidentally going through Deref.
             let &$Struct { $field: ref f, .. } = unsafe { &*u.as_ptr() };
@@ -276,7 +377,7 @@ macro_rules! offset_of {
             o
         }
         offset()
-    })
+    }};
 }
 
 #[macro_export]
@@ -414,26 +515,31 @@ pub enum VertexFormat {
     Float4x4,
 }
 
-
 #[derive(Clone)]
 pub struct VertexAttributeDesc {
-    name        : String,
-    format      : VertexFormat,
-    offset      : usize,
+    name: String,
+    format: VertexFormat,
+    offset: usize,
 }
 
 impl VertexAttributeDesc {
     pub fn new(name: String, format: VertexFormat, offset: usize) -> Self {
         Self {
-            name        : name,
-            format      : format,
-            offset      : offset,
+            name: name,
+            format: format,
+            offset: offset,
         }
     }
 
-    pub fn name(&self)      -> &String  { &self.name        }
-    pub fn format(&self)    -> VertexFormat   { self.format.clone() }
-    pub fn offset(&self)    -> usize    { self.offset       }
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+    pub fn format(&self) -> VertexFormat {
+        self.format.clone()
+    }
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
 }
 
 pub trait VertexTrait {
@@ -441,8 +547,6 @@ pub trait VertexTrait {
     fn get_attribute_names() -> Vec<String>;
     fn stride() -> usize;
 }
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /// UniformBlock
@@ -469,28 +573,49 @@ pub enum UniformDataType {
 
 #[derive(Clone)]
 pub struct UniformDesc {
-    name        : String,
-    format      : UniformDataType,
-    count       : usize,
+    name: String,
+    format: UniformDataType,
+    count: usize,
 }
 
 impl UniformDesc {
-    pub fn new(name: String, format: UniformDataType, count: usize) -> Self { Self { name: name, format: format, count: count } }
-    pub fn name(&self)      -> &str     { self.name.as_str() }
-    pub fn format(&self)    -> UniformDataType { self.format.clone() }
-    pub fn count(&self)     -> usize    { self.count }
+    pub fn new(name: String, format: UniformDataType, count: usize) -> Self {
+        Self {
+            name: name,
+            format: format,
+            count: count,
+        }
+    }
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+    pub fn format(&self) -> UniformDataType {
+        self.format.clone()
+    }
+    pub fn count(&self) -> usize {
+        self.count
+    }
 }
 
 #[derive(Clone)]
 pub struct UniformDataDesc {
-    pub desc        : UniformDesc,
-    pub offset      : usize,
+    pub desc: UniformDesc,
+    pub offset: usize,
 }
 
 impl UniformDataDesc {
-    pub fn new(name: String, format: UniformDataType, count: usize, offset: usize) -> Self { Self { desc: UniformDesc::new(name, format, count), offset: offset } }
-    pub fn offset(&self)    -> usize    { self.offset }
-    pub fn desc(&self)      -> &UniformDesc   { &self.desc }
+    pub fn new(name: String, format: UniformDataType, count: usize, offset: usize) -> Self {
+        Self {
+            desc: UniformDesc::new(name, format, count),
+            offset: offset,
+        }
+    }
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+    pub fn desc(&self) -> &UniformDesc {
+        &self.desc
+    }
 }
 
 pub trait UniformBlockTrait {
@@ -502,14 +627,18 @@ pub trait UniformBlockTrait {
 /// Buffers
 ////////////////////////////////////////////////////////////////////////////////
 
-pub trait Payload : Send + Sync {
+pub trait Payload: Send + Sync {
     fn ptr(&self) -> *const u8;
     fn size(&self) -> usize;
 }
 
 impl<T: Send + Sync> Payload for Vec<T> {
-    fn ptr(&self) -> *const u8 { self.as_ptr() as *const u8 }
-    fn size(&self) -> usize { ::core::mem::size_of::<T>() * self.len() }
+    fn ptr(&self) -> *const u8 {
+        self.as_ptr() as *const u8
+    }
+    fn size(&self) -> usize {
+        ::core::mem::size_of::<T>() * self.len()
+    }
 }
 
 pub struct GenPayload<T: Sized + Send + Sync> {
@@ -517,8 +646,12 @@ pub struct GenPayload<T: Sized + Send + Sync> {
 }
 
 impl<T: Sized + Send + Sync> Payload for GenPayload<T> {
-    fn ptr(&self) -> *const u8 { &self.t as *const T as *const u8 }
-    fn size(&self) -> usize { ::core::mem::size_of::<T>() }
+    fn ptr(&self) -> *const u8 {
+        &self.t as *const T as *const u8
+    }
+    fn size(&self) -> usize {
+        ::core::mem::size_of::<T>()
+    }
 }
 
 impl<T: Sized + Send + Sync> GenPayload<T> {
@@ -555,19 +688,18 @@ impl Usage {
 
     pub fn size(&self) -> usize {
         match self {
-            Usage::Static(b)        => b.size(),
-            Usage::Dynamic(s)       => *s,
-            Usage::Streamed(s)      => *s,
+            Usage::Static(b) => b.size(),
+            Usage::Dynamic(s) => *s,
+            Usage::Streamed(s) => *s,
         }
     }
 }
 
-
 pub struct DeviceBufferMapping {
-    pub ptr     : *mut u8,
-    pub offset  : usize,
-    pub size    : usize,
-    pub buff    : DeviceBufferPtr,
+    pub ptr: *mut u8,
+    pub offset: usize,
+    pub size: usize,
+    pub buff: DeviceBufferPtr,
 }
 
 pub enum DeviceBufferDesc {
@@ -579,15 +711,13 @@ pub enum DeviceBufferDesc {
 impl DeviceBufferDesc {
     pub fn size(&self) -> usize {
         match self {
-            Self::Vertex(u) |
-            Self::Index(u)  |
-            Self::Pixel(u)  => u.size(),
+            Self::Vertex(u) | Self::Index(u) | Self::Pixel(u) => u.size(),
         }
     }
 }
 
-pub type DeviceBuffer       = Resource<DeviceBufferDesc>;
-pub type DeviceBufferPtr    = Arc<DeviceBuffer>;
+pub type DeviceBuffer = Resource<DeviceBufferDesc>;
+pub type DeviceBufferPtr = Arc<DeviceBuffer>;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ImageDesc
@@ -603,32 +733,32 @@ pub enum WrapMode {
 
 #[derive(Clone)]
 pub struct PixelChannel {
-    pub size    : usize,
-    pub wrap    : WrapMode,
+    pub size: usize,
+    pub wrap: WrapMode,
 }
 
 impl PixelChannel {
     pub fn default(size: usize) -> Self {
         Self {
-            size    : size,
-            wrap    : WrapMode::Repeat,
+            size: size,
+            wrap: WrapMode::Repeat,
         }
     }
 
     pub fn resize(mut self, size: usize) -> Self {
-        self.size   = size;
+        self.size = size;
         self
     }
 
     pub fn with_wrap(mut self, wrap: WrapMode) -> Self {
-        self.wrap   = wrap;
+        self.wrap = wrap;
         self
     }
 }
 
 #[derive(Clone)]
 pub enum SamplerType {
-    Sampler2D    (PixelChannel, PixelChannel),
+    Sampler2D(PixelChannel, PixelChannel),
 }
 
 #[derive(Clone, Debug)]
@@ -666,15 +796,15 @@ pub enum PixelFormat {
 
 #[derive(Clone, Debug)]
 pub struct MinMagFilter {
-    pub min_filter  : Filter,
-    pub mag_filter  : Filter,
+    pub min_filter: Filter,
+    pub mag_filter: Filter,
 }
 
 impl MinMagFilter {
     pub fn default() -> Self {
         Self {
-            min_filter  : Filter::Nearest,
-            mag_filter  : Filter::Nearest,
+            min_filter: Filter::Nearest,
+            mag_filter: Filter::Nearest,
         }
     }
 
@@ -726,40 +856,42 @@ impl PixelFormat {
 
 #[derive(Clone)]
 pub struct SamplerDesc {
-    pub image_type  : SamplerType,
-    pub mip_maps    : usize,
+    pub image_type: SamplerType,
+    pub mip_maps: usize,
     pub pixel_format: PixelFormat,
 }
 
 impl SamplerDesc {
     pub fn default(width: usize, height: usize) -> Self {
         Self {
-            image_type  : SamplerType::Sampler2D(PixelChannel::default(width), PixelChannel::default(height)),
-            mip_maps    : 0,
+            image_type: SamplerType::Sampler2D(
+                PixelChannel::default(width),
+                PixelChannel::default(height),
+            ),
+            mip_maps: 0,
             pixel_format: PixelFormat::RGBA8U,
         }
     }
 
     pub fn with_wrap_mode(mut self, wrap: WrapMode) -> Self {
-        let image_type =
-            match self.image_type {
-                SamplerType::Sampler2D(mut w, mut h) => {
-                    w.wrap  = wrap;
-                    h.wrap  = wrap;
-                    SamplerType::Sampler2D(w, h)
-                }
-            };
+        let image_type = match self.image_type {
+            SamplerType::Sampler2D(mut w, mut h) => {
+                w.wrap = wrap;
+                h.wrap = wrap;
+                SamplerType::Sampler2D(w, h)
+            }
+        };
         self.image_type = image_type;
         self
     }
 
     pub fn with_pixel_format(mut self, pf: PixelFormat) -> Self {
-        self.pixel_format   = pf;
+        self.pixel_format = pf;
         self
     }
 
     pub fn with_mip_maps(mut self, levels: usize) -> Self {
-        self.mip_maps   = levels;
+        self.mip_maps = levels;
         self
     }
 
@@ -774,46 +906,45 @@ impl SamplerDesc {
             SamplerType::Sampler2D(_, PixelChannel { size, wrap: _ }) => size,
         }
     }
-
 }
 
 pub struct TextureDesc {
-    pub sampler_desc    : SamplerDesc,
-    pub payload         : Option<Arc<dyn Payload>>
+    pub sampler_desc: SamplerDesc,
+    pub payload: Option<Arc<dyn Payload>>,
 }
 
 pub struct RenderTargetDesc {
-    pub sampler_desc    : SamplerDesc,
-    pub sample_count    : usize
+    pub sampler_desc: SamplerDesc,
+    pub sample_count: usize,
 }
 
-pub type Texture    = Resource<TextureDesc>;
+pub type Texture = Resource<TextureDesc>;
 pub type TexturePtr = Arc<Texture>;
 
-pub type RenderTarget       = Resource<RenderTargetDesc>;
-pub type RenderTargetPtr    = Arc<RenderTarget>;
+pub type RenderTarget = Resource<RenderTargetDesc>;
+pub type RenderTargetPtr = Arc<RenderTarget>;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ShaderDesc
 ////////////////////////////////////////////////////////////////////////////////
 #[derive(Clone)]
 pub struct ShaderDesc {
-    pub vertex_shader       : String,
-    pub pixel_shader        : String,
+    pub vertex_shader: String,
+    pub pixel_shader: String,
 
-    pub vertex_attributes   : Vec<Vec<String>>,
-    pub vertex_uniforms     : Vec<String>,
-    pub vertex_surfaces     : Vec<String>,
+    pub vertex_attributes: Vec<Vec<String>>,
+    pub vertex_uniforms: Vec<String>,
+    pub vertex_surfaces: Vec<String>,
 
-    pub pixel_uniforms      : Vec<String>,
-    pub pixel_surfaces      : Vec<String>,
+    pub pixel_uniforms: Vec<String>,
+    pub pixel_surfaces: Vec<String>,
 }
 
 unsafe impl Send for ShaderDesc {}
 unsafe impl Sync for ShaderDesc {}
 
-pub type Shader     = Resource<ShaderDesc>;
-pub type ShaderPtr  = Arc<Shader>;
+pub type Shader = Resource<ShaderDesc>;
+pub type ShaderPtr = Arc<Shader>;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Binding
@@ -825,25 +956,29 @@ pub enum IndexType {
     UInt32,
 }
 
-pub trait IndexTypeTrait : Send + Sync {
+pub trait IndexTypeTrait: Send + Sync {
     fn to_index_type() -> IndexType;
 }
 
 impl IndexTypeTrait for u16 {
-    fn to_index_type() -> IndexType { IndexType::UInt16 }
+    fn to_index_type() -> IndexType {
+        IndexType::UInt16
+    }
 }
 
 impl IndexTypeTrait for u32 {
-    fn to_index_type() -> IndexType { IndexType::UInt32 }
+    fn to_index_type() -> IndexType {
+        IndexType::UInt32
+    }
 }
 
 #[derive(Clone)]
 pub struct Bindings {
-    pub vertex_buffers  : Vec<DeviceBufferPtr>,
-    pub index_buffer    : Option<DeviceBufferPtr>,
+    pub vertex_buffers: Vec<DeviceBufferPtr>,
+    pub index_buffer: Option<DeviceBufferPtr>,
 
-    pub vertex_images   : Vec<TexturePtr>,
-    pub pixel_images    : Vec<TexturePtr>,
+    pub vertex_images: Vec<TexturePtr>,
+    pub pixel_images: Vec<TexturePtr>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -872,10 +1007,10 @@ pub enum FaceWinding {
 
 #[derive(Clone)]
 pub struct VertexBufferLayout {
-    pub buffer_id           : usize,
-    pub vertex_attributes   : Vec<VertexAttributeDesc>,
-    pub stride              : usize,
-    pub divisor             : usize,
+    pub buffer_id: usize,
+    pub vertex_attributes: Vec<VertexAttributeDesc>,
+    pub stride: usize,
+    pub divisor: usize,
 }
 
 #[derive(Clone)]
@@ -900,24 +1035,23 @@ pub enum BlendFactor {
     OneMinusConstantAlpha,
 }
 
-
 #[derive(Clone)]
 pub struct Blend {
-    pub src_factor_rgb      : BlendFactor,
-    pub src_factor_alpha    : BlendFactor,
+    pub src_factor_rgb: BlendFactor,
+    pub src_factor_alpha: BlendFactor,
 
-    pub dst_factor_rgb      : BlendFactor,
-    pub dst_factor_alpha    : BlendFactor,
+    pub dst_factor_rgb: BlendFactor,
+    pub dst_factor_alpha: BlendFactor,
 }
 
 impl Blend {
     pub fn default() -> Self {
         Self {
-            src_factor_rgb          : BlendFactor::One,
-            src_factor_alpha        : BlendFactor::One,
+            src_factor_rgb: BlendFactor::One,
+            src_factor_alpha: BlendFactor::One,
 
-            dst_factor_rgb          : BlendFactor::OneMinusSrcAlpha,
-            dst_factor_alpha        : BlendFactor::OneMinusSrcAlpha,
+            dst_factor_rgb: BlendFactor::OneMinusSrcAlpha,
+            dst_factor_alpha: BlendFactor::OneMinusSrcAlpha,
         }
     }
 }
@@ -938,31 +1072,31 @@ pub enum PolygonOffset {
 
 #[derive(Clone)]
 pub struct PipelineDesc {
-    pub primitive_type      : PrimitiveType,
-    pub shader              : ShaderPtr,
+    pub primitive_type: PrimitiveType,
+    pub shader: ShaderPtr,
 
     // layout
-    pub buffer_layouts      : Vec<VertexBufferLayout>,
+    pub buffer_layouts: Vec<VertexBufferLayout>,
 
     //
-    pub uniform_descs       : Vec<UniformDataDesc>,
-    pub index_type          : IndexType,
+    pub uniform_descs: Vec<UniformDataDesc>,
+    pub index_type: IndexType,
 
-    pub face_winding        : FaceWinding,
-    pub cull_mode           : CullMode,
+    pub face_winding: FaceWinding,
+    pub cull_mode: CullMode,
 
-    pub depth_write         : bool,
-    pub depth_test          : bool,
+    pub depth_write: bool,
+    pub depth_test: bool,
 
-    pub blend               : BlendOp,
-    pub polygon_offset      : PolygonOffset,
+    pub blend: BlendOp,
+    pub polygon_offset: PolygonOffset,
 }
 
 unsafe impl Send for PipelineDesc {}
 unsafe impl Sync for PipelineDesc {}
 
-pub type Pipeline   = Resource<PipelineDesc>;
-pub type PipelinePtr= Arc<Pipeline>;
+pub type Pipeline = Resource<PipelineDesc>;
+pub type PipelinePtr = Arc<Pipeline>;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Pass
@@ -982,7 +1116,7 @@ pub enum DepthPassAction {
 #[derive(Clone)]
 pub enum SurfaceAttachment {
     Texture(TexturePtr),
-    RenderTarget(RenderTargetPtr)
+    RenderTarget(RenderTargetPtr),
 }
 
 impl SurfaceAttachment {
@@ -996,14 +1130,14 @@ impl SurfaceAttachment {
 
 #[derive(Clone)]
 pub struct FrameBufferDesc {
-    pub color_attachements          : [Option<SurfaceAttachment>; 4],
-    pub depth_stencil_attachement   : SurfaceAttachment,
+    pub color_attachements: [Option<SurfaceAttachment>; 4],
+    pub depth_stencil_attachement: SurfaceAttachment,
 }
 
 unsafe impl Send for FrameBufferDesc {}
 unsafe impl Sync for FrameBufferDesc {}
 
-pub type FrameBuffer    = Resource<FrameBufferDesc>;
+pub type FrameBuffer = Resource<FrameBufferDesc>;
 pub type FrameBufferPtr = Arc<FrameBuffer>;
 
 pub(crate) struct DrawCommand {
@@ -1011,7 +1145,7 @@ pub(crate) struct DrawCommand {
     pub bindings: Bindings,
     pub uniforms: Arc<dyn Payload>,
     pub prim_count: u32,
-    pub instance_count: u32
+    pub instance_count: u32,
 }
 
 pub(crate) struct UpdateDeviceBufferCommand {
@@ -1034,23 +1168,31 @@ pub(crate) enum RenderPassCommand {
 }
 
 pub struct Pass {
-    pub width           : usize,
-    pub height          : usize,
-    pub frame_buffer    : Option<FrameBufferPtr>,
-    pub color_actions   : [ColorPassAction; 4],
-    pub depth_action    : DepthPassAction,
+    pub width: usize,
+    pub height: usize,
+    pub frame_buffer: Option<FrameBufferPtr>,
+    pub color_actions: [ColorPassAction; 4],
+    pub depth_action: DepthPassAction,
 
-    pub(crate) commands            : Vec<RenderPassCommand>,
+    pub(crate) commands: Vec<RenderPassCommand>,
 }
 
 impl Pass {
-    pub fn new(width           : usize,
-        height          : usize,
-        frame_buffer    : Option<FrameBufferPtr>,
-        color_actions   : [ColorPassAction; 4],
-        depth_action    : DepthPassAction) -> Self {
-        
-        Self { width, height, frame_buffer, color_actions, depth_action, commands: Vec::new() }
+    pub fn new(
+        width: usize,
+        height: usize,
+        frame_buffer: Option<FrameBufferPtr>,
+        color_actions: [ColorPassAction; 4],
+        depth_action: DepthPassAction,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            frame_buffer,
+            color_actions,
+            depth_action,
+            commands: Vec::new(),
+        }
     }
 
     pub fn set_viewport(&mut self, x: u32, y: u32, w: u32, h: u32) {
@@ -1061,16 +1203,44 @@ impl Pass {
         self.commands.push(RenderPassCommand::Scissor(x, y, w, h))
     }
 
-    pub fn draw(&mut self, pipe: &PipelinePtr, bindings: &Bindings, uniforms: Arc<dyn Payload>, prim_count: u32, instance_count: u32) {
-        self.commands.push(RenderPassCommand::Draw(DrawCommand { pipe: pipe.clone(), bindings: bindings.clone(), uniforms, prim_count, instance_count }));
+    pub fn draw(
+        &mut self,
+        pipe: &PipelinePtr,
+        bindings: &Bindings,
+        uniforms: Arc<dyn Payload>,
+        prim_count: u32,
+        instance_count: u32,
+    ) {
+        self.commands.push(RenderPassCommand::Draw(DrawCommand {
+            pipe: pipe.clone(),
+            bindings: bindings.clone(),
+            uniforms,
+            prim_count,
+            instance_count,
+        }));
     }
 
-    pub fn update_device_buffer(&mut self, dev_buf: &mut DeviceBufferPtr, offset: usize, pl: Arc<dyn Payload>) {
-        self.commands.push(RenderPassCommand::UpdateDeviceBuffer(UpdateDeviceBufferCommand { buffer: dev_buf.clone(), offset, payload: pl }));
+    pub fn update_device_buffer(
+        &mut self,
+        dev_buf: &mut DeviceBufferPtr,
+        offset: usize,
+        pl: Arc<dyn Payload>,
+    ) {
+        self.commands.push(RenderPassCommand::UpdateDeviceBuffer(
+            UpdateDeviceBufferCommand {
+                buffer: dev_buf.clone(),
+                offset,
+                payload: pl,
+            },
+        ));
     }
 
     pub fn update_texture(&mut self, tex: &mut TexturePtr, pl: Arc<dyn Payload>) {
-        self.commands.push(RenderPassCommand::UpdateTexture(UpdateTextureCommand { tex: tex.clone(), payload: pl }));
+        self.commands
+            .push(RenderPassCommand::UpdateTexture(UpdateTextureCommand {
+                tex: tex.clone(),
+                payload: pl,
+            }));
     }
 
     pub fn drain(&mut self) {
@@ -1080,8 +1250,8 @@ impl Pass {
     pub fn clone_with_no_commands(&self) -> Self {
         Self {
             commands: Vec::new(),
-            frame_buffer    : self.frame_buffer.clone(),
-            ..*self        
+            frame_buffer: self.frame_buffer.clone(),
+            ..*self
         }
     }
 }
@@ -1108,7 +1278,7 @@ pub enum ReadbackError {
 
 pub enum ReadbackResult {
     Ok(ReadbackPayload),
-    Error(ReadbackError)
+    Error(ReadbackError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1116,7 +1286,7 @@ pub enum ReadbackResult {
 ////////////////////////////////////////////////////////////////////////////////
 #[derive(Copy, Clone)]
 pub struct DriverCaps {
-    pub max_2d_surface_dimension    : Dimensioni,
+    pub max_2d_surface_dimension: Dimensioni,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1135,21 +1305,28 @@ pub trait Driver {
 
     fn render_pass(&mut self, pass: &mut Pass);
 
-    fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload>;
+    fn read_back(
+        &mut self,
+        surface: &TexturePtr,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+    ) -> Option<ReadbackPayload>;
 }
 
 //
 // There is a very important reason for having this abstraction: Rust mutexes are not reentrant!!!
 // This would break mutability borrowing rules: many lock.muts would have multiple owners of mutability.
 // to remedy this, we need to abstract the lock and the automatic unlock within the same code block.
-// While we are using Driver trait, this should be transparent from the compiler point of view since, we 
+// While we are using Driver trait, this should be transparent from the compiler point of view since, we
 // are not using DriverPtr in dynamic way
 //
 pub(crate) type DriverPtrInternal = Arc<Mutex<dyn Driver>>;
 
 #[derive(Clone)]
 pub struct DriverPtr {
-    driver : DriverPtrInternal
+    driver: DriverPtrInternal,
 }
 
 unsafe impl Send for DriverPtr {}
@@ -1165,40 +1342,79 @@ impl Driver for DriverPtr {
     fn get_caps(&self) -> DriverCaps {
         self.driver.lock().as_deref_mut().unwrap().get_caps()
     }
-    
+
     fn create_device_buffer(&mut self, desc: DeviceBufferDesc) -> Option<DeviceBufferPtr> {
-        self.driver.lock().as_deref_mut().unwrap().create_device_buffer(desc)
+        self.driver
+            .lock()
+            .as_deref_mut()
+            .unwrap()
+            .create_device_buffer(desc)
     }
 
     fn create_texture(&mut self, desc: TextureDesc) -> Option<TexturePtr> {
-        self.driver.lock().as_deref_mut().unwrap().create_texture(desc)
+        self.driver
+            .lock()
+            .as_deref_mut()
+            .unwrap()
+            .create_texture(desc)
     }
 
     fn create_render_target(&mut self, desc: RenderTargetDesc) -> Option<RenderTargetPtr> {
-        self.driver.lock().as_deref_mut().unwrap().create_render_target(desc)
+        self.driver
+            .lock()
+            .as_deref_mut()
+            .unwrap()
+            .create_render_target(desc)
     }
 
     fn create_shader(&mut self, desc: ShaderDesc) -> Option<ShaderPtr> {
-        self.driver.lock().as_deref_mut().unwrap().create_shader(desc)
+        self.driver
+            .lock()
+            .as_deref_mut()
+            .unwrap()
+            .create_shader(desc)
     }
 
     fn create_pipeline(&mut self, desc: PipelineDesc) -> Option<PipelinePtr> {
-        self.driver.lock().as_deref_mut().unwrap().create_pipeline(desc)
+        self.driver
+            .lock()
+            .as_deref_mut()
+            .unwrap()
+            .create_pipeline(desc)
     }
 
     fn create_frame_buffer(&mut self, desc: FrameBufferDesc) -> Option<FrameBufferPtr> {
-        self.driver.lock().as_deref_mut().unwrap().create_frame_buffer(desc)
+        self.driver
+            .lock()
+            .as_deref_mut()
+            .unwrap()
+            .create_frame_buffer(desc)
     }
 
     fn delete_resource(&mut self, resource_type: &ResourceType, res_id: usize) {
-        self.driver.lock().as_deref_mut().unwrap().delete_resource(resource_type, res_id)
+        self.driver
+            .lock()
+            .as_deref_mut()
+            .unwrap()
+            .delete_resource(resource_type, res_id)
     }
 
     fn render_pass(&mut self, pass: &mut Pass) {
         self.driver.lock().as_deref_mut().unwrap().render_pass(pass)
     }
 
-    fn read_back(&mut self, surface: &TexturePtr, x: u32, y: u32, w: u32, h: u32) -> Option<ReadbackPayload> {
-        self.driver.lock().as_deref_mut().unwrap().read_back(surface, x, y, w, h)
+    fn read_back(
+        &mut self,
+        surface: &TexturePtr,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+    ) -> Option<ReadbackPayload> {
+        self.driver
+            .lock()
+            .as_deref_mut()
+            .unwrap()
+            .read_back(surface, x, y, w, h)
     }
 }

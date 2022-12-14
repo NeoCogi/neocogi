@@ -30,7 +30,7 @@
 extern crate neocogi;
 
 use neocogi::glfw;
-use neocogi::glfw::{Context};
+use neocogi::glfw::Context;
 
 use neocogi::rs_math3d::*;
 use neocogi::*;
