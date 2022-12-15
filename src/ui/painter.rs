@@ -215,7 +215,8 @@ impl Painter {
         v2: &Vertex,
         v3: &Vertex,
     ) {
-        if self.vertices.len() + 4 >= MAX_VERTEX_COUNT || self.indices.len() + 6 >= MAX_INDEX_COUNT {
+        if self.vertices.len() + 4 >= MAX_VERTEX_COUNT || self.indices.len() + 6 >= MAX_INDEX_COUNT
+        {
             self.flush(pass);
         }
 

@@ -29,7 +29,6 @@
 //
 extern crate neocogi;
 
-use glfw::ffi::glfwGetMonitorWorkarea;
 use neocogi::glfw;
 use neocogi::glfw::Context;
 
@@ -549,7 +548,6 @@ fn main() {
     let (width, height) = window.get_framebuffer_size();
     let mut painter = Painter::new(&mut driver, width as u32, height as u32);
 
-    let start_time = std::time::Instant::now();
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
         painter.set_canvas_size(width as u32, height as u32);
@@ -580,46 +578,11 @@ fn main() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
             match event {
-                glfw::WindowEvent::Close | glfw::WindowEvent::Key (glfw::Key::Escape, ..) => break 'running,
-                glfw::WindowEvent::CursorPos(x, y) => state.ctx.input_mousemove(x as i32, y as i32),
-                glfw::WindowEvent::Char(ch) => state.ctx.input_text(String::from(ch).as_str()),
-                glfw::WindowEvent::MouseButton(mb, ac, _) => {
-                    let (x, y) = window.get_cursor_pos();
-                    let b = match mb {
-                        glfw::MouseButtonLeft => ui::MouseButton::LEFT,
-                        glfw::MouseButtonLeft => ui::MouseButton::RIGHT,
-                        _ => ui::MouseButton::NONE
-                    };
-
-                    match ac {
-                        glfw::Action::Press => state.ctx.input_mousedown(x as i32, y as i32, b),
-                        glfw::Action::Release => state.ctx.input_mouseup(x as i32, y as i32, b),
-                        _ => ()
-                    }
+                glfw::WindowEvent::Close | glfw::WindowEvent::Key(glfw::Key::Escape, ..) => {
+                    break 'running
                 }
-                // glfw::Event::MouseMotion { x, y, .. } => state.ctx.input_mousemove(x, y),
-                // glfw::Event::MouseWheel { y, .. } => state.ctx.input_scroll(0, y * -30),
-                // glfw::Event::MouseButtonDown { x, y, mouse_btn, .. } => {
-                //     let mb = map_mouse_button(mouse_btn);
-                //     state.ctx.input_mousedown(x, y, mb);
-                // }
-                // glfw::Event::MouseButtonUp { x, y, mouse_btn, .. } => {
-                //     let mb = map_mouse_button(mouse_btn);
-                //     state.ctx.input_mouseup(x, y, mb);
-                // }
-                // glfw::Event::KeyDown { keymod, keycode, .. } => {
-                //     let km = map_keymode(keymod, keycode);
-                //     state.ctx.input_keydown(km);
-                // }
-                // glfw::Event::KeyUp { keymod, keycode, .. } => {
-                //     let km = map_keymode(keymod, keycode);
-                //     state.ctx.input_keyup(km);
-                // }
-                // glfw::Event::TextInput { text, .. } => {
-                //     state.ctx.input_text(text.as_str());
-                // }
 
-                _ => (),
+                _ => ui::handle_event(event, &mut window, &mut state.ctx),
             }
         }
     }

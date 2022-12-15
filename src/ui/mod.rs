@@ -62,6 +62,7 @@ pub mod input;
 pub mod painter;
 pub mod pointer;
 
+pub use input::*;
 pub use painter::*;
 
 use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
@@ -288,7 +289,7 @@ impl MouseButton {
 }
 
 bitflags! {
-    pub struct KeyMode : u32 {
+    pub struct KeyModifier : u32 {
         const RETURN = 16;
         const BACKSPACE = 8;
         const ALT = 4;
@@ -298,7 +299,7 @@ bitflags! {
     }
 }
 
-impl KeyMode {
+impl KeyModifier {
     pub fn is_none(&self) -> bool {
         self.bits == 0
     }
@@ -353,8 +354,8 @@ pub struct Context {
     pub scroll_delta: Vec2i,
     pub mouse_down: MouseButton,
     pub mouse_pressed: MouseButton,
-    pub key_down: KeyMode,
-    pub key_pressed: KeyMode,
+    pub key_down: KeyModifier,
+    pub key_pressed: KeyModifier,
     pub input_text: FixedString<32>,
 }
 
@@ -393,8 +394,8 @@ impl Default for Context {
             scroll_delta: Vec2i::default(),
             mouse_down: MouseButton::NONE,
             mouse_pressed: MouseButton::NONE,
-            key_down: KeyMode::NONE,
-            key_pressed: KeyMode::NONE,
+            key_down: KeyModifier::NONE,
+            key_pressed: KeyModifier::NONE,
             input_text: FixedString::default(),
         }
     }
@@ -656,7 +657,7 @@ impl Context {
         {
             self.bring_to_front(self.next_hover_root.unwrap());
         }
-        self.key_pressed = KeyMode::NONE;
+        self.key_pressed = KeyModifier::NONE;
         self.input_text.clear();
         self.mouse_pressed = MouseButton::NONE;
         self.scroll_delta = vec2(0, 0);
@@ -938,12 +939,12 @@ impl Context {
         self.scroll_delta.y += y;
     }
 
-    pub fn input_keydown(&mut self, key: KeyMode) {
+    pub fn input_keydown(&mut self, key: KeyModifier) {
         self.key_pressed |= key;
         self.key_down |= key;
     }
 
-    pub fn input_keyup(&mut self, key: KeyMode) {
+    pub fn input_keyup(&mut self, key: KeyModifier) {
         self.key_down &= !key;
     }
 

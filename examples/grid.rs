@@ -37,11 +37,50 @@ use neocogi::*;
 
 use neocogi::renderer::*;
 
-use neocogi::egui;
 use neocogi::scene::*;
 use neocogi::ui::*;
 
 use neocogi::scene::utility_mesh::*;
+
+pub fn r_get_char_width(_font: FontId, c: char) -> usize {
+    ATLAS[ATLAS_FONT as usize + c as usize].width as usize
+}
+pub fn r_get_font_height(_font: FontId) -> usize {
+    18
+}
+
+pub struct State {
+    view: View3D,
+    ctx: ui::Context,
+}
+
+impl State {
+    pub fn new(width: usize, height: usize) -> Self {
+        let camera = Camera::new(
+            Vec3f::zero(),
+            20.0,
+            Quatf::of_axis_angle(&Vec3f::new(-1.0, 0.0, 0.0), std::f32::consts::PI / 4.0),
+            std::f32::consts::PI / 4.0,
+            1.0,
+            0.1,
+            100.0,
+        );
+        let view = View3D::new(
+            camera,
+            Dimensioni::new(1024, 900),
+            Box3f::new(
+                &Vec3f::new(-20.0, -20.0, -20.0),
+                &Vec3f::new(20.0, 20.0, 20.0),
+            ),
+        );
+
+        let mut ctx = ui::Context::new();
+        ctx.char_width = Some(r_get_char_width);
+        ctx.font_height = Some(r_get_font_height);
+
+        Self { view, ctx }
+    }
+}
 
 fn main() {
     // initialize GLFW3 with OpenGL ES 3.0
@@ -73,76 +112,49 @@ fn main() {
     // utility mesh renderer
     let mut um_renderer = UMRenderer::new(&mut driver, 65536);
 
-    // initialize EGUI
-    let egui_ctx = egui::Context::default();
+    // initialize UI
     let mut painter = ui::Painter::new(&mut driver, 1024, 900);
-
     let (width, height) = window.get_framebuffer_size();
-    let native_pixels_per_point = window.get_content_scale().0;
 
-    println!("pixels per point: {}", native_pixels_per_point);
-    let mut egui_input_state = ui::EguiInputState::new(egui::RawInput {
-        screen_rect: Some(egui::Rect::from_min_size(
-            egui::Pos2::new(0f32, 0f32),
-            egui::vec2(width as f32, height as f32) / native_pixels_per_point,
-        )),
-        pixels_per_point: Some(native_pixels_per_point),
-        ..Default::default()
-    });
+    let mut state = State::new(width as usize, height as usize);
 
-    let start_time = std::time::Instant::now();
-    let camera = Camera::new(
-        Vec3f::zero(),
-        20.0,
-        Quatf::of_axis_angle(&Vec3f::new(-1.0, 0.0, 0.0), std::f32::consts::PI / 4.0),
-        std::f32::consts::PI / 4.0,
-        1.0,
-        0.1,
-        100.0,
-    );
-    let mut view3d = View3D::new(
-        camera,
-        Dimensioni::new(1024, 900),
-        Box3f::new(
-            &Vec3f::new(-20.0, -20.0, -20.0),
-            &Vec3f::new(20.0, 20.0, 20.0),
-        ),
-    );
-
-    let mut quit = false;
-    while !window.should_close() {
+    'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
         painter.set_canvas_size(width as u32, height as u32);
-        let native_pixels_per_point = window.get_content_scale().0;
-        egui_input_state.egui_input.screen_rect = Some(egui::Rect::from_min_size(
-            egui::Pos2::new(0f32, 0f32),
-            egui::vec2(width as f32, height as f32) / native_pixels_per_point,
-        ));
-        egui_input_state.egui_input.time = Some(start_time.elapsed().as_secs_f64());
 
-        let egui_output = egui_ctx.run(egui_input_state.egui_input.take(), |egui_ctx| {
-            egui::SidePanel::left("Test").show(&egui_ctx, |ui| {
-                ui.label("Navigation Mode:");
+        state.ctx.begin();
+        if !state
+            .ctx
+            .begin_window_ex(
+                "Navigation",
+                Rect::new(100, 100, 256, 128),
+                ui::WidgetOption::AUTO_SIZE,
+            )
+            .is_none()
+        {
+            state.ctx.layout_begin_column();
 
-                ui.horizontal(|ui| {
-                    let mut nav_mode = view3d.get_navigation_mode();
-                    ui.selectable_value(&mut nav_mode, NavigationMode::Pan, "Pan");
-                    ui.selectable_value(&mut nav_mode, NavigationMode::Orbit, "Orbit");
+            if state
+                .ctx
+                .button_ex("Orbit", ui::Icon::None, WidgetOption::NONE)
+                .is_submitted()
+            {
+                state.view.set_navigation_mode(NavigationMode::Orbit)
+            }
 
-                    view3d.set_navigation_mode(nav_mode);
-                });
-            });
-        });
+            if state
+                .ctx
+                .button_ex("Pan", ui::Icon::None, WidgetOption::NONE)
+                .is_submitted()
+            {
+                state.view.set_navigation_mode(NavigationMode::Pan)
+            }
 
-        //Handle cut, copy text from egui
-        if !egui_output.platform_output.copied_text.is_empty() {
-            ui::copy_to_clipboard(
-                &mut egui_input_state,
-                egui_output.platform_output.copied_text,
-            );
+            state.ctx.layout_end_column();
+            state.ctx.end_window();
         }
+        state.ctx.end();
 
-        let paint_jobs = egui_ctx.tessellate(egui_output.shapes);
         let mut pass = Pass::new(
             width as usize,
             height as usize,
@@ -165,18 +177,13 @@ fn main() {
         );
 
         let nodes = UMNode::Assembly(vec![grid, axis]);
-        um_renderer.draw_node(&mut pass, &view3d.pvm(), &nodes);
+        um_renderer.draw_node(&mut pass, &state.view.pvm(), &nodes);
 
         //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
         //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
         //drawing calls with it.
         //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
-        painter.paint_jobs(
-            &mut pass,
-            paint_jobs,
-            &egui_output.textures_delta,
-            native_pixels_per_point,
-        );
+        painter.paint(&mut pass, &mut state.ctx);
 
         driver.render_pass(&mut pass);
         window.swap_buffers();
@@ -194,21 +201,21 @@ fn main() {
             };
         let pointer_pos = Vec2f::new(rel_x, rel_y);
 
-        view3d.set_dimension(Dimensioni::new(width as i32, height as i32));
-        view3d.set_pointer(pointer_pos, pointer_button);
+        state
+            .view
+            .set_dimension(Dimensioni::new(width as i32, height as i32));
+        state.view.set_pointer(pointer_pos, pointer_button);
 
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
             match event {
                 glfw::WindowEvent::Key(glfw::Key::Escape, _, _, _) | glfw::WindowEvent::Close => {
-                    quit = true
+                    break 'running
                 }
-                _ => neocogi::ui::handle_event(event, &mut egui_input_state),
+                _ => neocogi::ui::handle_event(event, &mut window, &mut state.ctx),
             }
         }
-
-        if quit {
-            window.set_should_close(true)
-        }
     }
+
+    window.close();
 }
