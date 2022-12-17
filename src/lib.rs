@@ -14,6 +14,9 @@ pub mod scene;
 #[cfg(feature = "ui")]
 pub extern crate glfw;
 
+#[cfg(feature = "editor")]
+pub mod editor;
+
 pub enum UpdateResult {
     Handled,
     Unhandled,

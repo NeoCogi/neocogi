@@ -59,11 +59,8 @@ mod atlas;
 pub use atlas::*;
 
 pub mod system;
-pub mod pointer;
-pub mod view3d;
 
 pub use system::*;
-pub use view3d::*;
 
 use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 

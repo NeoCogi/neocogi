@@ -39,6 +39,7 @@ use neocogi::renderer::*;
 
 use neocogi::scene::*;
 use neocogi::ui::*;
+use neocogi::editor::*;
 
 use neocogi::scene::utility_mesh::*;
 
@@ -195,9 +196,9 @@ fn main() {
 
         let pointer_button =
             if window.get_mouse_button(glfw::MouseButtonLeft) == glfw::Action::Press {
-                pointer::ButtonState::Pressed(1.0)
+                ButtonState::Pressed(1.0)
             } else {
-                pointer::ButtonState::Released
+                ButtonState::Released
             };
         let pointer_pos = Vec2f::new(rel_x, rel_y);
 

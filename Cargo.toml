@@ -18,10 +18,11 @@ libc = "0.2.138"
 gl_generator = "0.14.0"
 
 [features]
-default = ["renderer", "scene", "ui"]
+default = ["renderer", "scene", "ui", "editor"]
 renderer = []
 ui = ["renderer", "glfw"]
 scene = ["renderer"]
+editor = ["renderer", "scene", "ui"]
 
 [dev-dependencies]
 
