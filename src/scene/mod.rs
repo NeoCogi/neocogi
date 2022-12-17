@@ -1,9 +1,7 @@
 mod camera;
 pub mod utility_mesh;
-mod view3d;
 
 pub use camera::*;
-pub use view3d::*;
 
 // use rs_math3d::*;
 

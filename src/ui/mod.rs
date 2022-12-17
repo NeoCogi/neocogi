@@ -58,12 +58,12 @@ pub use fixed_collections::*;
 mod atlas;
 pub use atlas::*;
 
-pub mod input;
-pub mod painter;
+pub mod system;
 pub mod pointer;
+pub mod view3d;
 
-pub use input::*;
-pub use painter::*;
+pub use system::*;
+pub use view3d::*;
 
 use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 

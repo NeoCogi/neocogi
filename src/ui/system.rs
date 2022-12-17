@@ -112,7 +112,7 @@ const FS_SRC: &str = r#"
 const MAX_VERTEX_COUNT: usize = 65536;
 const MAX_INDEX_COUNT: usize = 65536;
 
-pub struct Painter {
+pub struct System {
     driver: DriverPtr,
     pipeline: PipelinePtr,
     vertex_buffer: DeviceBufferPtr,
@@ -126,8 +126,8 @@ pub struct Painter {
     indices: Vec<u16>,
 }
 
-impl Painter {
-    pub fn new(drv: &mut DriverPtr, canvas_width: u32, canvas_height: u32) -> Painter {
+impl System {
+    pub fn new(drv: &mut DriverPtr, canvas_width: u32, canvas_height: u32) -> Self {
         let program = drv
             .create_shader(ShaderDesc {
                 vertex_shader: String::from(VS_SRC),
@@ -189,7 +189,7 @@ impl Painter {
         };
 
         let ui_texture = drv.create_texture(tex_desc).unwrap();
-        Painter {
+        Self {
             driver: drv.clone(),
             pipeline,
             canvas_width,
@@ -384,4 +384,48 @@ impl Painter {
         self.vertices.clear();
         self.indices.clear();
     }
+
+    pub fn handle_event(&mut self, event: glfw::WindowEvent, window: &mut glfw::Window, ctx: &mut ui::Context) {
+        match event {
+            glfw::WindowEvent::CursorPos(x, y) => ctx.input_mousemove(x as i32, y as i32),
+            glfw::WindowEvent::Char(ch) => ctx.input_text(String::from(ch).as_str()),
+            glfw::WindowEvent::MouseButton(mb, ac, _) => {
+                let (x, y) = window.get_cursor_pos();
+                let b = match mb {
+                    glfw::MouseButtonLeft => ui::MouseButton::LEFT,
+                    glfw::MouseButtonRight => ui::MouseButton::RIGHT,
+                    _ => ui::MouseButton::NONE,
+                };
+
+                match ac {
+                    glfw::Action::Press => ctx.input_mousedown(x as i32, y as i32, b),
+                    glfw::Action::Release => ctx.input_mouseup(x as i32, y as i32, b),
+                    _ => (),
+                }
+            }
+            glfw::WindowEvent::Key(key, scancode, action, modifiers) => {
+                let mut keymod = KeyModifier::NONE;
+                if key == glfw::Key::Enter {
+                    keymod |= KeyModifier::RETURN
+                }
+                if modifiers == glfw::Modifiers::Alt {
+                    keymod |= KeyModifier::ALT
+                } else if modifiers == glfw::Modifiers::Control {
+                    keymod |= KeyModifier::CTRL
+                } else if modifiers == glfw::Modifiers::Shift {
+                    keymod |= KeyModifier::SHIFT
+                } else if key == glfw::Key::Backspace {
+                    keymod |= KeyModifier::BACKSPACE
+                }
+
+                match action {
+                    glfw::Action::Press => ctx.input_keydown(keymod),
+                    glfw::Action::Release => ctx.input_keyup(keymod),
+                    _ => (),
+                }
+            }
+            _ => (),
+        }
+    }
+
 }

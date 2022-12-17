@@ -519,7 +519,7 @@ fn main() {
     // initialize GLFW3 with OpenGL ES 3.0
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::ContextCreationApi(
-        glfw::ContextCreationApi::Egl,
+         glfw::ContextCreationApi::Egl,
     ));
     glfw.window_hint(glfw::WindowHint::ClientApi(glfw::ClientApiHint::OpenGlEs));
     glfw.window_hint(glfw::WindowHint::ContextVersion(3, 0));
@@ -539,18 +539,18 @@ fn main() {
     window.set_key_polling(true);
     window.set_mouse_button_polling(true);
     window.make_current();
-    glfw.set_swap_interval(glfw::SwapInterval::Sync(1));
+    glfw.set_swap_interval(glfw::SwapInterval::Sync(0));
 
     let mut driver = renderer::get_driver();
 
     // initialize UI
     let mut state = State::new();
     let (width, height) = window.get_framebuffer_size();
-    let mut painter = Painter::new(&mut driver, width as u32, height as u32);
+    let mut system = System::new(&mut driver, width as u32, height as u32);
 
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
-        painter.set_canvas_size(width as u32, height as u32);
+        system.set_canvas_size(width as u32, height as u32);
 
         let mut pass = Pass::new(
             width as usize,
@@ -570,19 +570,19 @@ fn main() {
         //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
         //drawing calls with it.
         //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
-        painter.paint(&mut pass, &mut state.ctx);
+        system.paint(&mut pass, &mut state.ctx);
 
         driver.render_pass(&mut pass);
         window.swap_buffers();
 
-        glfw.poll_events();
+        glfw.wait_events_timeout(0.007);
         for (_, event) in glfw::flush_messages(&events) {
             match event {
                 glfw::WindowEvent::Close | glfw::WindowEvent::Key(glfw::Key::Escape, ..) => {
                     break 'running
                 }
 
-                _ => ui::handle_event(event, &mut window, &mut state.ctx),
+                _ => system.handle_event(event, &mut window, &mut state.ctx),
             }
         }
     }

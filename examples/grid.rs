@@ -113,14 +113,14 @@ fn main() {
     let mut um_renderer = UMRenderer::new(&mut driver, 65536);
 
     // initialize UI
-    let mut painter = ui::Painter::new(&mut driver, 1024, 900);
+    let mut uisys = ui::System::new(&mut driver, 1024, 900);
     let (width, height) = window.get_framebuffer_size();
 
     let mut state = State::new(width as usize, height as usize);
 
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
-        painter.set_canvas_size(width as u32, height as u32);
+        uisys.set_canvas_size(width as u32, height as u32);
 
         state.ctx.begin();
         if !state
@@ -183,7 +183,7 @@ fn main() {
         //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
         //drawing calls with it.
         //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
-        painter.paint(&mut pass, &mut state.ctx);
+        uisys.paint(&mut pass, &mut state.ctx);
 
         driver.render_pass(&mut pass);
         window.swap_buffers();
@@ -212,7 +212,7 @@ fn main() {
                 glfw::WindowEvent::Key(glfw::Key::Escape, _, _, _) | glfw::WindowEvent::Close => {
                     break 'running
                 }
-                _ => neocogi::ui::handle_event(event, &mut window, &mut state.ctx),
+                _ => uisys.handle_event(event, &mut window, &mut state.ctx),
             }
         }
     }

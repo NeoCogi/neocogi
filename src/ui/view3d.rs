@@ -29,8 +29,8 @@
 //
 use super::*;
 use crate::rs_math3d::*;
-use crate::ui::*;
 use crate::*;
+use crate::scene::*;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NavigationMode {
