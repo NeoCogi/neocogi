@@ -37,9 +37,9 @@ use neocogi::*;
 
 use neocogi::renderer::*;
 
+use neocogi::editor::*;
 use neocogi::scene::*;
 use neocogi::ui::*;
-use neocogi::editor::*;
 
 use neocogi::scene::utility_mesh::*;
 
@@ -52,7 +52,6 @@ pub fn r_get_font_height(_font: FontId) -> usize {
 
 pub struct State {
     view: View3D,
-    ctx: ui::Context,
 }
 
 impl State {
@@ -75,11 +74,7 @@ impl State {
             ),
         );
 
-        let mut ctx = ui::Context::new();
-        ctx.char_width = Some(r_get_char_width);
-        ctx.font_height = Some(r_get_font_height);
-
-        Self { view, ctx }
+        Self { view }
     }
 }
 
@@ -118,43 +113,40 @@ fn main() {
     let (width, height) = window.get_framebuffer_size();
 
     let mut state = State::new(width as usize, height as usize);
+    let mut ctx = ui::Context::new();
+    ctx.char_width = Some(r_get_char_width);
+    ctx.font_height = Some(r_get_font_height);
 
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
         uisys.set_canvas_size(width as u32, height as u32);
 
-        state.ctx.begin();
-        if !state
-            .ctx
-            .begin_window_ex(
+        ctx.frame(|ctx| {
+            ctx.window_ex(
                 "Navigation",
                 Rect::new(100, 100, 256, 128),
                 ui::WidgetOption::AUTO_SIZE,
-            )
-            .is_none()
-        {
-            state.ctx.layout_begin_column();
+                |ctx| {
+                    ctx.layout_begin_column();
 
-            if state
-                .ctx
-                .button_ex("Orbit", ui::Icon::None, WidgetOption::NONE)
-                .is_submitted()
-            {
-                state.view.set_navigation_mode(NavigationMode::Orbit)
-            }
+                    if ctx
+                        .button_ex("Orbit", ui::Icon::None, WidgetOption::NONE)
+                        .is_submitted()
+                    {
+                        state.view.set_navigation_mode(NavigationMode::Orbit)
+                    }
 
-            if state
-                .ctx
-                .button_ex("Pan", ui::Icon::None, WidgetOption::NONE)
-                .is_submitted()
-            {
-                state.view.set_navigation_mode(NavigationMode::Pan)
-            }
+                    if ctx
+                        .button_ex("Pan", ui::Icon::None, WidgetOption::NONE)
+                        .is_submitted()
+                    {
+                        state.view.set_navigation_mode(NavigationMode::Pan)
+                    }
 
-            state.ctx.layout_end_column();
-            state.ctx.end_window();
-        }
-        state.ctx.end();
+                    ctx.layout_end_column();
+                },
+            );
+        });
 
         let mut pass = Pass::new(
             width as usize,
@@ -184,7 +176,7 @@ fn main() {
         //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
         //drawing calls with it.
         //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
-        uisys.paint(&mut pass, &mut state.ctx);
+        uisys.paint(&mut pass, &mut ctx);
 
         driver.render_pass(&mut pass);
         window.swap_buffers();
@@ -213,7 +205,7 @@ fn main() {
                 glfw::WindowEvent::Key(glfw::Key::Escape, _, _, _) | glfw::WindowEvent::Close => {
                     break 'running
                 }
-                _ => uisys.handle_event(event, &mut window, &mut state.ctx),
+                _ => uisys.handle_event(event, &mut window, &mut ctx),
             }
         }
     }

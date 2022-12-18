@@ -621,7 +621,7 @@ impl Context {
         s
     }
 
-    pub fn begin(&mut self) {
+    fn begin(&mut self) {
         assert!((self.char_width).is_some() && (self.font_height).is_some());
         self.root_list.clear();
         self.text_stack.clear();
@@ -634,7 +634,7 @@ impl Context {
         self.frame += 1;
     }
 
-    pub fn end(&mut self) {
+    fn end(&mut self) {
         assert_eq!(self.container_stack.len(), 0);
         assert_eq!(self.clip_stack.len(), 0);
         assert_eq!(self.id_stack.len(), 0);
@@ -1585,7 +1585,7 @@ impl Context {
         return self.header(label, false, opt);
     }
 
-    pub fn begin_treenode_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
+    fn begin_treenode_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
         let res = self.header(label, true, opt);
         if res.is_active() && self.last_id.is_some() {
             self.get_layout_mut().indent += self.style.indent;
@@ -1594,7 +1594,7 @@ impl Context {
         return res;
     }
 
-    pub fn end_treenode(&mut self) {
+    fn end_treenode(&mut self) {
         self.get_layout_mut().indent -= self.style.indent;
         self.pop_id();
     }
@@ -1729,12 +1729,7 @@ impl Context {
         self.pop_container();
     }
 
-    pub fn begin_window_ex(
-        &mut self,
-        title: &str,
-        mut r: Recti,
-        opt: WidgetOption,
-    ) -> ResourceState {
+    fn begin_window_ex(&mut self, title: &str, mut r: Recti, opt: WidgetOption) -> ResourceState {
         let id = self.get_id_from_str(title);
         let cnt_id = self.get_container_index_intern(id, opt);
         if cnt_id.is_none() || !self.containers[cnt_id.unwrap()].open {
@@ -1821,7 +1816,7 @@ impl Context {
         return ResourceState::ACTIVE;
     }
 
-    pub fn end_window(&mut self) {
+    fn end_window(&mut self) {
         self.pop_clip_rect();
         self.end_root_container();
     }
@@ -1835,7 +1830,7 @@ impl Context {
         self.bring_to_front(cnt.unwrap());
     }
 
-    pub fn begin_popup(&mut self, name: &str) -> ResourceState {
+    fn begin_popup(&mut self, name: &str) -> ResourceState {
         let opt = WidgetOption::POPUP
             | WidgetOption::AUTO_SIZE
             | WidgetOption::NO_RESIZE
@@ -1845,11 +1840,11 @@ impl Context {
         return self.begin_window_ex(name, Rect::new(0, 0, 0, 0), opt);
     }
 
-    pub fn end_popup(&mut self) {
+    fn end_popup(&mut self) {
         self.end_window();
     }
 
-    pub fn begin_panel_ex(&mut self, name: &str, opt: WidgetOption) {
+    fn begin_panel_ex(&mut self, name: &str, opt: WidgetOption) {
         self.push_id_from_str(name);
         let cnt_id = self.get_container_index_intern(self.last_id.unwrap(), opt);
         let rect = self.layout_next();
@@ -1867,8 +1862,62 @@ impl Context {
         self.push_clip_rect(self.containers[cnt_id.unwrap()].body);
     }
 
-    pub fn end_panel(&mut self) {
+    fn end_panel(&mut self) {
         self.pop_clip_rect();
         self.pop_container();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // LAMBDA based context
+    ////////////////////////////////////////////////////////////////////////////
+
+    pub fn popup<F: FnOnce(&mut Self)>(&mut self, name: &str, f: F) -> ResourceState {
+        let res = self.begin_popup(name);
+        if !res.is_none() {
+            f(self);
+            self.end_popup();
+        }
+        res
+    }
+
+    pub fn treenode_ex<F: FnOnce(&mut Self)>(
+        &mut self,
+        label: &str,
+        opt: WidgetOption,
+        f: F,
+    ) -> ResourceState {
+        let res = self.begin_treenode_ex(label, opt);
+        if !res.is_none() {
+            f(self);
+            self.end_treenode()
+        }
+        res
+    }
+
+    pub fn window_ex<F: FnOnce(&mut Self)>(
+        &mut self,
+        title: &str,
+        mut r: Recti,
+        opt: WidgetOption,
+        f: F,
+    ) -> ResourceState {
+        let res = self.begin_window_ex(title, r, opt);
+        if !res.is_none() {
+            f(self);
+            self.end_window();
+        }
+        res
+    }
+
+    pub fn panel_ex<F: FnOnce(&mut Self)>(&mut self, name: &str, opt: WidgetOption, f: F) {
+        self.begin_panel_ex(name, opt);
+        f(self);
+        self.end_panel();
+    }
+
+    pub fn frame<F: FnOnce(&mut Self)>(&mut self, f: F) {
+        self.begin();
+        f(self);
+        self.end();
     }
 }

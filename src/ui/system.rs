@@ -385,7 +385,12 @@ impl System {
         self.indices.clear();
     }
 
-    pub fn handle_event(&mut self, event: glfw::WindowEvent, window: &mut glfw::Window, ctx: &mut ui::Context) {
+    pub fn handle_event(
+        &mut self,
+        event: glfw::WindowEvent,
+        window: &mut glfw::Window,
+        ctx: &mut ui::Context,
+    ) {
         match event {
             glfw::WindowEvent::CursorPos(x, y) => ctx.input_mousemove(x as i32, y as i32),
             glfw::WindowEvent::Char(ch) => ctx.input_text(String::from(ch).as_str()),
@@ -427,5 +432,4 @@ impl System {
             _ => (),
         }
     }
-
 }
