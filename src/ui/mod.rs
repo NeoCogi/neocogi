@@ -59,6 +59,9 @@ pub use fixed_collections::*;
 mod atlas;
 pub use atlas::*;
 
+mod layout;
+use layout::*;
+
 pub mod system;
 
 pub use system::*;
@@ -335,13 +338,10 @@ impl KeyModifier {
 
 #[repr(C)]
 pub struct Context<P, R: Renderer<P>> {
-    pub char_width: Option<fn(FontId, char) -> usize>,
-    pub font_height: Option<fn(FontId) -> usize>,
     pub style: Style,
     pub hover: Option<Id>,
     pub focus: Option<Id>,
     pub last_id: Option<Id>,
-    pub last_rect: Recti,
     pub last_zindex: i32,
     pub updated_focus: bool,
     pub frame: usize,
@@ -355,7 +355,7 @@ pub struct Context<P, R: Renderer<P>> {
     pub container_stack: FixedVec<usize, 32>,
     pub clip_stack: FixedVec<Recti, 32>,
     pub id_stack: FixedVec<Id, 32>,
-    pub layout_stack: FixedVec<Layout, 16>,
+    pub layout_stack: LayoutStack,
     pub text_stack: FixedString<65536>,
     pub container_pool: Pool<48>,
     pub containers: [Container; 48],
@@ -394,20 +394,7 @@ pub struct Container {
     pub open: bool,
 }
 
-#[derive(Default, Copy, Clone)]
-pub struct Layout {
-    pub body: Recti,
-    pub next: Recti,
-    pub position: Vec2i,
-    pub size: Vec2i,
-    pub max: Vec2i,
-    pub widths: [i32; 16],
-    pub items: usize,
-    pub item_index: usize,
-    pub next_row: i32,
-    pub next_type: LayoutPosition,
-    pub indent: i32,
-}
+
 
 #[derive(Copy, Clone)]
 pub enum Command {
@@ -470,19 +457,6 @@ pub struct Style {
 
 pub type Real = f32;
 
-#[derive(PartialEq, Copy, Clone)]
-#[repr(u32)]
-pub enum LayoutPosition {
-    Absolute = 2,
-    Relative = 1,
-    None = 0,
-}
-
-impl Default for LayoutPosition {
-    fn default() -> Self {
-        LayoutPosition::None
-    }
-}
 
 static UNCLIPPED_RECT: Recti = Recti {
     x: 0,
@@ -578,13 +552,10 @@ fn hash_bytes(hash_0: &mut Id, s: &[u8]) {
 impl<P, R: Renderer<P>> Context<P, R> {
     pub fn new(renderer: R) -> Self {
         Self {
-            char_width: None,
-            font_height: None,
             style: Style::default(),
             hover: None,
             focus: None,
             last_id: None,
-            last_rect: Rect::new(0, 0, 0, 0),
             last_zindex: 0,
             updated_focus: false,
             frame: 0,
@@ -598,7 +569,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
             container_stack: FixedVec::default(),
             clip_stack: FixedVec::default(),
             id_stack: FixedVec::default(),
-            layout_stack: FixedVec::default(),
+            layout_stack: LayoutStack::default(),
             text_stack: FixedString::default(),
             container_pool: Pool::default(),
             containers: [Container::default(); 48],
@@ -635,7 +606,6 @@ impl<P, R: Renderer<P>> Context<P, R> {
     }
 
     fn begin(&mut self, width: usize, height: usize) {
-        assert!((self.char_width).is_some() && (self.font_height).is_some());
         self.root_list.clear();
         self.text_stack.clear();
         self.scroll_target = None;
@@ -821,52 +791,10 @@ impl<P, R: Renderer<P>> Context<P, R> {
         return Clip::Part;
     }
 
-    fn push_layout(&mut self, body: Recti, scroll: Vec2i) {
-        let mut layout: Layout = Layout {
-            body: Recti {
-                x: 0,
-                y: 0,
-                width: 0,
-                height: 0,
-            },
-            next: Recti {
-                x: 0,
-                y: 0,
-                width: 0,
-                height: 0,
-            },
-            position: Vec2i { x: 0, y: 0 },
-            size: Vec2i { x: 0, y: 0 },
-            max: Vec2i { x: 0, y: 0 },
-            widths: [0; 16],
-            items: 0,
-            item_index: 0,
-            next_row: 0,
-            next_type: LayoutPosition::None,
-            indent: 0,
-        };
-        layout.body = Rect::new(
-            body.x - scroll.x,
-            body.y - scroll.y,
-            body.width,
-            body.height,
-        );
-        layout.max = vec2(-0x1000000, -0x1000000);
-        self.layout_stack.push(layout);
-        self.layout_row(&[0], 0);
-    }
-
-    fn get_layout(&self) -> &Layout {
-        return self.layout_stack.top().unwrap();
-    }
-
-    fn get_layout_mut(&mut self) -> &mut Layout {
-        return self.layout_stack.top_mut().unwrap();
-    }
 
     fn pop_container(&mut self) {
         let cnt = self.get_current_container();
-        let layout = *self.get_layout();
+        let layout = *self.layout_stack.top();
         self.containers[cnt].content_size.x = layout.max.x - layout.body.x;
         self.containers[cnt].content_size.y = layout.max.y - layout.body.y;
 
@@ -950,7 +878,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
 
     pub fn input_scroll(&mut self, x: i32, y: i32) {
         self.scroll_delta.x += x;
-        self.scroll_delta.y += y * (self.font_height.unwrap()(FontId(0)) as i32);
+        self.scroll_delta.y += y * (self.renderer.get_font_height(FontId(0)) as i32);
     }
 
     pub fn input_keydown(&mut self, key: KeyModifier) {
@@ -1067,125 +995,6 @@ impl<P, R: Renderer<P>> Context<P, R> {
         }
     }
 
-    pub fn layout_begin_column(&mut self) {
-        let layout = self.layout_next();
-        self.push_layout(layout, vec2(0, 0));
-    }
-
-    pub fn layout_end_column(&mut self) {
-        let b = self.get_layout().clone();
-        self.layout_stack.pop();
-
-        let a = self.get_layout_mut();
-        a.position.x = if a.position.x > b.position.x + b.body.x - a.body.x {
-            a.position.x
-        } else {
-            b.position.x + b.body.x - a.body.x
-        };
-        a.next_row = if a.next_row > b.next_row + b.body.y - a.body.y {
-            a.next_row
-        } else {
-            b.next_row + b.body.y - a.body.y
-        };
-        a.max.x = i32::max(a.max.x, b.max.x);
-        a.max.y = i32::max(a.max.y, b.max.y);
-    }
-
-    pub fn layout_row_for_layout(layout: &mut Layout, widths: &[i32], height: i32) {
-        layout.items = widths.len();
-        assert!(widths.len() <= 16);
-        for i in 0..widths.len() {
-            layout.widths[i] = widths[i];
-        }
-        layout.position = vec2(layout.indent, layout.next_row);
-        layout.size.y = height;
-        layout.item_index = 0;
-    }
-
-    pub fn layout_row(&mut self, widths: &[i32], height: i32) {
-        let layout = self.get_layout_mut();
-        Self::layout_row_for_layout(layout, widths, height);
-    }
-
-    pub fn layout_width(&mut self, width: i32) {
-        self.get_layout_mut().size.x = width;
-    }
-
-    pub fn layout_height(&mut self, height: i32) {
-        self.get_layout_mut().size.y = height;
-    }
-
-    pub fn layout_set_next(&mut self, r: Recti, position: LayoutPosition) {
-        let layout = self.get_layout_mut();
-        layout.next = r;
-        layout.next_type = position;
-    }
-
-    pub fn layout_next(&mut self) -> Recti {
-        let style = self.style;
-        let layout = self.get_layout_mut();
-        let mut res = Recti::new(0, 0, 0, 0);
-        if layout.next_type != LayoutPosition::None {
-            let type_0 = layout.next_type;
-            layout.next_type = LayoutPosition::None;
-            res = layout.next;
-            if type_0 == LayoutPosition::Absolute {
-                self.last_rect = res;
-                return self.last_rect;
-            }
-        } else {
-            let litems = layout.items;
-            let lsize_y = layout.size.y;
-            let mut undefined_widths = [0; 16];
-            undefined_widths[0..litems as usize]
-                .copy_from_slice(&layout.widths[0..litems as usize]);
-            if layout.item_index == layout.items {
-                Self::layout_row_for_layout(layout, &undefined_widths[0..litems as usize], lsize_y);
-            }
-            res.x = layout.position.x;
-            res.y = layout.position.y;
-            res.width = if layout.items > 0 {
-                layout.widths[layout.item_index as usize]
-            } else {
-                layout.size.x
-            };
-            res.height = layout.size.y;
-            if res.width == 0 {
-                res.width = style.size.x + style.padding * 2;
-            }
-            if res.height == 0 {
-                res.height = style.size.y + style.padding * 2;
-            }
-            if res.width < 0 {
-                res.width += layout.body.width - res.x + 1;
-            }
-            if res.height < 0 {
-                res.height += layout.body.height - res.y + 1;
-            }
-            layout.item_index += 1;
-        }
-        layout.position.x += res.width + style.spacing;
-        layout.next_row = if layout.next_row > res.y + res.height + style.spacing {
-            layout.next_row
-        } else {
-            res.y + res.height + style.spacing
-        };
-        res.x += layout.body.x;
-        res.y += layout.body.y;
-        layout.max.x = if layout.max.x > res.x + res.width {
-            layout.max.x
-        } else {
-            res.x + res.width
-        };
-        layout.max.y = if layout.max.y > res.y + res.height {
-            layout.max.y
-        } else {
-            res.y + res.height
-        };
-        self.last_rect = res;
-        return self.last_rect;
-    }
-
     fn in_hover_root(&mut self) -> bool {
         match self.hover_root {
             Some(hover_root) => {
@@ -1291,14 +1100,14 @@ impl<P, R: Renderer<P>> Context<P, R> {
                 res = usize::max(res, acc);
                 acc = 0;
             }
-            acc += self.char_width.expect("non-null function pointer")(font, c);
+            acc += self.renderer.get_char_width(font, c);
         }
         res = usize::max(res, acc);
         res as i32
     }
 
     pub fn get_text_height(&self, font: FontId, text: &str) -> i32 {
-        let font_height = self.font_height.expect("non-null function pointer")(font);
+        let font_height = self.renderer.get_font_height(font);
         let lc = text.lines().count();
         (lc * font_height) as i32
     }
@@ -1306,10 +1115,10 @@ impl<P, R: Renderer<P>> Context<P, R> {
     pub fn text(&mut self, text: &str) {
         let font = self.style.font;
         let color = self.style.colors[ControlColor::Text as usize];
-        self.layout_begin_column();
-        let h = self.font_height.expect("non-null function pointer")(font) as i32;
-        self.layout_row(&[-1], h);
-        let mut r = self.layout_next();
+        self.layout_stack.begin_column(&self.style);
+        let h = self.renderer.get_font_height(font) as i32;
+        self.layout_stack.row(&[-1], h);
+        let mut r = self.layout_stack.next(&self.style);
         for line in text.lines() {
             let mut rx = r.x;
             let words = line.split_inclusive(' ');
@@ -1320,17 +1129,17 @@ impl<P, R: Renderer<P>> Context<P, R> {
                     self.draw_text(font, w, vec2(rx, r.y), color);
                     rx += tw;
                 } else {
-                    r = self.layout_next();
+                    r = self.layout_stack.next(&self.style);
                     rx = r.x;
                 }
             }
-            r = self.layout_next();
+            r = self.layout_stack.next(&self.style);
         }
-        self.layout_end_column();
+        self.layout_stack.end_column();
     }
 
     pub fn label(&mut self, text: &str) {
-        let layout = self.layout_next();
+        let layout = self.layout_stack.next(&self.style);
         self.draw_control_text(text, layout, ControlColor::Text, WidgetOption::NONE);
     }
 
@@ -1341,7 +1150,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
         } else {
             self.get_id_u32(icon as u32)
         };
-        let r = self.layout_next();
+        let r = self.layout_stack.next(&self.style);
         self.update_control(id, r, opt);
         if self.mouse_pressed.is_left() && self.focus == Some(id) {
             res |= ResourceState::SUBMIT;
@@ -1359,7 +1168,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
     pub fn checkbox(&mut self, label: &str, state: &mut bool) -> ResourceState {
         let mut res = ResourceState::NONE;
         let id: Id = self.get_id_from_ptr(state);
-        let mut r = self.layout_next();
+        let mut r = self.layout_stack.next(&self.style);
         let box_0 = Rect::new(r.x, r.y, r.height, r.height);
         self.update_control(id, r, WidgetOption::NONE);
         if self.mouse_pressed.is_left() && self.focus == Some(id) {
@@ -1467,7 +1276,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
 
     pub fn textbox_ex(&mut self, buf: &mut dyn IString, opt: WidgetOption) -> ResourceState {
         let id = self.get_id_from_ptr(buf);
-        let r = self.layout_next();
+        let r = self.layout_stack.next(&self.style);
         return self.textbox_raw(buf, id, r, opt);
     }
 
@@ -1484,7 +1293,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
         let last = *value;
         let mut v = last;
         let id = self.get_id_from_ptr(value);
-        let base = self.layout_next();
+        let base = self.layout_stack.next(&self.style);
         if !self.number_textbox(&mut v, base, id).is_none() {
             return res;
         }
@@ -1526,7 +1335,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
     ) -> ResourceState {
         let mut res = ResourceState::NONE;
         let id: Id = self.get_id_from_ptr(value);
-        let base = self.layout_next();
+        let base = self.layout_stack.next(&self.style);
         let last: Real = *value;
         if !self.number_textbox(value, base, id).is_none() {
             return res;
@@ -1548,14 +1357,14 @@ impl<P, R: Renderer<P>> Context<P, R> {
     fn header(&mut self, label: &str, is_treenode: bool, opt: WidgetOption) -> ResourceState {
         let id: Id = self.get_id_from_str(label);
         let idx = self.treenode_pool.get(id);
-        self.layout_row(&[-1], 0);
+        self.layout_stack.row(&[-1], 0);
         let mut active = idx.is_some() as i32;
         let expanded = if opt.is_expanded() {
             (active == 0) as i32
         } else {
             active
         };
-        let mut r = self.layout_next();
+        let mut r = self.layout_stack.next(&self.style);
         self.update_control(id, r, WidgetOption::NONE);
         active ^= (self.mouse_pressed.is_left() && self.focus == Some(id)) as i32;
         if idx.is_some() {
@@ -1601,14 +1410,14 @@ impl<P, R: Renderer<P>> Context<P, R> {
     fn begin_treenode_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
         let res = self.header(label, true, opt);
         if res.is_active() && self.last_id.is_some() {
-            self.get_layout_mut().indent += self.style.indent;
+            self.layout_stack.top_mut().indent += self.style.indent;
             self.id_stack.push(self.last_id.unwrap());
         }
         return res;
     }
 
     fn end_treenode(&mut self) {
-        self.get_layout_mut().indent -= self.style.indent;
+        self.layout_stack.top_mut().indent -= self.style.indent;
         self.pop_id();
     }
 
@@ -1694,7 +1503,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
         if !opt.has_no_scroll() {
             self.scrollbars(cnt_idx, &mut body);
         }
-        self.push_layout(
+        self.layout_stack.push(
             expand_rect(body, -self.style.padding),
             self.containers[cnt_idx].scroll,
         );
@@ -1797,7 +1606,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
             }
         }
         if opt.is_auto_sizing() {
-            let r_1 = self.get_layout().body;
+            let r_1 = self.layout_stack.top().body;
             self.containers[cnt_id.unwrap()].rect.width =
                 self.containers[cnt_id.unwrap()].content_size.x
                     + (self.containers[cnt_id.unwrap()].rect.width - r_1.width);
@@ -1844,7 +1653,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
     fn begin_panel_ex(&mut self, name: &str, opt: WidgetOption) {
         self.push_id_from_str(name);
         let cnt_id = self.get_container_index_intern(self.last_id.unwrap(), opt);
-        let rect = self.layout_next();
+        let rect = self.layout_stack.next(&self.style);
         self.containers[cnt_id.unwrap()].rect = rect;
         if !opt.has_no_frame() {
             self.draw_frame(rect, ControlColor::PanelBG);

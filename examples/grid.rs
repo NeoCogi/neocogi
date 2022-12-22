@@ -109,25 +109,24 @@ fn main() {
     let mut um_renderer = UMRenderer::new(&mut driver, 65536);
 
     // initialize UI
-    let mut uisys = ui::System::new(&mut driver, 1024, 900);
     let (width, height) = window.get_framebuffer_size();
 
     let mut state = State::new(width as usize, height as usize);
-    let mut ctx = ui::Context::new();
-    ctx.char_width = Some(r_get_char_width);
-    ctx.font_height = Some(r_get_font_height);
+    let renderer = system::Renderer::new(&mut driver, width as u32, height as u32);
+    let mut input = Input::new();
+    let mut ctx = ui::Context::new(renderer);
+
 
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
-        uisys.set_canvas_size(width as u32, height as u32);
 
-        ctx.frame(|ctx| {
+        let mut pass = ctx.frame(width as _, height as _, |ctx| {
             ctx.window_ex(
                 "Navigation",
                 Rect::new(100, 100, 256, 128),
                 ui::WidgetOption::AUTO_SIZE,
                 |ctx| {
-                    ctx.layout_begin_column();
+                    ctx.layout_stack.begin_column(&ctx.style);
 
                     if ctx
                         .button_ex("Orbit", ui::Icon::None, WidgetOption::NONE)
@@ -143,12 +142,12 @@ fn main() {
                         state.view.set_navigation_mode(NavigationMode::Pan)
                     }
 
-                    ctx.layout_end_column();
+                    ctx.layout_stack.end_column();
                 },
             );
         });
 
-        let mut pass = Pass::new(
+        let mut pass_3d = Pass::new(
             width as usize,
             height as usize,
             None,
@@ -170,14 +169,11 @@ fn main() {
         );
 
         let nodes = UMNode::Assembly(vec![grid, axis]);
-        um_renderer.draw_node(&mut pass, &state.view.pvm(), &nodes);
+        um_renderer.draw_node(&mut pass_3d, &state.view.pvm(), &nodes);
 
-        //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
-        //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
-        //drawing calls with it.
-        //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
-        uisys.paint(&mut pass, &mut ctx);
+        driver.render_pass(&mut pass_3d);
 
+        pass.color_actions[0] = ColorPassAction::Previous;
         driver.render_pass(&mut pass);
         window.swap_buffers();
 
@@ -205,7 +201,7 @@ fn main() {
                 glfw::WindowEvent::Key(glfw::Key::Escape, _, _, _) | glfw::WindowEvent::Close => {
                     break 'running
                 }
-                _ => uisys.handle_event(event, &mut window, &mut ctx),
+                _ => input.handle_event(event, &mut window, &mut ctx),
             }
         }
     }

@@ -1,0 +1,208 @@
+use super::*;
+
+#[derive(Default, Copy, Clone)]
+pub struct Layout {
+    pub body: Recti,
+    pub next: Recti,
+    pub position: Vec2i,
+    pub size: Vec2i,
+    pub max: Vec2i,
+    pub widths: [i32; 16],
+    pub items: usize,
+    pub item_index: usize,
+    pub next_row: i32,
+    pub next_type: LayoutPosition,
+    pub indent: i32,
+}
+
+#[derive(PartialEq, Copy, Clone)]
+#[repr(u32)]
+pub enum LayoutPosition {
+    Absolute = 2,
+    Relative = 1,
+    None = 0,
+}
+
+impl Default for LayoutPosition {
+    fn default() -> Self {
+        LayoutPosition::None
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct LayoutStack {
+    stack: FixedVec<Layout, 16>,
+    last_rect: Recti,
+}
+
+impl LayoutStack {
+    pub fn push(&mut self, body: Recti, scroll: Vec2i) {
+        let mut layout: Layout = Layout {
+            body: Recti {
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+            },
+            next: Recti {
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+            },
+            position: Vec2i { x: 0, y: 0 },
+            size: Vec2i { x: 0, y: 0 },
+            max: Vec2i { x: 0, y: 0 },
+            widths: [0; 16],
+            items: 0,
+            item_index: 0,
+            next_row: 0,
+            next_type: LayoutPosition::None,
+            indent: 0,
+        };
+        layout.body = Rect::new(
+            body.x - scroll.x,
+            body.y - scroll.y,
+            body.width,
+            body.height,
+        );
+        layout.max = vec2(-0x1000000, -0x1000000);
+        self.stack.push(layout);
+        self.row(&[0], 0);
+    }
+
+    pub fn top(&self) -> &Layout {
+        return self.stack.top().unwrap();
+    }
+
+    pub fn top_mut(&mut self) -> &mut Layout {
+        return self.stack.top_mut().unwrap();
+    }
+
+    pub fn pop(&mut self) {
+        self.stack.pop()
+    }
+
+    pub fn len(&self) -> usize {
+        self.stack.len()
+    }
+
+    pub fn begin_column(&mut self, style: &Style) {
+        let layout = self.next(style);
+        self.push(layout, vec2(0, 0));
+    }
+
+    pub fn end_column(&mut self) {
+        let b = self.top().clone();
+        self.stack.pop();
+
+        let a = self.top_mut();
+        a.position.x = if a.position.x > b.position.x + b.body.x - a.body.x {
+            a.position.x
+        } else {
+            b.position.x + b.body.x - a.body.x
+        };
+        a.next_row = if a.next_row > b.next_row + b.body.y - a.body.y {
+            a.next_row
+        } else {
+            b.next_row + b.body.y - a.body.y
+        };
+        a.max.x = i32::max(a.max.x, b.max.x);
+        a.max.y = i32::max(a.max.y, b.max.y);
+    }
+
+    pub fn row_for_layout(layout: &mut Layout, widths: &[i32], height: i32) {
+        layout.items = widths.len();
+        assert!(widths.len() <= 16);
+        for i in 0..widths.len() {
+            layout.widths[i] = widths[i];
+        }
+        layout.position = vec2(layout.indent, layout.next_row);
+        layout.size.y = height;
+        layout.item_index = 0;
+    }
+
+    pub fn row(&mut self, widths: &[i32], height: i32) {
+        let layout = self.top_mut();
+        Self::row_for_layout(layout, widths, height);
+    }
+
+    pub fn width(&mut self, width: i32) {
+        self.top_mut().size.x = width;
+    }
+
+    pub fn height(&mut self, height: i32) {
+        self.top_mut().size.y = height;
+    }
+
+    pub fn set_next(&mut self, r: Recti, position: LayoutPosition) {
+        let layout = self.top_mut();
+        layout.next = r;
+        layout.next_type = position;
+    }
+
+    pub fn next(&mut self, style: &Style) -> Recti {
+        let layout = self.top_mut();
+        let mut res = Recti::new(0, 0, 0, 0);
+        if layout.next_type != LayoutPosition::None {
+            let type_0 = layout.next_type;
+            layout.next_type = LayoutPosition::None;
+            res = layout.next;
+            if type_0 == LayoutPosition::Absolute {
+                self.last_rect = res;
+                return self.last_rect;
+            }
+        } else {
+            let litems = layout.items;
+            let lsize_y = layout.size.y;
+            let mut undefined_widths = [0; 16];
+            undefined_widths[0..litems as usize]
+                .copy_from_slice(&layout.widths[0..litems as usize]);
+            if layout.item_index == layout.items {
+                Self::row_for_layout(layout, &undefined_widths[0..litems as usize], lsize_y);
+            }
+            res.x = layout.position.x;
+            res.y = layout.position.y;
+            res.width = if layout.items > 0 {
+                layout.widths[layout.item_index as usize]
+            } else {
+                layout.size.x
+            };
+            res.height = layout.size.y;
+            if res.width == 0 {
+                res.width = style.size.x + style.padding * 2;
+            }
+            if res.height == 0 {
+                res.height = style.size.y + style.padding * 2;
+            }
+            if res.width < 0 {
+                res.width += layout.body.width - res.x + 1;
+            }
+            if res.height < 0 {
+                res.height += layout.body.height - res.y + 1;
+            }
+            layout.item_index += 1;
+        }
+        layout.position.x += res.width + style.spacing;
+        layout.next_row = if layout.next_row > res.y + res.height + style.spacing {
+            layout.next_row
+        } else {
+            res.y + res.height + style.spacing
+        };
+        res.x += layout.body.x;
+        res.y += layout.body.y;
+        layout.max.x = if layout.max.x > res.x + res.width {
+            layout.max.x
+        } else {
+            res.x + res.width
+        };
+        layout.max.y = if layout.max.y > res.y + res.height {
+            layout.max.y
+        } else {
+            res.y + res.height
+        };
+        self.last_rect = res;
+        return self.last_rect;
+    }
+}
+

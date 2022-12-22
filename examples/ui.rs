@@ -40,14 +40,6 @@ use neocogi::renderer::*;
 use neocogi::ui;
 use ui::*;
 
-pub fn r_get_char_width(_font: FontId, c: char) -> usize {
-    ATLAS[ATLAS_FONT as usize + c as usize].width as usize
-}
-
-pub fn r_get_font_height(_font: FontId) -> usize {
-    18
-}
-
 struct State<'a> {
     label_colors: [LabelColor<'a>; 15],
     bg: [Real; 3],
@@ -164,7 +156,7 @@ impl<'a> State<'a> {
 
             if !ctx.header_ex("Window Info", WidgetOption::NONE).is_none() {
                 let win_0 = ctx.get_current_container_rect();
-                ctx.layout_row(&[54, -1], 0);
+                ctx.layout_stack.row(&[54, -1], 0);
                 ctx.label("Position:");
 
                 buff.clear();
@@ -186,7 +178,7 @@ impl<'a> State<'a> {
                 .header_ex("Test Buttons", WidgetOption::EXPANDED)
                 .is_none()
             {
-                ctx.layout_row(&[86, -110, -1], 0);
+                ctx.layout_stack.row(&[86, -110, -1], 0);
                 ctx.label("Test buttons 1:");
                 if !ctx
                     .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
@@ -233,8 +225,8 @@ impl<'a> State<'a> {
                 .header_ex("Tree and Text", WidgetOption::EXPANDED)
                 .is_none()
             {
-                ctx.layout_row(&[140, -1], 0);
-                ctx.layout_begin_column();
+                ctx.layout_stack.row(&[140, -1], 0);
+                ctx.layout_stack.begin_column(&ctx.style);
                 ctx.treenode_ex("Test 1", WidgetOption::NONE, |ctx| {
                     ctx.treenode_ex("Test 1a", WidgetOption::NONE, |ctx| {
                         ctx.label("Hello");
@@ -256,7 +248,7 @@ impl<'a> State<'a> {
                     });
                 });
                 ctx.treenode_ex("Test 2", WidgetOption::NONE, |ctx| {
-                    ctx.layout_row(&[54, 54], 0);
+                    ctx.layout_stack.row(&[54, 54], 0);
                     if !ctx
                         .button_ex("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
                         .is_none()
@@ -287,22 +279,22 @@ impl<'a> State<'a> {
                     ctx.checkbox("Checkbox 2", &mut self.checks[1]);
                     ctx.checkbox("Checkbox 3", &mut self.checks[2]);
                 });
-                ctx.layout_end_column();
-                ctx.layout_begin_column();
-                ctx.layout_row(&[-1], 0);
+                ctx.layout_stack.end_column();
+                ctx.layout_stack.begin_column(&ctx.style);
+                ctx.layout_stack.row(&[-1], 0);
                 ctx.text(
                     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas lacinia, sem eu lacinia molestie, mi risus faucibus ipsum, eu varius magna felis a nulla."
                     ,
                 );
-                ctx.layout_end_column();
+                ctx.layout_stack.end_column();
             }
             if !ctx
                 .header_ex("Background Color", WidgetOption::EXPANDED)
                 .is_none()
             {
-                ctx.layout_row(&[-78, -1], 74);
-                ctx.layout_begin_column();
-                ctx.layout_row(&[46, -1], 0);
+                ctx.layout_stack.row(&[-78, -1], 74);
+                ctx.layout_stack.begin_column(&ctx.style);
+                ctx.layout_stack.row(&[46, -1], 0);
                 ctx.label("Red:");
                 ctx.slider_ex(
                     &mut self.bg[0],
@@ -330,8 +322,8 @@ impl<'a> State<'a> {
                     "%.2",
                     WidgetOption::ALIGN_CENTER,
                 );
-                ctx.layout_end_column();
-                let r = ctx.layout_next();
+                ctx.layout_stack.end_column();
+                let r = ctx.layout_stack.next(&ctx.style);
                 ctx.draw_rect(
                     r,
                     color(self.bg[0] as u8, self.bg[1] as u8, self.bg[2] as u8, 255),
@@ -357,11 +349,11 @@ impl<'a> State<'a> {
             Rect::new(350, 40, 300, 200),
             WidgetOption::NONE,
             |ctx| {
-                ctx.layout_row(&[-1], -25);
+                ctx.layout_stack.row(&[-1], -25);
                 ctx.panel_ex("Log Output", WidgetOption::NONE, |ctx| {
                     let mut scroll = ctx.get_current_container_scroll();
                     let content_size = ctx.get_current_container_content_size();
-                    ctx.layout_row(&[-1], -1);
+                    ctx.layout_stack.row(&[-1], -1);
                     ctx.text(self.logbuf.as_str());
                     if self.logbuf_updated {
                         scroll.y = content_size.y;
@@ -371,7 +363,7 @@ impl<'a> State<'a> {
                 });
 
                 let mut submitted = false;
-                ctx.layout_row(&[-70, -1], 0);
+                ctx.layout_stack.row(&[-70, -1], 0);
                 if ctx
                     .textbox_ex(&mut self.submit_buf, WidgetOption::NONE)
                     .is_submitted()
@@ -428,7 +420,7 @@ impl<'a> State<'a> {
             |ctx| {
                 let sw: libc::c_int = (ctx.get_current_container_body().width as libc::c_double
                     * 0.14f64) as libc::c_int;
-                ctx.layout_row(&[80, sw, sw, sw, sw, -1], 0);
+                ctx.layout_stack.row(&[80, sw, sw, sw, sw, -1], 0);
                 let mut i = 0;
                 while self.label_colors[i].label.len() > 0 {
                     ctx.label(self.label_colors[i].label);
@@ -459,7 +451,7 @@ impl<'a> State<'a> {
                             255 as libc::c_int,
                         );
                     }
-                    let next_layout = ctx.layout_next();
+                    let next_layout = ctx.layout_stack.next(&ctx.style);
                     ctx.draw_rect(next_layout, ctx.style.colors[i]);
                     i += 1;
                 }
@@ -500,11 +492,6 @@ fn main() {
         .create_window(1024, 900, "ui Test", glfw::WindowMode::Windowed)
         .expect("Failed to create GLFW window.");
 
-    // window.set_char_polling(true);
-    // window.set_cursor_pos_polling(true);
-    // window.set_key_polling(true);
-    // window.set_mouse_button_polling(true);
-    // window.set_scroll_polling(true);
     window.set_all_polling(true);
     window.make_current();
     glfw.set_swap_interval(glfw::SwapInterval::Sync(0));
@@ -518,17 +505,11 @@ fn main() {
     let renderer = system::Renderer::new(&mut driver, width as u32, height as u32);
     let mut input = Input::new();
     let mut ctx = ui::Context::new(renderer);
-    ctx.char_width = Some(r_get_char_width);
-    ctx.font_height = Some(r_get_font_height);
 
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
 
         let mut pass = state.process_frame(&mut ctx, width as _, height as _);
-        //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
-        //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
-        //drawing calls with it.
-        //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
 
         driver.render_pass(&mut pass);
         window.swap_buffers();
