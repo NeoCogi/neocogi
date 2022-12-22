@@ -147,7 +147,7 @@ impl<'a> State<'a> {
         self.logbuf_updated = true;
     }
 
-    fn test_window(&mut self, ctx: &mut ui::Context) {
+    fn test_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
         ctx
         .window_ex(
                 "Demo Window",
@@ -351,7 +351,7 @@ impl<'a> State<'a> {
         });
     }
 
-    fn log_window(&mut self, ctx: &mut ui::Context) {
+    fn log_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
         ctx.window_ex(
             "Log Window",
             Rect::new(350, 40, 300, 200),
@@ -396,7 +396,7 @@ impl<'a> State<'a> {
     }
     fn uint8_slider(
         &mut self,
-        ctx: &mut ui::Context,
+        ctx: &mut ui::Context<Pass, system::Renderer>,
         value: &mut u8,
         low: i32,
         high: i32,
@@ -415,7 +415,7 @@ impl<'a> State<'a> {
         ctx.pop_id();
         return res;
     }
-    fn style_window(&mut self, ctx: &mut ui::Context) {
+    fn style_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
         ctx.window_ex(
             "Style Editor",
             Rect::new(
@@ -467,12 +467,17 @@ impl<'a> State<'a> {
         );
     }
 
-    fn process_frame(&mut self, ctx: &mut ui::Context) {
-        ctx.frame(|ctx| {
+    fn process_frame(
+        &mut self,
+        ctx: &mut ui::Context<Pass, system::Renderer>,
+        width: usize,
+        height: usize,
+    ) -> Pass {
+        ctx.frame(width, height, |ctx| {
             self.style_window(ctx);
             self.log_window(ctx);
             self.test_window(ctx);
-        });
+        })
     }
 }
 
@@ -495,10 +500,12 @@ fn main() {
         .create_window(1024, 900, "ui Test", glfw::WindowMode::Windowed)
         .expect("Failed to create GLFW window.");
 
-    window.set_char_polling(true);
-    window.set_cursor_pos_polling(true);
-    window.set_key_polling(true);
-    window.set_mouse_button_polling(true);
+    // window.set_char_polling(true);
+    // window.set_cursor_pos_polling(true);
+    // window.set_key_polling(true);
+    // window.set_mouse_button_polling(true);
+    // window.set_scroll_polling(true);
+    window.set_all_polling(true);
     window.make_current();
     glfw.set_swap_interval(glfw::SwapInterval::Sync(0));
 
@@ -506,37 +513,22 @@ fn main() {
 
     // initialize UI
     let mut state = State::new();
-    let mut ctx = ui::Context::new();
 
+    let (width, height) = window.get_framebuffer_size();
+    let renderer = system::Renderer::new(&mut driver, width as u32, height as u32);
+    let mut input = Input::new();
+    let mut ctx = ui::Context::new(renderer);
     ctx.char_width = Some(r_get_char_width);
     ctx.font_height = Some(r_get_font_height);
 
-    let (width, height) = window.get_framebuffer_size();
-    let mut system = System::new(&mut driver, width as u32, height as u32);
-
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
-        system.set_canvas_size(width as u32, height as u32);
 
-        let mut pass = Pass::new(
-            width as usize,
-            height as usize,
-            None,
-            [
-                ColorPassAction::Clear(color4b(0x7F, 0x7F, 0x7F, 0xFF)),
-                ColorPassAction::Previous,
-                ColorPassAction::Previous,
-                ColorPassAction::Previous,
-            ],
-            DepthPassAction::Clear(1.0),
-        );
-
-        state.process_frame(&mut ctx);
+        let mut pass = state.process_frame(&mut ctx, width as _, height as _);
         //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
         //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
         //drawing calls with it.
         //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
-        system.paint(&mut pass, &mut ctx);
 
         driver.render_pass(&mut pass);
         window.swap_buffers();
@@ -548,7 +540,7 @@ fn main() {
                     break 'running
                 }
 
-                _ => system.handle_event(event, &mut window, &mut ctx),
+                _ => input.handle_event(event, &mut window, &mut ctx),
             }
         }
     }

@@ -31,7 +31,7 @@ use core::cmp::Ordering;
 use core::ops::{AddAssign, Index, IndexMut};
 use core::str::Chars;
 
-pub trait IVec<T: Default + Copy> {
+pub trait IVec<T: Default + Clone> {
     fn push(&mut self, t: T) -> (&mut T, usize);
     fn pop(&mut self);
 
@@ -98,12 +98,12 @@ fn partition<T, F: Fn(&T, &T) -> Ordering>(arr: &mut [T], low: isize, high: isiz
 }
 
 #[derive(Clone)]
-pub struct FixedVec<T: Default + Copy, const N: usize> {
+pub struct FixedVec<T: Default + Clone, const N: usize> {
     idx: usize,
     items: [T; N],
 }
 
-impl<T: Default + Copy, const N: usize> IVec<T> for FixedVec<T, N> {
+impl<T: Default + Clone, const N: usize> IVec<T> for FixedVec<T, N> {
     fn push(&mut self, t: T) -> (&mut T, usize) {
         assert!(self.idx < N - 1);
         self.items[self.idx] = t;

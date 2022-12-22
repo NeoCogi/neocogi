@@ -1,3 +1,4 @@
+use std::alloc::System;
 //
 // Copyright 2021-Present (c) Raja Lehtihet & Wael El Oraiby
 //
@@ -112,7 +113,7 @@ const FS_SRC: &str = r#"
 const MAX_VERTEX_COUNT: usize = 65536;
 const MAX_INDEX_COUNT: usize = 65536;
 
-pub struct System {
+pub struct Renderer {
     driver: DriverPtr,
     pipeline: PipelinePtr,
     vertex_buffer: DeviceBufferPtr,
@@ -124,9 +125,23 @@ pub struct System {
 
     vertices: Vec<Vertex>,
     indices: Vec<u16>,
+
+    pass: Option<Pass>,
 }
 
-impl System {
+pub struct Input<P, R: super::Renderer<P>> {
+    _unused: PhantomData<(P, R)>,
+}
+
+impl<P, R: super::Renderer<P>> Input<P, R> {
+    pub fn new() -> Self {
+        Self {
+            _unused: PhantomData::default(),
+        }
+    }
+}
+
+impl Renderer {
     pub fn new(drv: &mut DriverPtr, canvas_width: u32, canvas_height: u32) -> Self {
         let program = drv
             .create_shader(ShaderDesc {
@@ -199,25 +214,14 @@ impl System {
             ui_texture,
             vertices: Vec::new(),
             indices: Vec::new(),
+            pass: None,
         }
     }
 
-    pub fn set_canvas_size(&mut self, width: u32, height: u32) {
-        self.canvas_width = width;
-        self.canvas_height = height;
-    }
-
-    fn push_quad_vertices(
-        &mut self,
-        pass: &mut Pass,
-        v0: &Vertex,
-        v1: &Vertex,
-        v2: &Vertex,
-        v3: &Vertex,
-    ) {
+    fn push_quad_vertices(&mut self, v0: &Vertex, v1: &Vertex, v2: &Vertex, v3: &Vertex) {
         if self.vertices.len() + 4 >= MAX_VERTEX_COUNT || self.indices.len() + 6 >= MAX_INDEX_COUNT
         {
-            self.flush(pass);
+            (self as &mut super::Renderer<_>).flush();
         }
 
         let is = self.vertices.len() as u16;
@@ -234,7 +238,7 @@ impl System {
         self.vertices.push(v3.clone());
     }
 
-    pub fn push_rect(&mut self, pass: &mut Pass, dst: Recti, src: Recti, color: Color4b) {
+    pub fn push_rect(&mut self, dst: Recti, src: Recti, color: Color4b) {
         let x = src.x as f32 / ATLAS_WIDTH as f32;
         let y = src.y as f32 / ATLAS_HEIGHT as f32;
         let w = src.width as f32 / ATLAS_WIDTH as f32;
@@ -271,14 +275,46 @@ impl System {
         v2.s_rgba = v0.s_rgba;
         v3.s_rgba = v0.s_rgba;
 
-        self.push_quad_vertices(pass, &v0, &v1, &v2, &v3);
+        self.push_quad_vertices(&v0, &v1, &v2, &v3);
+    }
+}
+
+impl super::Renderer<Pass> for Renderer {
+    fn begin_frame(&mut self, width: usize, height: usize) {
+        assert_eq!(self.pass.is_none(), true);
+        self.canvas_width = width as _;
+        self.canvas_height = height as _;
+
+        let mut pass = Pass::new(
+            width as usize,
+            height as usize,
+            None,
+            [
+                ColorPassAction::Clear(color4b(0x7F, 0x7F, 0x7F, 0xFF)),
+                ColorPassAction::Previous,
+                ColorPassAction::Previous,
+                ColorPassAction::Previous,
+            ],
+            DepthPassAction::Clear(1.0),
+        );
+
+        pass.set_viewport(0, 0, self.canvas_width, self.canvas_height);
+
+        self.pass = Some(pass)
     }
 
-    pub fn draw_rect(&mut self, pass: &mut Pass, rect: Recti, color: Color4b) {
-        self.push_rect(pass, rect, ATLAS[ATLAS_WHITE as usize], color);
+    fn end_frame(&mut self) -> Pass {
+        self.flush();
+        let mut pass = None;
+        core::mem::swap(&mut self.pass, &mut pass);
+        pass.unwrap()
     }
 
-    pub fn draw_text(&mut self, pass: &mut Pass, text: &str, pos: Vec2i, color: Color4b) {
+    fn draw_rect(&mut self, rect: Recti, color: Color4b) {
+        self.push_rect(rect, ATLAS[ATLAS_WHITE as usize], color);
+    }
+
+    fn draw_text(&mut self, text: &str, pos: Vec2i, color: Color4b) {
         let mut dst = Rect::new(pos.x, pos.y, 0, 0);
         for p in text.chars() {
             if (p as usize) < 127 {
@@ -286,81 +322,49 @@ impl System {
                 let src = ATLAS[ATLAS_FONT as usize + chr];
                 dst.width = src.width;
                 dst.height = src.height;
-                self.push_rect(pass, dst, src, color);
+                self.push_rect(dst, src, color);
                 dst.x += dst.width;
             }
         }
     }
 
-    pub fn draw_icon(&mut self, pass: &mut Pass, id: Icon, r: Recti, color: Color4b) {
+    fn draw_icon(&mut self, id: Icon, r: Recti, color: Color4b) {
         let src = ATLAS[id as usize];
         let x = r.x + (r.width - src.width) / 2;
         let y = r.y + (r.height - src.height) / 2;
-        self.push_rect(pass, Rect::new(x, y, src.width, src.height), src, color);
+        self.push_rect(Rect::new(x, y, src.width, src.height), src, color);
     }
 
-    pub fn set_clip_rect(&mut self, pass: &mut Pass, width: u32, height: u32, rect: Recti) {
-        self.canvas_width = width as u32;
-        self.canvas_height = height as u32;
-        self.flush(pass);
-        pass.set_scissor(
+    fn set_clip_rect(&mut self, rect: Recti) {
+        self.flush();
+        self.pass.as_mut().unwrap().set_scissor(
             rect.x as u32,
-            (height as i32 - (rect.y + rect.height)) as u32,
+            (self.canvas_height as i32 - (rect.y + rect.height)) as u32,
             rect.width as u32,
             rect.height as u32,
         );
     }
 
-    pub fn get_char_width(&self, _font: FontId, c: char) -> usize {
+    fn get_char_width(&self, _font: FontId, c: char) -> usize {
         ATLAS[ATLAS_FONT as usize + c as usize].width as usize
     }
 
-    pub fn get_font_height(&self, _font: FontId) -> usize {
+    fn get_font_height(&self, _font: FontId) -> usize {
         18
     }
 
-    pub fn paint(&mut self, pass: &mut Pass, ctx: &mut super::Context) {
-        pass.set_viewport(0, 0, self.canvas_width, self.canvas_height);
-
-        let mut cmd_id = 0;
-        loop {
-            match ctx.mu_next_command(cmd_id) {
-                Some((command, id)) => {
-                    match command {
-                        Command::Text {
-                            str_start,
-                            str_len,
-                            pos,
-                            color,
-                            ..
-                        } => {
-                            let str = &ctx.text_stack[str_start..str_start + str_len];
-                            self.draw_text(pass, str, pos, color);
-                        }
-                        Command::Rect { rect, color } => {
-                            self.draw_rect(pass, rect, color);
-                        }
-                        Command::Icon { id, rect, color } => {
-                            self.draw_icon(pass, id, rect, color);
-                        }
-                        Command::Clip { rect } => {
-                            self.set_clip_rect(pass, self.canvas_width, self.canvas_height, rect);
-                        }
-                        _ => {}
-                    }
-                    cmd_id = id;
-                }
-                None => break,
-            }
-        }
-
-        self.flush(pass);
-    }
-
-    fn flush(&mut self, pass: &mut Pass) {
+    fn flush(&mut self) {
         if self.vertices.len() != 0 && self.indices.len() != 0 {
-            pass.update_device_buffer(&mut self.vertex_buffer, 0, Arc::new(self.vertices.clone()));
-            pass.update_device_buffer(&mut self.index_buffer, 0, Arc::new(self.indices.clone()));
+            self.pass.as_mut().unwrap().update_device_buffer(
+                &mut self.vertex_buffer,
+                0,
+                Arc::new(self.vertices.clone()),
+            );
+            self.pass.as_mut().unwrap().update_device_buffer(
+                &mut self.index_buffer,
+                0,
+                Arc::new(self.indices.clone()),
+            );
 
             let bindings = Bindings {
                 vertex_buffers: vec![self.vertex_buffer.clone()],
@@ -373,7 +377,7 @@ impl System {
             let u = Uniforms {
                 u_screen_size: Vec2f::new(self.canvas_width as f32, self.canvas_height as f32),
             };
-            pass.draw(
+            self.pass.as_mut().unwrap().draw(
                 &self.pipeline,
                 &bindings,
                 Arc::new(GenPayload::from(u)),
@@ -384,12 +388,14 @@ impl System {
         self.vertices.clear();
         self.indices.clear();
     }
+}
 
+impl<P: Sized, R: super::Renderer<P>> Input<P, R> {
     pub fn handle_event(
         &mut self,
         event: glfw::WindowEvent,
         window: &mut glfw::Window,
-        ctx: &mut ui::Context,
+        ctx: &mut ui::Context<P, R>,
     ) {
         match event {
             glfw::WindowEvent::CursorPos(x, y) => ctx.input_mousemove(x as i32, y as i32),
@@ -408,6 +414,7 @@ impl System {
                     _ => (),
                 }
             }
+            glfw::WindowEvent::Scroll(x, y) => ctx.input_scroll(x as i32, y as i32),
             glfw::WindowEvent::Key(key, scancode, action, modifiers) => {
                 let mut keymod = KeyModifier::NONE;
                 if key == glfw::Key::Enter {

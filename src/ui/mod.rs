@@ -51,6 +51,7 @@
 // IN THE SOFTWARE.
 //
 use core::ptr;
+use std::marker::PhantomData;
 
 mod fixed_collections;
 pub use fixed_collections::*;
@@ -65,6 +66,21 @@ pub use system::*;
 use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 
 use bitflags::*;
+
+pub trait Renderer<P> {
+    fn get_char_width(&self, _font: FontId, c: char) -> usize;
+    fn get_font_height(&self, _font: FontId) -> usize;
+
+    fn begin_frame(&mut self, width: usize, height: usize);
+    fn end_frame(&mut self) -> P;
+
+    fn draw_rect(&mut self, rect: Recti, color: Color4b);
+    fn draw_text(&mut self, text: &str, pos: Vec2i, color: Color4b);
+    fn draw_icon(&mut self, id: Icon, r: Recti, color: Color4b);
+    fn set_clip_rect(&mut self, rect: Recti);
+
+    fn flush(&mut self);
+}
 
 #[derive(Copy, Clone)]
 pub struct Pool<const N: usize> {
@@ -318,10 +334,9 @@ impl KeyModifier {
 }
 
 #[repr(C)]
-pub struct Context {
+pub struct Context<P, R: Renderer<P>> {
     pub char_width: Option<fn(FontId, char) -> usize>,
     pub font_height: Option<fn(FontId) -> usize>,
-    pub draw_frame: Option<fn(&mut Context, Recti, ControlColor) -> ()>,
     pub style: Style,
     pub hover: Option<Id>,
     pub focus: Option<Id>,
@@ -354,48 +369,8 @@ pub struct Context {
     pub key_down: KeyModifier,
     pub key_pressed: KeyModifier,
     pub input_text: FixedString<32>,
-}
-
-impl Default for Context {
-    fn default() -> Self {
-        Self {
-            char_width: None,
-            font_height: None,
-            draw_frame: None,
-            style: Style::default(),
-            hover: None,
-            focus: None,
-            last_id: None,
-            last_rect: Rect::new(0, 0, 0, 0),
-            last_zindex: 0,
-            updated_focus: false,
-            frame: 0,
-            hover_root: None,
-            next_hover_root: None,
-            scroll_target: None,
-            number_edit_buf: FixedString::default(),
-            number_edit: None,
-            command_list: FixedVec::default(),
-            root_list: FixedVec::default(),
-            container_stack: FixedVec::default(),
-            clip_stack: FixedVec::default(),
-            id_stack: FixedVec::default(),
-            layout_stack: FixedVec::default(),
-            text_stack: FixedString::default(),
-            container_pool: Pool::default(),
-            containers: [Container::default(); 48],
-            treenode_pool: Pool::default(),
-            mouse_pos: Vec2i::default(),
-            last_mouse_pos: Vec2i::default(),
-            mouse_delta: Vec2i::default(),
-            scroll_delta: Vec2i::default(),
-            mouse_down: MouseButton::NONE,
-            mouse_pressed: MouseButton::NONE,
-            key_down: KeyModifier::NONE,
-            key_pressed: KeyModifier::NONE,
-            input_text: FixedString::default(),
-        }
-    }
+    renderer: R,
+    _unused: PhantomData<P>,
 }
 
 #[derive(Default, Copy, Clone)]
@@ -457,6 +432,10 @@ pub enum Command {
         rect: Recti,
         id: Icon,
         color: Color4b,
+    },
+    Custom {
+        rect: Recti,
+        render_fn_id: usize,
     },
     None,
 }
@@ -573,23 +552,6 @@ pub fn rect_overlaps_vec2(r: Recti, p: Vec2i) -> bool {
     p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height
 }
 
-pub fn draw_frame(ctx: &mut Context, rect: Recti, colorid: ControlColor) {
-    ctx.draw_rect(rect, ctx.style.colors[colorid as usize]);
-    if colorid == ControlColor::ScrollBase
-        || colorid == ControlColor::ScrollThumb
-        || colorid == ControlColor::TitleBG
-    {
-        return;
-    }
-    if ctx.style.colors[ControlColor::Border as usize].w != 0 {
-        // alpha
-        ctx.draw_box(
-            expand_rect(rect, 1),
-            ctx.style.colors[ControlColor::Border as usize],
-        );
-    }
-}
-
 fn hash_step(h: u32, n: u32) -> u32 {
     (h ^ n).wrapping_mul(16777619 as u32)
 }
@@ -613,15 +575,66 @@ fn hash_bytes(hash_0: &mut Id, s: &[u8]) {
     }
 }
 
-impl Context {
-    pub fn new() -> Self {
-        let mut s = Self::default();
-        s.draw_frame = Some(draw_frame as fn(&mut Context, Recti, ControlColor) -> ());
-        s.style = Style::default();
-        s
+impl<P, R: Renderer<P>> Context<P, R> {
+    pub fn new(renderer: R) -> Self {
+        Self {
+            char_width: None,
+            font_height: None,
+            style: Style::default(),
+            hover: None,
+            focus: None,
+            last_id: None,
+            last_rect: Rect::new(0, 0, 0, 0),
+            last_zindex: 0,
+            updated_focus: false,
+            frame: 0,
+            hover_root: None,
+            next_hover_root: None,
+            scroll_target: None,
+            number_edit_buf: FixedString::default(),
+            number_edit: None,
+            command_list: FixedVec::default(),
+            root_list: FixedVec::default(),
+            container_stack: FixedVec::default(),
+            clip_stack: FixedVec::default(),
+            id_stack: FixedVec::default(),
+            layout_stack: FixedVec::default(),
+            text_stack: FixedString::default(),
+            container_pool: Pool::default(),
+            containers: [Container::default(); 48],
+            treenode_pool: Pool::default(),
+            mouse_pos: Vec2i::default(),
+            last_mouse_pos: Vec2i::default(),
+            mouse_delta: Vec2i::default(),
+            scroll_delta: Vec2i::default(),
+            mouse_down: MouseButton::NONE,
+            mouse_pressed: MouseButton::NONE,
+            key_down: KeyModifier::NONE,
+            key_pressed: KeyModifier::NONE,
+            input_text: FixedString::default(),
+            renderer,
+            _unused: PhantomData::default(),
+        }
     }
 
-    fn begin(&mut self) {
+    fn draw_frame(&mut self, rect: Recti, colorid: ControlColor) {
+        self.draw_rect(rect, self.style.colors[colorid as usize]);
+        if colorid == ControlColor::ScrollBase
+            || colorid == ControlColor::ScrollThumb
+            || colorid == ControlColor::TitleBG
+        {
+            return;
+        }
+        if self.style.colors[ControlColor::Border as usize].w != 0 {
+            // alpha
+            self.draw_box(
+                expand_rect(rect, 1),
+                self.style.colors[ControlColor::Border as usize],
+            );
+        }
+    }
+
+    fn begin(&mut self, width: usize, height: usize) {
         assert!((self.char_width).is_some() && (self.font_height).is_some());
         self.root_list.clear();
         self.text_stack.clear();
@@ -632,9 +645,10 @@ impl Context {
         self.mouse_delta.y = self.mouse_pos.y - self.last_mouse_pos.y;
         self.command_list.clear();
         self.frame += 1;
+        self.renderer.begin_frame(width, height);
     }
 
-    fn end(&mut self) {
+    fn end(&mut self) -> P {
         assert_eq!(self.container_stack.len(), 0);
         assert_eq!(self.clip_stack.len(), 0);
         assert_eq!(self.id_stack.len(), 0);
@@ -719,6 +733,9 @@ impl Context {
                 // the snake eats its tail
             }
         }
+
+        self.paint();
+        self.renderer.end_frame()
     }
 
     pub fn set_focus(&mut self, id: Option<Id>) {
@@ -933,7 +950,7 @@ impl Context {
 
     pub fn input_scroll(&mut self, x: i32, y: i32) {
         self.scroll_delta.x += x;
-        self.scroll_delta.y += y;
+        self.scroll_delta.y += y * (self.font_height.unwrap()(FontId(0)) as i32);
     }
 
     pub fn input_keydown(&mut self, key: KeyModifier) {
@@ -1206,7 +1223,7 @@ impl Context {
         } else if self.hover == Some(id) {
             colorid.hover()
         }
-        (self.draw_frame).expect("non-null function pointer")(self, rect, colorid);
+        self.draw_frame(rect, colorid);
     }
 
     pub fn draw_control_text(
@@ -1553,11 +1570,7 @@ impl Context {
 
         if is_treenode {
             if self.hover == Some(id) {
-                (self.draw_frame).expect("non-null function pointer")(
-                    self,
-                    r,
-                    ControlColor::ButtonHover,
-                );
+                self.draw_frame(r, ControlColor::ButtonHover);
             }
         } else {
             self.draw_control_frame(id, r, ControlColor::Button, WidgetOption::NONE);
@@ -1629,11 +1642,7 @@ impl Context {
             self.containers[cnt_id].scroll.y =
                 Self::clamp(self.containers[cnt_id].scroll.y, 0, maxscroll);
 
-            (self.draw_frame).expect("non-null function pointer")(
-                self,
-                base,
-                ControlColor::ScrollBase,
-            );
+            self.draw_frame(base, ControlColor::ScrollBase);
             let mut thumb = base;
             thumb.height = if self.style.thumb_size > base.height * body.height / cs.y {
                 self.style.thumb_size
@@ -1641,11 +1650,7 @@ impl Context {
                 base.height * body.height / cs.y
             };
             thumb.y += self.containers[cnt_id].scroll.y * (base.height - thumb.height) / maxscroll;
-            (self.draw_frame).expect("non-null function pointer")(
-                self,
-                thumb,
-                ControlColor::ScrollThumb,
-            );
+            self.draw_frame(thumb, ControlColor::ScrollThumb);
             if self.mouse_over(body) {
                 self.scroll_target = Some(cnt_id);
             }
@@ -1665,11 +1670,7 @@ impl Context {
             self.containers[cnt_id].scroll.x =
                 Self::clamp(self.containers[cnt_id].scroll.x, 0, maxscroll_0);
 
-            (self.draw_frame).expect("non-null function pointer")(
-                self,
-                base_0,
-                ControlColor::ScrollBase,
-            );
+            self.draw_frame(base_0, ControlColor::ScrollBase);
             let mut thumb_0 = base_0;
             thumb_0.width = if self.style.thumb_size > base_0.width * body.width / cs.x {
                 self.style.thumb_size
@@ -1678,11 +1679,7 @@ impl Context {
             };
             thumb_0.x +=
                 self.containers[cnt_id].scroll.x * (base_0.width - thumb_0.width) / maxscroll_0;
-            (self.draw_frame).expect("non-null function pointer")(
-                self,
-                thumb_0,
-                ControlColor::ScrollThumb,
-            );
+            self.draw_frame(thumb_0, ControlColor::ScrollThumb);
             if self.mouse_over(body) {
                 self.scroll_target = Some(cnt_id);
             }
@@ -1744,12 +1741,12 @@ impl Context {
         let mut body = self.containers[cnt_id.unwrap()].rect;
         r = body;
         if !opt.has_no_frame() {
-            (self.draw_frame).expect("non-null function pointer")(self, r, ControlColor::WindowBG);
+            self.draw_frame(r, ControlColor::WindowBG);
         }
         if !opt.has_no_title() {
             let mut tr = r;
             tr.height = self.style.title_height;
-            (self.draw_frame).expect("non-null function pointer")(self, tr, ControlColor::TitleBG);
+            self.draw_frame(tr, ControlColor::TitleBG);
 
             // TODO: Is this necessary?
             if !opt.has_no_title() {
@@ -1850,11 +1847,7 @@ impl Context {
         let rect = self.layout_next();
         self.containers[cnt_id.unwrap()].rect = rect;
         if !opt.has_no_frame() {
-            (self.draw_frame).expect("non-null function pointer")(
-                self,
-                rect,
-                ControlColor::PanelBG,
-            );
+            self.draw_frame(rect, ControlColor::PanelBG);
         }
 
         self.container_stack.push(cnt_id.unwrap());
@@ -1865,6 +1858,42 @@ impl Context {
     fn end_panel(&mut self) {
         self.pop_clip_rect();
         self.pop_container();
+    }
+
+    fn paint(&mut self) {
+        let mut cmd_id = 0;
+        loop {
+            match self.mu_next_command(cmd_id) {
+                Some((command, id)) => {
+                    match command {
+                        Command::Text {
+                            str_start,
+                            str_len,
+                            pos,
+                            color,
+                            ..
+                        } => {
+                            let str = &self.text_stack[str_start..str_start + str_len];
+                            self.renderer.draw_text(str, pos, color);
+                        }
+                        Command::Rect { rect, color } => {
+                            self.renderer.draw_rect(rect, color);
+                        }
+                        Command::Icon { id, rect, color } => {
+                            self.renderer.draw_icon(id, rect, color);
+                        }
+                        Command::Clip { rect } => {
+                            self.renderer.set_clip_rect(rect);
+                        }
+                        _ => {}
+                    }
+                    cmd_id = id;
+                }
+                None => break,
+            }
+        }
+
+        self.renderer.flush();
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -1915,9 +1944,9 @@ impl Context {
         self.end_panel();
     }
 
-    pub fn frame<F: FnOnce(&mut Self)>(&mut self, f: F) {
-        self.begin();
+    pub fn frame<F: FnOnce(&mut Self)>(&mut self, width: usize, height: usize, f: F) -> P {
+        self.begin(width, height);
         f(self);
-        self.end();
+        self.end()
     }
 }
