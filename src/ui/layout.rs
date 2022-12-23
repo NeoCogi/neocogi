@@ -125,17 +125,10 @@ impl LayoutStack {
         let b = self.top().clone();
         self.stack.pop();
 
+        // inherit position/next_row/max from child layout if they are greater
         let a = self.top_mut();
-        a.position.x = if a.position.x > b.position.x + b.body.x - a.body.x {
-            a.position.x
-        } else {
-            b.position.x + b.body.x - a.body.x
-        };
-        a.next_row = if a.next_row > b.next_row + b.body.y - a.body.y {
-            a.next_row
-        } else {
-            b.next_row + b.body.y - a.body.y
-        };
+        a.position.x = i32::max(a.position.x, b.position.x + b.body.x - a.body.x);
+        a.next_row = i32::max(a.next_row, b.next_row + b.body.y - a.body.y);
         a.max.x = i32::max(a.max.x, b.max.x);
         a.max.y = i32::max(a.max.y, b.max.y);
     }
@@ -182,6 +175,7 @@ impl LayoutStack {
                 return self.last_rect;
             }
         } else {
+            // handle next row
             let litems = layout.items;
             let lsize_y = layout.size.y;
             let mut undefined_widths = [0; 16];
@@ -190,8 +184,12 @@ impl LayoutStack {
             if layout.item_index == layout.items {
                 Self::row_for_layout(layout, &undefined_widths[0..litems as usize], lsize_y);
             }
+
+            // position
             res.x = layout.position.x;
             res.y = layout.position.y;
+
+            // size
             res.width = if layout.items > 0 {
                 layout.widths[layout.item_index as usize]
             } else {
@@ -212,24 +210,18 @@ impl LayoutStack {
             }
             layout.item_index += 1;
         }
+
+        // update position
         layout.position.x += res.width + style.spacing;
-        layout.next_row = if layout.next_row > res.y + res.height + style.spacing {
-            layout.next_row
-        } else {
-            res.y + res.height + style.spacing
-        };
+        layout.next_row = i32::max(layout.next_row, res.y + res.height + style.spacing);
+
+        // apply body offset
         res.x += layout.body.x;
         res.y += layout.body.y;
-        layout.max.x = if layout.max.x > res.x + res.width {
-            layout.max.x
-        } else {
-            res.x + res.width
-        };
-        layout.max.y = if layout.max.y > res.y + res.height {
-            layout.max.y
-        } else {
-            res.y + res.height
-        };
+
+        // update max position
+        layout.max.x = i32::max(layout.max.x, res.x + res.width);
+        layout.max.y = i32::max(layout.max.y, res.y + res.height);
         self.last_rect = res;
         return self.last_rect;
     }
