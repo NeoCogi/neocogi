@@ -64,6 +64,9 @@ use layout::*;
 
 pub mod system;
 
+mod controls;
+pub use controls::*;
+
 pub use system::*;
 
 use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
@@ -83,39 +86,6 @@ pub trait Renderer<P> {
     fn set_clip_rect(&mut self, rect: Recti);
 
     fn flush(&mut self);
-}
-
-pub trait ControlProvider {
-    fn text(&mut self, text: &str);
-    fn label(&mut self, text: &str);
-    fn button_ex(&mut self, label: &str, icon: Icon, opt: WidgetOption) -> ResourceState;
-    fn checkbox(&mut self, label: &str, state: &mut bool) -> ResourceState;
-    fn textbox_raw(
-        &mut self,
-        buf: &mut dyn IString,
-        id: Id,
-        r: Recti,
-        opt: WidgetOption,
-    ) -> ResourceState;
-    fn textbox_ex(&mut self, buf: &mut dyn IString, opt: WidgetOption) -> ResourceState;
-
-    fn slider_ex(
-        &mut self,
-        value: &mut Real,
-        low: Real,
-        high: Real,
-        step: Real,
-        fmt: &str,
-        opt: WidgetOption,
-    ) -> ResourceState;
-
-    fn number_ex(
-        &mut self,
-        value: &mut Real,
-        step: Real,
-        fmt: &str,
-        opt: WidgetOption,
-    ) -> ResourceState;
 }
 
 #[derive(Copy, Clone)]
@@ -1141,249 +1111,6 @@ impl<P, R: Renderer<P>> Context<P, R> {
         (lc * font_height) as i32
     }
 
-    pub fn text(&mut self, text: &str) {
-        let font = self.style.font;
-        let color = self.style.colors[ControlColor::Text as usize];
-        let style = self.style;
-        self.column(&style, |ctx| {
-            let h = ctx.renderer.get_font_height(font) as i32;
-            ctx.layout_stack.row(&[-1], h);
-            let mut r = ctx.layout_stack.next(&ctx.style);
-            for line in text.lines() {
-                let mut rx = r.x;
-                let words = line.split_inclusive(' ');
-                for w in words {
-                    // TODO: split w when its width > w into many lines
-                    let tw = ctx.get_text_width(font, w);
-                    if tw + rx < r.x + r.width {
-                        ctx.draw_text(font, w, vec2(rx, r.y), color);
-                        rx += tw;
-                    } else {
-                        r = ctx.layout_stack.next(&ctx.style);
-                        rx = r.x;
-                    }
-                }
-                r = ctx.layout_stack.next(&ctx.style);
-            }
-        });
-    }
-
-    pub fn label(&mut self, text: &str) {
-        let layout = self.layout_stack.next(&self.style);
-        self.draw_control_text(text, layout, ControlColor::Text, WidgetOption::NONE);
-    }
-
-    pub fn button_ex(&mut self, label: &str, icon: Icon, opt: WidgetOption) -> ResourceState {
-        let mut res = ResourceState::NONE;
-        let id: Id = if label.len() > 0 {
-            self.get_id_from_str(label)
-        } else {
-            self.get_id_u32(icon as u32)
-        };
-        let r = self.layout_stack.next(&self.style);
-        self.update_control(id, r, opt);
-        if self.mouse_pressed.is_left() && self.focus == Some(id) {
-            res |= ResourceState::SUBMIT;
-        }
-        self.draw_control_frame(id, r, ControlColor::Button, opt);
-        if label.len() > 0 {
-            self.draw_control_text(label, r, ControlColor::Text, opt);
-        }
-        if icon != Icon::None {
-            self.draw_icon(icon, r, self.style.colors[ControlColor::Text as usize]);
-        }
-        return res;
-    }
-
-    pub fn checkbox(&mut self, label: &str, state: &mut bool) -> ResourceState {
-        let mut res = ResourceState::NONE;
-        let id: Id = self.get_id_from_ptr(state);
-        let mut r = self.layout_stack.next(&self.style);
-        let box_0 = Rect::new(r.x, r.y, r.height, r.height);
-        self.update_control(id, r, WidgetOption::NONE);
-        if self.mouse_pressed.is_left() && self.focus == Some(id) {
-            res |= ResourceState::CHANGE;
-            *state = *state == false;
-        }
-        self.draw_control_frame(id, box_0, ControlColor::Base, WidgetOption::NONE);
-        if *state {
-            self.draw_icon(
-                Icon::Check,
-                box_0,
-                self.style.colors[ControlColor::Text as usize],
-            );
-        }
-        r = Rect::new(r.x + box_0.width, r.y, r.width - box_0.width, r.height);
-        self.draw_control_text(label, r, ControlColor::Text, WidgetOption::NONE);
-        return res;
-    }
-
-    pub fn textbox_raw(
-        &mut self,
-        buf: &mut dyn IString,
-        id: Id,
-        r: Recti,
-        opt: WidgetOption,
-    ) -> ResourceState {
-        let mut res = ResourceState::NONE;
-        self.update_control(id, r, opt | WidgetOption::HOLD_FOCUS);
-        if self.focus == Some(id) {
-            let mut len = buf.len();
-
-            if self.input_text.len() > 0 && self.input_text.len() + len < buf.capacity() {
-                buf.add_str(self.input_text.as_str());
-                len += self.input_text.len() as usize;
-                res |= ResourceState::CHANGE
-            }
-
-            if self.key_pressed.is_backspace() && len > 0 {
-                // skip utf-8 continuation bytes
-                buf.pop();
-                res |= ResourceState::CHANGE
-            }
-            if self.key_pressed.is_return() {
-                self.set_focus(None);
-                res |= ResourceState::SUBMIT;
-            }
-        }
-        self.draw_control_frame(id, r, ControlColor::Base, opt);
-        if self.focus == Some(id) {
-            let color = self.style.colors[ControlColor::Text as usize];
-            let font = self.style.font;
-            let textw = self.get_text_width(font, buf.as_str());
-            let texth = self.get_text_height(font, buf.as_str());
-            let ofx = r.width - self.style.padding - textw - 1;
-            let textx = r.x
-                + (if ofx < self.style.padding {
-                    ofx
-                } else {
-                    self.style.padding
-                });
-            let texty = r.y + (r.height - texth) / 2;
-            self.push_clip_rect(r);
-            self.draw_text(font, buf.as_str(), vec2(textx, texty), color);
-            self.draw_rect(Rect::new(textx + textw, texty, 1, texth), color);
-            self.pop_clip_rect();
-        } else {
-            self.draw_control_text(buf.as_str(), r, ControlColor::Text, opt);
-        }
-        return res;
-    }
-
-    fn number_textbox(&mut self, value: &mut Real, r: Recti, id: Id) -> ResourceState {
-        if self.mouse_pressed.is_left() && self.key_down.is_shift() && self.hover == Some(id) {
-            self.number_edit = Some(id);
-            self.number_edit_buf.clear();
-            self.number_edit_buf.append_real("%.3f", *value);
-        }
-
-        if self.number_edit == Some(id) {
-            let mut temp = self.number_edit_buf.clone();
-            let res: ResourceState = self.textbox_raw(&mut temp, id, r, WidgetOption::NONE);
-            self.number_edit_buf = temp;
-            if res.is_submitted() || self.focus != Some(id) {
-                let mut ascii = [0u8; 32];
-                let mut i = 0;
-                for c in self.number_edit_buf.as_str().chars() {
-                    ascii[i] = c as u8;
-                    i += 1;
-                }
-                ascii[i] = '\0' as u8;
-                let v = unsafe {
-                    libc::strtod(
-                        ascii.as_ptr() as *const libc::c_char,
-                        ptr::null_mut() as *mut *mut libc::c_char,
-                    )
-                };
-                *value = v as Real;
-                self.number_edit = None;
-            } else {
-                return ResourceState::ACTIVE;
-            }
-        }
-        return ResourceState::NONE;
-    }
-
-    pub fn textbox_ex(&mut self, buf: &mut dyn IString, opt: WidgetOption) -> ResourceState {
-        let id = self.get_id_from_ptr(buf);
-        let r = self.layout_stack.next(&self.style);
-        return self.textbox_raw(buf, id, r, opt);
-    }
-
-    pub fn slider_ex(
-        &mut self,
-        value: &mut Real,
-        low: Real,
-        high: Real,
-        step: Real,
-        fmt: &str,
-        opt: WidgetOption,
-    ) -> ResourceState {
-        let mut res = ResourceState::NONE;
-        let last = *value;
-        let mut v = last;
-        let id = self.get_id_from_ptr(value);
-        let base = self.layout_stack.next(&self.style);
-        if !self.number_textbox(&mut v, base, id).is_none() {
-            return res;
-        }
-        self.update_control(id, base, opt);
-        if self.focus == Some(id) && (!self.mouse_down.is_none() | self.mouse_pressed.is_left()) {
-            v = low + (self.mouse_pos.x - base.x) as Real * (high - low) / base.width as Real;
-            if step != 0. {
-                v = (v + step / 2 as Real) / step * step;
-            }
-        }
-        v = if high < (if low > v { low } else { v }) {
-            high
-        } else if low > v {
-            low
-        } else {
-            v
-        };
-        *value = v;
-        if last != v {
-            res |= ResourceState::CHANGE;
-        }
-        self.draw_control_frame(id, base, ControlColor::Base, opt);
-        let w = self.style.thumb_size;
-        let x = ((v - low) * (base.width - w) as Real / (high - low)) as i32;
-        let thumb = Rect::new(base.x + x, base.y, w, base.height);
-        self.draw_control_frame(id, thumb, ControlColor::Button, opt);
-        let mut buff = FixedString::<64>::new();
-        buff.append_real(fmt, *value);
-        self.draw_control_text(buff.as_str(), base, ControlColor::Text, opt);
-        return res;
-    }
-
-    pub fn number_ex(
-        &mut self,
-        value: &mut Real,
-        step: Real,
-        fmt: &str,
-        opt: WidgetOption,
-    ) -> ResourceState {
-        let mut res = ResourceState::NONE;
-        let id: Id = self.get_id_from_ptr(value);
-        let base = self.layout_stack.next(&self.style);
-        let last: Real = *value;
-        if !self.number_textbox(value, base, id).is_none() {
-            return res;
-        }
-        self.update_control(id, base, opt);
-        if self.focus == Some(id) && self.mouse_down.is_left() {
-            *value += self.mouse_delta.x as Real * step;
-        }
-        if *value != last {
-            res |= ResourceState::CHANGE;
-        }
-        self.draw_control_frame(id, base, ControlColor::Base, opt);
-        let mut buff = FixedString::<64>::new();
-        buff.append_real(fmt, *value);
-        self.draw_control_text(buff.as_str(), base, ControlColor::Text, opt);
-        return res;
-    }
-
     fn header(&mut self, label: &str, is_treenode: bool, opt: WidgetOption) -> ResourceState {
         let id: Id = self.get_id_from_str(label);
         let idx = self.treenode_pool.get(id);
@@ -1797,5 +1524,9 @@ impl<P, R: Renderer<P>> Context<P, R> {
 
     pub fn row(&mut self, widths: &[i32], height: i32) {
         self.layout_stack.row(widths, height);
+    }
+
+    pub fn next(&mut self, style: &Style) -> Recti {
+        self.layout_stack.next(style)
     }
 }

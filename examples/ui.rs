@@ -153,6 +153,7 @@ impl<'a> State<'a> {
             ctx.set_current_container_rect(&win);
 
             let mut buff = FixedString::<128>::new();
+            let style = ctx.style;
 
             if !ctx.header_ex("Window Info", WidgetOption::NONE).is_none() {
                 let win_0 = ctx.get_current_container_rect();
@@ -226,7 +227,7 @@ impl<'a> State<'a> {
                 .is_none()
             {
                 ctx.row(&[140, -1], 0);
-                ctx.column(&ctx.style, |ctx| {
+                ctx.column(&style, |ctx| {
                     ctx.treenode_ex("Test 1", WidgetOption::NONE, |ctx| {
                         ctx.treenode_ex("Test 1a", WidgetOption::NONE, |ctx| {
                             ctx.label("Hello");
@@ -280,7 +281,7 @@ impl<'a> State<'a> {
                         ctx.checkbox("Checkbox 3", &mut self.checks[2]);
                     });
                 });
-                ctx.column(&ctx.style, |ctx| {
+                ctx.column(&style, |ctx| {
                     ctx.row(&[-1], 0);
                     ctx.text(
                         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas lacinia, sem eu lacinia molestie, mi risus faucibus ipsum, eu varius magna felis a nulla."
@@ -293,7 +294,7 @@ impl<'a> State<'a> {
                 .is_none()
             {
                 ctx.row(&[-78, -1], 74);
-                ctx.column(&ctx.style, |crx| {
+                ctx.column(&style, |ctx| {
                     ctx.row(&[46, -1], 0);
                     ctx.label("Red:");
                     ctx.slider_ex(
@@ -323,7 +324,7 @@ impl<'a> State<'a> {
                         WidgetOption::ALIGN_CENTER,
                     );
                 });
-                let r = ctx.layout_stack.next(&ctx.style);
+                let r = ctx.next(&style);
                 ctx.draw_rect(
                     r,
                     color(self.bg[0] as u8, self.bg[1] as u8, self.bg[2] as u8, 255),
@@ -418,6 +419,7 @@ impl<'a> State<'a> {
             ),
             WidgetOption::NONE,
             |ctx| {
+                let style = ctx.style;
                 let sw: libc::c_int = (ctx.get_current_container_body().width as libc::c_double
                     * 0.14f64) as libc::c_int;
                 ctx.row(&[80, sw, sw, sw, sw, -1], 0);
@@ -451,7 +453,7 @@ impl<'a> State<'a> {
                             255 as libc::c_int,
                         );
                     }
-                    let next_layout = ctx.layout_stack.next(&ctx.style);
+                    let next_layout = ctx.next(&style);
                     ctx.draw_rect(next_layout, ctx.style.colors[i]);
                     i += 1;
                 }
