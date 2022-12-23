@@ -116,7 +116,6 @@ fn main() {
     let mut input = Input::new();
     let mut ctx = ui::Context::new(renderer);
 
-
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
 
@@ -126,23 +125,22 @@ fn main() {
                 Rect::new(100, 100, 256, 128),
                 ui::WidgetOption::AUTO_SIZE,
                 |ctx| {
-                    ctx.layout_stack.begin_column(&ctx.style);
+                    let style = ctx.style;
+                    ctx.column(&style, |ctx| {
+                        if ctx
+                            .button_ex("Orbit", ui::Icon::None, WidgetOption::NONE)
+                            .is_submitted()
+                        {
+                            state.view.set_navigation_mode(NavigationMode::Orbit)
+                        }
 
-                    if ctx
-                        .button_ex("Orbit", ui::Icon::None, WidgetOption::NONE)
-                        .is_submitted()
-                    {
-                        state.view.set_navigation_mode(NavigationMode::Orbit)
-                    }
-
-                    if ctx
-                        .button_ex("Pan", ui::Icon::None, WidgetOption::NONE)
-                        .is_submitted()
-                    {
-                        state.view.set_navigation_mode(NavigationMode::Pan)
-                    }
-
-                    ctx.layout_stack.end_column();
+                        if ctx
+                            .button_ex("Pan", ui::Icon::None, WidgetOption::NONE)
+                            .is_submitted()
+                        {
+                            state.view.set_navigation_mode(NavigationMode::Pan)
+                        }
+                    });
                 },
             );
         });

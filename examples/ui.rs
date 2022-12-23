@@ -156,7 +156,7 @@ impl<'a> State<'a> {
 
             if !ctx.header_ex("Window Info", WidgetOption::NONE).is_none() {
                 let win_0 = ctx.get_current_container_rect();
-                ctx.layout_stack.row(&[54, -1], 0);
+                ctx.row(&[54, -1], 0);
                 ctx.label("Position:");
 
                 buff.clear();
@@ -178,7 +178,7 @@ impl<'a> State<'a> {
                 .header_ex("Test Buttons", WidgetOption::EXPANDED)
                 .is_none()
             {
-                ctx.layout_stack.row(&[86, -110, -1], 0);
+                ctx.row(&[86, -110, -1], 0);
                 ctx.label("Test buttons 1:");
                 if !ctx
                     .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
@@ -225,104 +225,104 @@ impl<'a> State<'a> {
                 .header_ex("Tree and Text", WidgetOption::EXPANDED)
                 .is_none()
             {
-                ctx.layout_stack.row(&[140, -1], 0);
-                ctx.layout_stack.begin_column(&ctx.style);
-                ctx.treenode_ex("Test 1", WidgetOption::NONE, |ctx| {
-                    ctx.treenode_ex("Test 1a", WidgetOption::NONE, |ctx| {
-                        ctx.label("Hello");
-                        ctx.label("world");
+                ctx.row(&[140, -1], 0);
+                ctx.column(&ctx.style, |ctx| {
+                    ctx.treenode_ex("Test 1", WidgetOption::NONE, |ctx| {
+                        ctx.treenode_ex("Test 1a", WidgetOption::NONE, |ctx| {
+                            ctx.label("Hello");
+                            ctx.label("world");
+                        });
+                        ctx.treenode_ex("Test 1b", WidgetOption::NONE, |ctx| {
+                            if !ctx
+                                .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
+                                .is_none()
+                            {
+                                self.write_log("Pressed button 1");
+                            }
+                            if !ctx
+                                .button_ex("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
+                                .is_none()
+                            {
+                                self.write_log("Pressed button 2");
+                            }
+                        });
                     });
-                    ctx.treenode_ex("Test 1b", WidgetOption::NONE, |ctx| {
+                    ctx.treenode_ex("Test 2", WidgetOption::NONE, |ctx| {
+                        ctx.row(&[54, 54], 0);
                         if !ctx
-                            .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .button_ex("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
-                            self.write_log("Pressed button 1");
+                            self.write_log("Pressed button 3");
                         }
                         if !ctx
-                            .button_ex("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .button_ex("Button 4", Icon::None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
-                            self.write_log("Pressed button 2");
+                            self.write_log("Pressed button 4");
+                        }
+                        if !ctx
+                            .button_ex("Button 5", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .is_none()
+                        {
+                            self.write_log("Pressed button 5");
+                        }
+                        if !ctx
+                            .button_ex("Button 6", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .is_none()
+                        {
+                            self.write_log("Pressed button 6");
                         }
                     });
+                    ctx.treenode_ex("Test 3", WidgetOption::NONE, |ctx| {
+                        ctx.checkbox("Checkbox 1", &mut self.checks[0]);
+                        ctx.checkbox("Checkbox 2", &mut self.checks[1]);
+                        ctx.checkbox("Checkbox 3", &mut self.checks[2]);
+                    });
                 });
-                ctx.treenode_ex("Test 2", WidgetOption::NONE, |ctx| {
-                    ctx.layout_stack.row(&[54, 54], 0);
-                    if !ctx
-                        .button_ex("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
-                        .is_none()
-                    {
-                        self.write_log("Pressed button 3");
-                    }
-                    if !ctx
-                        .button_ex("Button 4", Icon::None, WidgetOption::ALIGN_CENTER)
-                        .is_none()
-                    {
-                        self.write_log("Pressed button 4");
-                    }
-                    if !ctx
-                        .button_ex("Button 5", Icon::None, WidgetOption::ALIGN_CENTER)
-                        .is_none()
-                    {
-                        self.write_log("Pressed button 5");
-                    }
-                    if !ctx
-                        .button_ex("Button 6", Icon::None, WidgetOption::ALIGN_CENTER)
-                        .is_none()
-                    {
-                        self.write_log("Pressed button 6");
-                    }
+                ctx.column(&ctx.style, |ctx| {
+                    ctx.row(&[-1], 0);
+                    ctx.text(
+                        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas lacinia, sem eu lacinia molestie, mi risus faucibus ipsum, eu varius magna felis a nulla."
+                        ,
+                    );
                 });
-                ctx.treenode_ex("Test 3", WidgetOption::NONE, |ctx| {
-                    ctx.checkbox("Checkbox 1", &mut self.checks[0]);
-                    ctx.checkbox("Checkbox 2", &mut self.checks[1]);
-                    ctx.checkbox("Checkbox 3", &mut self.checks[2]);
-                });
-                ctx.layout_stack.end_column();
-                ctx.layout_stack.begin_column(&ctx.style);
-                ctx.layout_stack.row(&[-1], 0);
-                ctx.text(
-                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas lacinia, sem eu lacinia molestie, mi risus faucibus ipsum, eu varius magna felis a nulla."
-                    ,
-                );
-                ctx.layout_stack.end_column();
             }
             if !ctx
                 .header_ex("Background Color", WidgetOption::EXPANDED)
                 .is_none()
             {
-                ctx.layout_stack.row(&[-78, -1], 74);
-                ctx.layout_stack.begin_column(&ctx.style);
-                ctx.layout_stack.row(&[46, -1], 0);
-                ctx.label("Red:");
-                ctx.slider_ex(
-                    &mut self.bg[0],
-                    0 as libc::c_int as Real,
-                    255 as libc::c_int as Real,
-                    0 as libc::c_int as Real,
-                    "%.2",
-                    WidgetOption::ALIGN_CENTER,
-                );
-                ctx.label("Green:");
-                ctx.slider_ex(
-                    &mut self.bg[1],
-                    0 as libc::c_int as Real,
-                    255 as libc::c_int as Real,
-                    0 as libc::c_int as Real,
-                    "%.2",
-                    WidgetOption::ALIGN_CENTER,
-                );
-                ctx.label("Blue:");
-                ctx.slider_ex(
-                    &mut self.bg[2],
-                    0 as libc::c_int as Real,
-                    255 as libc::c_int as Real,
-                    0 as libc::c_int as Real,
-                    "%.2",
-                    WidgetOption::ALIGN_CENTER,
-                );
-                ctx.layout_stack.end_column();
+                ctx.row(&[-78, -1], 74);
+                ctx.column(&ctx.style, |crx| {
+                    ctx.row(&[46, -1], 0);
+                    ctx.label("Red:");
+                    ctx.slider_ex(
+                        &mut self.bg[0],
+                        0 as libc::c_int as Real,
+                        255 as libc::c_int as Real,
+                        0 as libc::c_int as Real,
+                        "%.2",
+                        WidgetOption::ALIGN_CENTER,
+                    );
+                    ctx.label("Green:");
+                    ctx.slider_ex(
+                        &mut self.bg[1],
+                        0 as libc::c_int as Real,
+                        255 as libc::c_int as Real,
+                        0 as libc::c_int as Real,
+                        "%.2",
+                        WidgetOption::ALIGN_CENTER,
+                    );
+                    ctx.label("Blue:");
+                    ctx.slider_ex(
+                        &mut self.bg[2],
+                        0 as libc::c_int as Real,
+                        255 as libc::c_int as Real,
+                        0 as libc::c_int as Real,
+                        "%.2",
+                        WidgetOption::ALIGN_CENTER,
+                    );
+                });
                 let r = ctx.layout_stack.next(&ctx.style);
                 ctx.draw_rect(
                     r,
@@ -349,11 +349,11 @@ impl<'a> State<'a> {
             Rect::new(350, 40, 300, 200),
             WidgetOption::NONE,
             |ctx| {
-                ctx.layout_stack.row(&[-1], -25);
+                ctx.row(&[-1], -25);
                 ctx.panel_ex("Log Output", WidgetOption::NONE, |ctx| {
                     let mut scroll = ctx.get_current_container_scroll();
                     let content_size = ctx.get_current_container_content_size();
-                    ctx.layout_stack.row(&[-1], -1);
+                    ctx.row(&[-1], -1);
                     ctx.text(self.logbuf.as_str());
                     if self.logbuf_updated {
                         scroll.y = content_size.y;
@@ -363,7 +363,7 @@ impl<'a> State<'a> {
                 });
 
                 let mut submitted = false;
-                ctx.layout_stack.row(&[-70, -1], 0);
+                ctx.row(&[-70, -1], 0);
                 if ctx
                     .textbox_ex(&mut self.submit_buf, WidgetOption::NONE)
                     .is_submitted()
@@ -420,7 +420,7 @@ impl<'a> State<'a> {
             |ctx| {
                 let sw: libc::c_int = (ctx.get_current_container_body().width as libc::c_double
                     * 0.14f64) as libc::c_int;
-                ctx.layout_stack.row(&[80, sw, sw, sw, sw, -1], 0);
+                ctx.row(&[80, sw, sw, sw, sw, -1], 0);
                 let mut i = 0;
                 while self.label_colors[i].label.len() > 0 {
                     ctx.label(self.label_colors[i].label);

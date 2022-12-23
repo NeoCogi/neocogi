@@ -85,6 +85,39 @@ pub trait Renderer<P> {
     fn flush(&mut self);
 }
 
+pub trait ControlProvider {
+    fn text(&mut self, text: &str);
+    fn label(&mut self, text: &str);
+    fn button_ex(&mut self, label: &str, icon: Icon, opt: WidgetOption) -> ResourceState;
+    fn checkbox(&mut self, label: &str, state: &mut bool) -> ResourceState;
+    fn textbox_raw(
+        &mut self,
+        buf: &mut dyn IString,
+        id: Id,
+        r: Recti,
+        opt: WidgetOption,
+    ) -> ResourceState;
+    fn textbox_ex(&mut self, buf: &mut dyn IString, opt: WidgetOption) -> ResourceState;
+
+    fn slider_ex(
+        &mut self,
+        value: &mut Real,
+        low: Real,
+        high: Real,
+        step: Real,
+        fmt: &str,
+        opt: WidgetOption,
+    ) -> ResourceState;
+
+    fn number_ex(
+        &mut self,
+        value: &mut Real,
+        step: Real,
+        fmt: &str,
+        opt: WidgetOption,
+    ) -> ResourceState;
+}
+
 #[derive(Copy, Clone)]
 pub struct Pool<const N: usize> {
     vec: [PoolItem; N],
@@ -355,7 +388,7 @@ pub struct Context<P, R: Renderer<P>> {
     pub container_stack: FixedVec<usize, 32>,
     pub clip_stack: FixedVec<Recti, 32>,
     pub id_stack: FixedVec<Id, 32>,
-    pub layout_stack: LayoutStack,
+    layout_stack: LayoutStack,
     pub text_stack: FixedString<65536>,
     pub container_pool: Pool<48>,
     pub containers: [Container; 48],
@@ -393,8 +426,6 @@ pub struct Container {
     pub zindex: i32,
     pub open: bool,
 }
-
-
 
 #[derive(Copy, Clone)]
 pub enum Command {
@@ -456,7 +487,6 @@ pub struct Style {
 }
 
 pub type Real = f32;
-
 
 static UNCLIPPED_RECT: Recti = Recti {
     x: 0,
@@ -791,7 +821,6 @@ impl<P, R: Renderer<P>> Context<P, R> {
         return Clip::Part;
     }
 
-
     fn pop_container(&mut self) {
         let cnt = self.get_current_container();
         let layout = *self.layout_stack.top();
@@ -1115,27 +1144,28 @@ impl<P, R: Renderer<P>> Context<P, R> {
     pub fn text(&mut self, text: &str) {
         let font = self.style.font;
         let color = self.style.colors[ControlColor::Text as usize];
-        self.layout_stack.begin_column(&self.style);
-        let h = self.renderer.get_font_height(font) as i32;
-        self.layout_stack.row(&[-1], h);
-        let mut r = self.layout_stack.next(&self.style);
-        for line in text.lines() {
-            let mut rx = r.x;
-            let words = line.split_inclusive(' ');
-            for w in words {
-                // TODO: split w when its width > w into many lines
-                let tw = self.get_text_width(font, w);
-                if tw + rx < r.x + r.width {
-                    self.draw_text(font, w, vec2(rx, r.y), color);
-                    rx += tw;
-                } else {
-                    r = self.layout_stack.next(&self.style);
-                    rx = r.x;
+        let style = self.style;
+        self.column(&style, |ctx| {
+            let h = ctx.renderer.get_font_height(font) as i32;
+            ctx.layout_stack.row(&[-1], h);
+            let mut r = ctx.layout_stack.next(&ctx.style);
+            for line in text.lines() {
+                let mut rx = r.x;
+                let words = line.split_inclusive(' ');
+                for w in words {
+                    // TODO: split w when its width > w into many lines
+                    let tw = ctx.get_text_width(font, w);
+                    if tw + rx < r.x + r.width {
+                        ctx.draw_text(font, w, vec2(rx, r.y), color);
+                        rx += tw;
+                    } else {
+                        r = ctx.layout_stack.next(&ctx.style);
+                        rx = r.x;
+                    }
                 }
+                r = ctx.layout_stack.next(&ctx.style);
             }
-            r = self.layout_stack.next(&self.style);
-        }
-        self.layout_stack.end_column();
+        });
     }
 
     pub fn label(&mut self, text: &str) {
@@ -1757,5 +1787,15 @@ impl<P, R: Renderer<P>> Context<P, R> {
         self.begin(width, height);
         f(self);
         self.end()
+    }
+
+    pub fn column<F: FnOnce(&mut Self)>(&mut self, style: &Style, f: F) {
+        self.layout_stack.begin_column(style);
+        f(self);
+        self.layout_stack.end_column()
+    }
+
+    pub fn row(&mut self, widths: &[i32], height: i32) {
+        self.layout_stack.row(widths, height);
     }
 }

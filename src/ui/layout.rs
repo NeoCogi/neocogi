@@ -111,7 +111,7 @@ impl LayoutStack {
         a.max.y = i32::max(a.max.y, b.max.y);
     }
 
-    pub fn row_for_layout(layout: &mut Layout, widths: &[i32], height: i32) {
+    fn row_for_layout(layout: &mut Layout, widths: &[i32], height: i32) {
         layout.items = widths.len();
         assert!(widths.len() <= 16);
         for i in 0..widths.len() {
@@ -205,4 +205,3 @@ impl LayoutStack {
         return self.last_rect;
     }
 }
-
