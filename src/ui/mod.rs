@@ -1121,7 +1121,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         } else {
             active
         };
-        let mut r = self.layout_stack.next(&self.style);
+        let mut r = self.layout_stack.next_cell(&self.style);
         self.update_control(id, r, WidgetOption::NONE);
         active ^= (self.mouse_pressed.is_left() && self.focus == Some(id)) as i32;
         if idx.is_some() {
@@ -1410,7 +1410,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     fn begin_panel_ex(&mut self, name: &str, opt: WidgetOption) {
         self.push_id_from_str(name);
         let cnt_id = self.get_container_index_intern(self.last_id.unwrap(), opt);
-        let rect = self.layout_stack.next(&self.style);
+        let rect = self.layout_stack.next_cell(&self.style);
         self.containers[cnt_id.unwrap()].rect = rect;
         if !opt.has_no_frame() {
             self.draw_frame(rect, ControlColor::PanelBG);
@@ -1461,8 +1461,6 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
 
         self.renderer.flush();
     }
-
-
 
     ////////////////////////////////////////////////////////////////////////////
     // LAMBDA based context
@@ -1528,7 +1526,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.layout_stack.row(widths, height);
     }
 
-    pub fn next_row_cell(&mut self) -> Recti {
-        self.layout_stack.next(&self.style)
+    pub fn next_cell(&mut self) -> Recti {
+        self.layout_stack.next_cell(&self.style)
     }
 }

@@ -116,7 +116,7 @@ impl<'a> State<'a> {
                 LabelColor {
                     label: "scrollthumb:",
                     idx: ControlColor::ScrollThumb,
-                }
+                },
             ],
             bg: [90.0, 95.0, 100.0],
             logbuf: FixedString::new(),
@@ -322,7 +322,7 @@ impl<'a> State<'a> {
                         WidgetOption::ALIGN_CENTER,
                     );
                 });
-                let r = ctx.next_row_cell();
+                let r = ctx.next_cell();
                 ctx.draw_rect(
                     r,
                     color(self.bg[0] as u8, self.bg[1] as u8, self.bg[2] as u8, 255),
@@ -423,32 +423,12 @@ impl<'a> State<'a> {
                 for i in 0..self.label_colors.len() {
                     ctx.label(self.label_colors[i].label);
                     let color = &mut self.colors[i];
-                    Self::uint8_slider(
-                        ctx,
-                        &mut color.x,
-                        0 as libc::c_int,
-                        255 as libc::c_int,
-                    );
-                    Self::uint8_slider(
-                        ctx,
-                        &mut color.y,
-                        0 as libc::c_int,
-                        255 as libc::c_int,
-                    );
-                    Self::uint8_slider(
-                        ctx,
-                        &mut color.z,
-                        0 as libc::c_int,
-                        255 as libc::c_int,
-                    );
-                    Self::uint8_slider(
-                        ctx,
-                        &mut color.w,
-                        0 as libc::c_int,
-                        255 as libc::c_int,
-                    );
+                    Self::uint8_slider(ctx, &mut color.x, 0 as libc::c_int, 255 as libc::c_int);
+                    Self::uint8_slider(ctx, &mut color.y, 0 as libc::c_int, 255 as libc::c_int);
+                    Self::uint8_slider(ctx, &mut color.z, 0 as libc::c_int, 255 as libc::c_int);
+                    Self::uint8_slider(ctx, &mut color.w, 0 as libc::c_int, 255 as libc::c_int);
                     ctx.style.colors[i] = *color;
-                    let r = ctx.next_row_cell();
+                    let r = ctx.next_cell();
                     ctx.draw_rect(r, ctx.style.colors[i]);
                 }
             },

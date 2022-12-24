@@ -117,7 +117,7 @@ impl LayoutStack {
     }
 
     pub fn begin_column(&mut self, style: &Style) {
-        let layout = self.next(style);
+        let layout = self.next_cell(style);
         self.push(layout, vec2(0, 0));
     }
 
@@ -163,7 +163,7 @@ impl LayoutStack {
         layout.next_type = position;
     }
 
-    pub fn next(&mut self, style: &Style) -> Recti {
+    pub fn next_cell(&mut self, style: &Style) -> Recti {
         let layout = self.top_mut();
         let mut res = Recti::new(0, 0, 0, 0);
         if layout.next_type != LayoutPosition::None {
@@ -223,6 +223,6 @@ impl LayoutStack {
         layout.max.x = i32::max(layout.max.x, res.x + res.width);
         layout.max.y = i32::max(layout.max.y, res.y + res.height);
         self.last_rect = res;
-        return self.last_rect;
+        self.last_rect
     }
 }
