@@ -1,4 +1,3 @@
-use std::alloc::System;
 //
 // Copyright 2021-Present (c) Raja Lehtihet & Wael El Oraiby
 //
@@ -33,8 +32,8 @@ use crate::rs_math3d::*;
 use crate::*;
 
 use super::*;
-use std::collections::HashMap;
 use std::sync::*;
+use crate::ui::RendererBackEnd;
 
 render_data! {
     vertex Vertex {
@@ -129,11 +128,11 @@ pub struct Renderer {
     pass: Option<Pass>,
 }
 
-pub struct Input<P, R: super::Renderer<P>> {
+pub struct Input<P, R: super::RendererBackEnd<P>> {
     _unused: PhantomData<(P, R)>,
 }
 
-impl<P, R: super::Renderer<P>> Input<P, R> {
+impl<P, R: super::RendererBackEnd<P>> Input<P, R> {
     pub fn new() -> Self {
         Self {
             _unused: PhantomData::default(),
@@ -221,7 +220,8 @@ impl Renderer {
     fn push_quad_vertices(&mut self, v0: &Vertex, v1: &Vertex, v2: &Vertex, v3: &Vertex) {
         if self.vertices.len() + 4 >= MAX_VERTEX_COUNT || self.indices.len() + 6 >= MAX_INDEX_COUNT
         {
-            (self as &mut super::Renderer<_>).flush();
+            //(self as &mut super::Renderer<_>).flush();
+            self.flush();
         }
 
         let is = self.vertices.len() as u16;
@@ -279,7 +279,7 @@ impl Renderer {
     }
 }
 
-impl super::Renderer<Pass> for Renderer {
+impl super::RendererBackEnd<Pass> for Renderer {
     fn begin_frame(&mut self, width: usize, height: usize) {
         assert_eq!(self.pass.is_none(), true);
         self.canvas_width = width as _;
@@ -390,7 +390,7 @@ impl super::Renderer<Pass> for Renderer {
     }
 }
 
-impl<P: Sized, R: super::Renderer<P>> Input<P, R> {
+impl<P: Sized, R: super::RendererBackEnd<P>> Input<P, R> {
     pub fn handle_event(
         &mut self,
         event: glfw::WindowEvent,

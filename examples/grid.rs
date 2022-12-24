@@ -126,7 +126,7 @@ fn main() {
                 ui::WidgetOption::AUTO_SIZE,
                 |ctx| {
                     let style = ctx.style;
-                    ctx.column(&style, |ctx| {
+                    ctx.column(|ctx| {
                         if ctx
                             .button_ex("Orbit", ui::Icon::None, WidgetOption::NONE)
                             .is_submitted()

@@ -73,7 +73,7 @@ use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 
 use bitflags::*;
 
-pub trait Renderer<P> {
+pub trait RendererBackEnd<P> {
     fn get_char_width(&self, _font: FontId, c: char) -> usize;
     fn get_font_height(&self, _font: FontId) -> usize;
 
@@ -340,7 +340,7 @@ impl KeyModifier {
 }
 
 #[repr(C)]
-pub struct Context<P, R: Renderer<P>> {
+pub struct Context<P, R: RendererBackEnd<P>> {
     pub style: Style,
     pub hover: Option<Id>,
     pub focus: Option<Id>,
@@ -549,7 +549,7 @@ fn hash_bytes(hash_0: &mut Id, s: &[u8]) {
     }
 }
 
-impl<P, R: Renderer<P>> Context<P, R> {
+impl<P, R: RendererBackEnd<P>> Context<P, R> {
     pub fn new(renderer: R) -> Self {
         Self {
             style: Style::default(),
@@ -1462,6 +1462,8 @@ impl<P, R: Renderer<P>> Context<P, R> {
         self.renderer.flush();
     }
 
+
+
     ////////////////////////////////////////////////////////////////////////////
     // LAMBDA based context
     ////////////////////////////////////////////////////////////////////////////
@@ -1492,7 +1494,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
     pub fn window_ex<F: FnOnce(&mut Self)>(
         &mut self,
         title: &str,
-        mut r: Recti,
+        r: Recti,
         opt: WidgetOption,
         f: F,
     ) -> ResourceState {
@@ -1516,8 +1518,8 @@ impl<P, R: Renderer<P>> Context<P, R> {
         self.end()
     }
 
-    pub fn column<F: FnOnce(&mut Self)>(&mut self, style: &Style, f: F) {
-        self.layout_stack.begin_column(style);
+    pub fn column<F: FnOnce(&mut Self)>(&mut self, f: F) {
+        self.layout_stack.begin_column(&self.style);
         f(self);
         self.layout_stack.end_column()
     }
@@ -1526,7 +1528,7 @@ impl<P, R: Renderer<P>> Context<P, R> {
         self.layout_stack.row(widths, height);
     }
 
-    pub fn next(&mut self, style: &Style) -> Recti {
-        self.layout_stack.next(style)
+    pub fn next_row_cell(&mut self) -> Recti {
+        self.layout_stack.next(&self.style)
     }
 }

@@ -41,12 +41,13 @@ use neocogi::ui;
 use ui::*;
 
 struct State<'a> {
-    label_colors: [LabelColor<'a>; 15],
+    label_colors: [LabelColor<'a>; 14],
     bg: [Real; 3],
     logbuf: FixedString<65536>,
     logbuf_updated: bool,
     submit_buf: FixedString<128>,
     checks: [bool; 3],
+    colors: [Color4b; 14],
 }
 
 #[derive(Copy, Clone)]
@@ -115,17 +116,14 @@ impl<'a> State<'a> {
                 LabelColor {
                     label: "scrollthumb:",
                     idx: ControlColor::ScrollThumb,
-                },
-                LabelColor {
-                    label: "",
-                    idx: ControlColor::Text,
-                },
+                }
             ],
             bg: [90.0, 95.0, 100.0],
             logbuf: FixedString::new(),
             logbuf_updated: false,
             submit_buf: FixedString::new(),
             checks: [false, true, false],
+            colors: [color4b(0, 0, 0, 0); 14],
         }
     }
 
@@ -227,7 +225,7 @@ impl<'a> State<'a> {
                 .is_none()
             {
                 ctx.row(&[140, -1], 0);
-                ctx.column(&style, |ctx| {
+                ctx.column(|ctx| {
                     ctx.treenode_ex("Test 1", WidgetOption::NONE, |ctx| {
                         ctx.treenode_ex("Test 1a", WidgetOption::NONE, |ctx| {
                             ctx.label("Hello");
@@ -281,7 +279,7 @@ impl<'a> State<'a> {
                         ctx.checkbox("Checkbox 3", &mut self.checks[2]);
                     });
                 });
-                ctx.column(&style, |ctx| {
+                ctx.column(|ctx| {
                     ctx.row(&[-1], 0);
                     ctx.text(
                         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas lacinia, sem eu lacinia molestie, mi risus faucibus ipsum, eu varius magna felis a nulla."
@@ -294,7 +292,7 @@ impl<'a> State<'a> {
                 .is_none()
             {
                 ctx.row(&[-78, -1], 74);
-                ctx.column(&style, |ctx| {
+                ctx.column(|ctx| {
                     ctx.row(&[46, -1], 0);
                     ctx.label("Red:");
                     ctx.slider_ex(
@@ -324,7 +322,7 @@ impl<'a> State<'a> {
                         WidgetOption::ALIGN_CENTER,
                     );
                 });
-                let r = ctx.next(&style);
+                let r = ctx.next_row_cell();
                 ctx.draw_rect(
                     r,
                     color(self.bg[0] as u8, self.bg[1] as u8, self.bg[2] as u8, 255),
@@ -388,7 +386,6 @@ impl<'a> State<'a> {
         );
     }
     fn uint8_slider(
-        &mut self,
         ctx: &mut ui::Context<Pass, system::Renderer>,
         value: &mut u8,
         low: i32,
@@ -423,39 +420,36 @@ impl<'a> State<'a> {
                 let sw: libc::c_int = (ctx.get_current_container_body().width as libc::c_double
                     * 0.14f64) as libc::c_int;
                 ctx.row(&[80, sw, sw, sw, sw, -1], 0);
-                let mut i = 0;
-                while self.label_colors[i].label.len() > 0 {
+                for i in 0..self.label_colors.len() {
                     ctx.label(self.label_colors[i].label);
-                    unsafe {
-                        let color = ctx.style.colors.as_mut_ptr().offset(i as isize);
-                        self.uint8_slider(
-                            ctx,
-                            &mut (*color).x,
-                            0 as libc::c_int,
-                            255 as libc::c_int,
-                        );
-                        self.uint8_slider(
-                            ctx,
-                            &mut (*color).y,
-                            0 as libc::c_int,
-                            255 as libc::c_int,
-                        );
-                        self.uint8_slider(
-                            ctx,
-                            &mut (*color).z,
-                            0 as libc::c_int,
-                            255 as libc::c_int,
-                        );
-                        self.uint8_slider(
-                            ctx,
-                            &mut (*color).w,
-                            0 as libc::c_int,
-                            255 as libc::c_int,
-                        );
-                    }
-                    let next_layout = ctx.next(&style);
-                    ctx.draw_rect(next_layout, ctx.style.colors[i]);
-                    i += 1;
+                    let color = &mut self.colors[i];
+                    Self::uint8_slider(
+                        ctx,
+                        &mut color.x,
+                        0 as libc::c_int,
+                        255 as libc::c_int,
+                    );
+                    Self::uint8_slider(
+                        ctx,
+                        &mut color.y,
+                        0 as libc::c_int,
+                        255 as libc::c_int,
+                    );
+                    Self::uint8_slider(
+                        ctx,
+                        &mut color.z,
+                        0 as libc::c_int,
+                        255 as libc::c_int,
+                    );
+                    Self::uint8_slider(
+                        ctx,
+                        &mut color.w,
+                        0 as libc::c_int,
+                        255 as libc::c_int,
+                    );
+                    ctx.style.colors[i] = *color;
+                    let r = ctx.next_row_cell();
+                    ctx.draw_rect(r, ctx.style.colors[i]);
                 }
             },
         );
@@ -507,6 +501,10 @@ fn main() {
     let renderer = system::Renderer::new(&mut driver, width as u32, height as u32);
     let mut input = Input::new();
     let mut ctx = ui::Context::new(renderer);
+
+    for i in 0..state.colors.len() {
+        state.colors[i] = ctx.style.colors[i];
+    }
 
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();

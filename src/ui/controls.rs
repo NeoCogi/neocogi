@@ -62,7 +62,7 @@ pub trait ControlProvider {
     ) -> ResourceState;
 }
 
-impl<P, R: Renderer<P>> Context<P, R> {
+impl<P, R: RendererBackEnd<P>> Context<P, R> {
     fn number_textbox(&mut self, value: &mut Real, r: Recti, id: Id) -> ResourceState {
         if self.mouse_pressed.is_left() && self.key_down.is_shift() && self.hover == Some(id) {
             self.number_edit = Some(id);
@@ -98,12 +98,12 @@ impl<P, R: Renderer<P>> Context<P, R> {
     }
 }
 
-impl<P, R: Renderer<P>> ControlProvider for Context<P, R> {
+impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
     fn text(&mut self, text: &str) {
         let font = self.style.font;
         let color = self.style.colors[ControlColor::Text as usize];
         let style = self.style;
-        self.column(&style, |ctx| {
+        self.column(|ctx| {
             let h = ctx.renderer.get_font_height(font) as i32;
             ctx.layout_stack.row(&[-1], h);
             let mut r = ctx.layout_stack.next(&ctx.style);
