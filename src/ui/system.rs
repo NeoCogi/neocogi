@@ -33,6 +33,7 @@ use crate::*;
 
 use super::*;
 use crate::ui::RendererBackEnd;
+use glfw::Context;
 use std::sync::*;
 
 render_data! {
@@ -438,5 +439,84 @@ impl<P: Sized, R: super::RendererBackEnd<P>> Input<P, R> {
             }
             _ => (),
         }
+    }
+}
+
+pub struct App {
+    glfw: glfw::Glfw,
+    window: glfw::Window,
+    driver: DriverPtr,
+    context: super::Context<Pass, Renderer>,
+    input: Input<Pass, Renderer>,
+    events: std::sync::mpsc::Receiver<(f64, glfw::WindowEvent)>,
+}
+
+impl App {
+    pub fn new() -> Self {
+        // initialize GLFW3 with OpenGL ES 3.0
+        let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+        glfw.window_hint(glfw::WindowHint::ContextCreationApi(
+            glfw::ContextCreationApi::Egl,
+        ));
+        glfw.window_hint(glfw::WindowHint::ClientApi(glfw::ClientApiHint::OpenGlEs));
+        glfw.window_hint(glfw::WindowHint::ContextVersion(3, 0));
+        glfw.window_hint(glfw::WindowHint::OpenGlProfile(
+            glfw::OpenGlProfileHint::Core,
+        ));
+        glfw.window_hint(glfw::WindowHint::DoubleBuffer(true));
+        glfw.window_hint(glfw::WindowHint::Resizable(true));
+        glfw.window_hint(glfw::WindowHint::Floating(true));
+
+        let (mut window, events) = glfw
+            .create_window(1024, 900, "ui Test", glfw::WindowMode::Windowed)
+            .expect("Failed to create GLFW window.");
+
+        window.set_all_polling(true);
+        window.make_current();
+        glfw.set_swap_interval(glfw::SwapInterval::Sync(0));
+
+        let mut driver = renderer::get_driver();
+
+        let (width, height) = window.get_framebuffer_size();
+        let renderer = system::Renderer::new(&mut driver, width as u32, height as u32);
+        let input = Input::new();
+        let context = ui::Context::new(renderer);
+
+        Self {
+            glfw,
+            window,
+            events,
+            context,
+            input,
+            driver,
+        }
+    }
+
+    pub fn run<F: FnMut(&mut super::Context<Pass, Renderer>)>(mut self, mut process_frame: F) {
+        'running: while !self.window.should_close() {
+            let (width, height) = self.window.get_framebuffer_size();
+
+            let mut pass = self
+                .context
+                .frame(width as _, height as _, |ctx| process_frame(ctx));
+
+            self.driver.render_pass(&mut pass);
+            self.window.swap_buffers();
+
+            self.glfw.wait_events_timeout(0.007);
+            for (_, event) in glfw::flush_messages(&self.events) {
+                match event {
+                    glfw::WindowEvent::Close | glfw::WindowEvent::Key(glfw::Key::Escape, ..) => {
+                        break 'running
+                    }
+
+                    _ => self
+                        .input
+                        .handle_event(event, &mut self.window, &mut self.context),
+                }
+            }
+        }
+
+        self.window.close();
     }
 }
