@@ -105,24 +105,25 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         let style = self.style;
         self.column(|ctx| {
             let h = ctx.renderer.get_font_height(font) as i32;
-            ctx.layout_stack.row(&[-1], h);
-            let mut r = ctx.layout_stack.next_cell(&ctx.style);
-            for line in text.lines() {
-                let mut rx = r.x;
-                let words = line.split_inclusive(' ');
-                for w in words {
-                    // TODO: split w when its width > w into many lines
-                    let tw = ctx.get_text_width(font, w);
-                    if tw + rx < r.x + r.width {
-                        ctx.draw_text(font, w, vec2(rx, r.y), color);
-                        rx += tw;
-                    } else {
-                        r = ctx.layout_stack.next_cell(&ctx.style);
-                        rx = r.x;
+            ctx.rows_with_line_config(&[-1], h, |ctx| {
+                let mut r = ctx.layout_stack.next_cell(&ctx.style);
+                for line in text.lines() {
+                    let mut rx = r.x;
+                    let words = line.split_inclusive(' ');
+                    for w in words {
+                        // TODO: split w when its width > w into many lines
+                        let tw = ctx.get_text_width(font, w);
+                        if tw + rx < r.x + r.width {
+                            ctx.draw_text(font, w, vec2(rx, r.y), color);
+                            rx += tw;
+                        } else {
+                            r = ctx.layout_stack.next_cell(&ctx.style);
+                            rx = r.x;
+                        }
                     }
+                    r = ctx.layout_stack.next_cell(&ctx.style);
                 }
-                r = ctx.layout_stack.next_cell(&ctx.style);
-            }
+            });
         });
     }
 

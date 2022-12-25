@@ -65,14 +65,14 @@ pub struct LayoutStack {
 }
 
 impl LayoutStack {
-    pub fn push(&mut self, body: Recti, scroll: Vec2i) {
+    pub fn push_rect_scroll(&mut self, body: Recti, scroll: Vec2i) {
         let mut layout: Layout = Layout {
-            body: Recti {
-                x: 0,
-                y: 0,
-                width: 0,
-                height: 0,
-            },
+            body: Rect::new(
+                body.x - scroll.x,
+                body.y - scroll.y,
+                body.width,
+                body.height,
+            ),
             next: Recti {
                 x: 0,
                 y: 0,
@@ -89,15 +89,13 @@ impl LayoutStack {
             next_type: LayoutPosition::None,
             indent: 0,
         };
-        layout.body = Rect::new(
-            body.x - scroll.x,
-            body.y - scroll.y,
-            body.width,
-            body.height,
-        );
         layout.max = vec2(-0x1000000, -0x1000000);
+        Self::row_for_layout(&mut layout, &[0], 0);
         self.stack.push(layout);
-        self.row(&[0], 0);
+    }
+
+    pub fn push_layout(&mut self, layout: Layout) {
+        self.stack.push(layout);
     }
 
     pub fn top(&self) -> &Layout {
@@ -118,7 +116,7 @@ impl LayoutStack {
 
     pub fn begin_column(&mut self, style: &Style) {
         let layout = self.next_cell(style);
-        self.push(layout, vec2(0, 0));
+        self.push_rect_scroll(layout, vec2(0, 0));
     }
 
     pub fn end_column(&mut self) {
@@ -144,7 +142,7 @@ impl LayoutStack {
         layout.item_index = 0;
     }
 
-    pub fn row(&mut self, widths: &[i32], height: i32) {
+    pub fn row_config(&mut self, widths: &[i32], height: i32) {
         let layout = self.top_mut();
         Self::row_for_layout(layout, widths, height);
     }

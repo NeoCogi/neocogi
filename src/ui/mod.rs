@@ -1111,48 +1111,55 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         (lc * font_height) as i32
     }
 
-    fn header(&mut self, label: &str, is_treenode: bool, opt: WidgetOption) -> ResourceState {
+    fn header_internal(
+        &mut self,
+        label: &str,
+        is_treenode: bool,
+        opt: WidgetOption,
+    ) -> ResourceState {
         let id: Id = self.get_id_from_str(label);
         let idx = self.treenode_pool.get(id);
-        self.layout_stack.row(&[-1], 0);
-        let mut active = idx.is_some() as i32;
-        let expanded = if opt.is_expanded() {
-            (active == 0) as i32
-        } else {
-            active
-        };
-        let mut r = self.layout_stack.next_cell(&self.style);
-        self.update_control(id, r, WidgetOption::NONE);
-        active ^= (self.mouse_pressed.is_left() && self.focus == Some(id)) as i32;
-        if idx.is_some() {
-            if active != 0 {
-                self.treenode_pool.update(idx.unwrap(), self.frame);
+        let mut expanded = 0;
+        self.rows_with_line_config(&[-1], 0, |ctx| {
+            let mut active = idx.is_some() as i32;
+            expanded = if opt.is_expanded() {
+                (active == 0) as i32
             } else {
-                self.treenode_pool.reset(idx.unwrap());
+                active
+            };
+            let mut r = ctx.layout_stack.next_cell(&ctx.style);
+            ctx.update_control(id, r, WidgetOption::NONE);
+            active ^= (ctx.mouse_pressed.is_left() && ctx.focus == Some(id)) as i32;
+            if idx.is_some() {
+                if active != 0 {
+                    ctx.treenode_pool.update(idx.unwrap(), ctx.frame);
+                } else {
+                    ctx.treenode_pool.reset(idx.unwrap());
+                }
+            } else if active != 0 {
+                ctx.treenode_pool.alloc(id, ctx.frame);
             }
-        } else if active != 0 {
-            self.treenode_pool.alloc(id, self.frame);
-        }
 
-        if is_treenode {
-            if self.hover == Some(id) {
-                self.draw_frame(r, ControlColor::ButtonHover);
-            }
-        } else {
-            self.draw_control_frame(id, r, ControlColor::Button, WidgetOption::NONE);
-        }
-        self.draw_icon(
-            if expanded != 0 {
-                Icon::Expanded
+            if is_treenode {
+                if ctx.hover == Some(id) {
+                    ctx.draw_frame(r, ControlColor::ButtonHover);
+                }
             } else {
-                Icon::Collapsed
-            },
-            Rect::new(r.x, r.y, r.height, r.height),
-            self.style.colors[ControlColor::Text as usize],
-        );
-        r.x += r.height - self.style.padding;
-        r.width -= r.height - self.style.padding;
-        self.draw_control_text(label, r, ControlColor::Text, WidgetOption::NONE);
+                ctx.draw_control_frame(id, r, ControlColor::Button, WidgetOption::NONE);
+            }
+            ctx.draw_icon(
+                if expanded != 0 {
+                    Icon::Expanded
+                } else {
+                    Icon::Collapsed
+                },
+                Rect::new(r.x, r.y, r.height, r.height),
+                ctx.style.colors[ControlColor::Text as usize],
+            );
+            r.x += r.height - ctx.style.padding;
+            r.width -= r.height - ctx.style.padding;
+            ctx.draw_control_text(label, r, ControlColor::Text, WidgetOption::NONE);
+        });
         return if expanded != 0 {
             ResourceState::ACTIVE
         } else {
@@ -1160,12 +1167,12 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         };
     }
 
-    pub fn header_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
-        return self.header(label, false, opt);
+    fn header_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
+        self.header_internal(label, false, opt)
     }
 
     fn begin_treenode_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
-        let res = self.header(label, true, opt);
+        let res = self.header_internal(label, true, opt);
         if res.is_active() && self.last_id.is_some() {
             self.layout_stack.top_mut().indent += self.style.indent;
             self.id_stack.push(self.last_id.unwrap());
@@ -1260,7 +1267,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         if !opt.has_no_scroll() {
             self.scrollbars(cnt_idx, &mut body);
         }
-        self.layout_stack.push(
+        self.layout_stack.push_rect_scroll(
             expand_rect(body, -self.style.padding),
             self.containers[cnt_idx].scroll,
         );
@@ -1522,11 +1529,30 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.layout_stack.end_column()
     }
 
-    pub fn row(&mut self, widths: &[i32], height: i32) {
-        self.layout_stack.row(widths, height);
+    pub fn rows_with_line_config<F: FnOnce(&mut Self)>(
+        &mut self,
+        widths: &[i32],
+        height: i32,
+        f: F,
+    ) {
+        self.layout_stack.row_config(widths, height);
+        f(self);
     }
 
     pub fn next_cell(&mut self) -> Recti {
         self.layout_stack.next_cell(&self.style)
+    }
+
+    pub fn header<F: FnOnce(&mut Self)>(
+        &mut self,
+        label: &str,
+        opt: WidgetOption,
+        f: F,
+    ) -> ResourceState {
+        let res = self.header_internal(label, false, opt);
+        if res.is_active() && self.last_id.is_some() {
+            f(self);
+        }
+        res
     }
 }

@@ -153,192 +153,191 @@ impl<'a> State<'a> {
             let mut buff = FixedString::<128>::new();
             let style = ctx.style;
 
-            if !ctx.header_ex("Window Info", WidgetOption::NONE).is_none() {
+            ctx.header("Window Info", WidgetOption::NONE, |ctx| {
                 let win_0 = ctx.get_current_container_rect();
-                ctx.row(&[54, -1], 0);
-                ctx.label("Position:");
+                ctx.rows_with_line_config(&[54, -1], 0, |ctx| {
+                    ctx.label("Position:");
 
-                buff.clear();
-                buff.append_int("%d", win_0.x);
-                buff.add_str(", ");
-                buff.append_int("%d", win_0.y);
+                    buff.clear();
+                    buff.append_int("%d", win_0.x);
+                    buff.add_str(", ");
+                    buff.append_int("%d", win_0.y);
 
-                ctx.label(buff.as_str());
-                buff.clear();
-                ctx.label("Size:");
+                    ctx.label(buff.as_str());
+                    buff.clear();
+                    ctx.label("Size:");
 
-                buff.append_int("%d", win_0.width);
-                buff.add_str(", ");
-                buff.append_int("%d", win_0.height);
+                    buff.append_int("%d", win_0.width);
+                    buff.add_str(", ");
+                    buff.append_int("%d", win_0.height);
 
-                ctx.label(buff.as_str());
-            }
-            if !ctx
-                .header_ex("Test Buttons", WidgetOption::EXPANDED)
-                .is_none()
-            {
-                ctx.row(&[86, -110, -1], 0);
-                ctx.label("Test buttons 1:");
-                if !ctx
-                    .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
-                    .is_none()
-                {
-                    self.write_log("Pressed button 1");
-                }
-                if !ctx
-                    .button_ex("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
-                    .is_none()
-                {
-                    self.write_log("Pressed button 2");
-                }
-                ctx.label("Test buttons 2:");
-                if !ctx
-                    .button_ex("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
-                    .is_none()
-                {
-                    self.write_log("Pressed button 3");
-                }
-                if !ctx
-                    .button_ex("Popup", Icon::None, WidgetOption::ALIGN_CENTER)
-                    .is_none()
-                {
-                    ctx.open_popup("Test Popup");
-                }
-
-                ctx.popup("Test Popup", |ctx| {
+                    ctx.label(buff.as_str());
+                });
+            });
+            ctx
+            .header("Test Buttons", WidgetOption::EXPANDED, |ctx| {
+                ctx.rows_with_line_config(&[86, -110, -1], 0, |ctx| {
+                    ctx.label("Test buttons 1:");
                     if !ctx
-                        .button_ex("Hello", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
-                        self.write_log("Hello")
+                        self.write_log("Pressed button 1");
                     }
                     if !ctx
-                        .button_ex("World", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button_ex("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
-                        self.write_log("World")
+                        self.write_log("Pressed button 2");
                     }
+                    ctx.label("Test buttons 2:");
+                    if !ctx
+                        .button_ex("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .is_none()
+                    {
+                        self.write_log("Pressed button 3");
+                    }
+                    if !ctx
+                        .button_ex("Popup", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .is_none()
+                    {
+                        ctx.open_popup("Test Popup");
+                    }
+
+                    ctx.popup("Test Popup", |ctx| {
+                        if !ctx
+                            .button_ex("Hello", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .is_none()
+                        {
+                            self.write_log("Hello")
+                        }
+                        if !ctx
+                            .button_ex("World", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .is_none()
+                        {
+                            self.write_log("World")
+                        }
+                    });
                 });
-            }
-            if !ctx
-                .header_ex("Tree and Text", WidgetOption::EXPANDED)
-                .is_none()
-            {
-                ctx.row(&[140, -1], 0);
-                ctx.column(|ctx| {
-                    ctx.treenode_ex("Test 1", WidgetOption::NONE, |ctx| {
-                        ctx.treenode_ex("Test 1a", WidgetOption::NONE, |ctx| {
-                            ctx.label("Hello");
-                            ctx.label("world");
+            });
+            ctx.header("Tree and Text", WidgetOption::EXPANDED, |ctx| {
+                ctx.rows_with_line_config(&[140, -1], 0, |ctx| {
+                    ctx.column(|ctx| {
+                        ctx.treenode_ex("Test 1", WidgetOption::NONE, |ctx| {
+                            ctx.treenode_ex("Test 1a", WidgetOption::NONE, |ctx| {
+                                ctx.label("Hello");
+                                ctx.label("world");
+                            });
+                            ctx.treenode_ex("Test 1b", WidgetOption::NONE, |ctx| {
+                                if !ctx
+                                    .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .is_none()
+                                {
+                                    self.write_log("Pressed button 1");
+                                }
+                                if !ctx
+                                    .button_ex("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .is_none()
+                                {
+                                    self.write_log("Pressed button 2");
+                                }
+                            });
                         });
-                        ctx.treenode_ex("Test 1b", WidgetOption::NONE, |ctx| {
-                            if !ctx
-                                .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
-                                .is_none()
-                            {
-                                self.write_log("Pressed button 1");
-                            }
-                            if !ctx
-                                .button_ex("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
-                                .is_none()
-                            {
-                                self.write_log("Pressed button 2");
-                            }
+                        ctx.treenode_ex("Test 2", WidgetOption::NONE, |ctx| {
+                            ctx.rows_with_line_config(&[54, 54], 0, |ctx| {
+                                if !ctx
+                                    .button_ex("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .is_none()
+                                {
+                                    self.write_log("Pressed button 3");
+                                }
+                                if !ctx
+                                    .button_ex("Button 4", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .is_none()
+                                {
+                                    self.write_log("Pressed button 4");
+                                }
+                                if !ctx
+                                    .button_ex("Button 5", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .is_none()
+                                {
+                                    self.write_log("Pressed button 5");
+                                }
+                                if !ctx
+                                    .button_ex("Button 6", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .is_none()
+                                {
+                                    self.write_log("Pressed button 6");
+                                }
+                            });
+                        });
+                        ctx.treenode_ex("Test 3", WidgetOption::NONE, |ctx| {
+                            ctx.checkbox("Checkbox 1", &mut self.checks[0]);
+                            ctx.checkbox("Checkbox 2", &mut self.checks[1]);
+                            ctx.checkbox("Checkbox 3", &mut self.checks[2]);
                         });
                     });
-                    ctx.treenode_ex("Test 2", WidgetOption::NONE, |ctx| {
-                        ctx.row(&[54, 54], 0);
-                        if !ctx
-                            .button_ex("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
-                            .is_none()
-                        {
-                            self.write_log("Pressed button 3");
-                        }
-                        if !ctx
-                            .button_ex("Button 4", Icon::None, WidgetOption::ALIGN_CENTER)
-                            .is_none()
-                        {
-                            self.write_log("Pressed button 4");
-                        }
-                        if !ctx
-                            .button_ex("Button 5", Icon::None, WidgetOption::ALIGN_CENTER)
-                            .is_none()
-                        {
-                            self.write_log("Pressed button 5");
-                        }
-                        if !ctx
-                            .button_ex("Button 6", Icon::None, WidgetOption::ALIGN_CENTER)
-                            .is_none()
-                        {
-                            self.write_log("Pressed button 6");
-                        }
-                    });
-                    ctx.treenode_ex("Test 3", WidgetOption::NONE, |ctx| {
-                        ctx.checkbox("Checkbox 1", &mut self.checks[0]);
-                        ctx.checkbox("Checkbox 2", &mut self.checks[1]);
-                        ctx.checkbox("Checkbox 3", &mut self.checks[2]);
+                    ctx.column(|ctx| {
+                        ctx.rows_with_line_config(&[-1], 0, |ctx| {
+                            ctx.text(
+                                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas lacinia, sem eu lacinia molestie, mi risus faucibus ipsum, eu varius magna felis a nulla."
+                                ,
+                            );
+                        });
                     });
                 });
-                ctx.column(|ctx| {
-                    ctx.row(&[-1], 0);
-                    ctx.text(
-                        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas lacinia, sem eu lacinia molestie, mi risus faucibus ipsum, eu varius magna felis a nulla."
-                        ,
+            });
+            ctx.header("Background Color", WidgetOption::EXPANDED, |ctx| {
+                ctx.rows_with_line_config(&[-78, -1], 74, |ctx| {
+                    ctx.column(|ctx| {
+                        ctx.rows_with_line_config(&[46, -1], 0, |ctx| {
+                            ctx.label("Red:");
+                            ctx.slider_ex(
+                                &mut self.bg[0],
+                                0 as libc::c_int as Real,
+                                255 as libc::c_int as Real,
+                                0 as libc::c_int as Real,
+                                "%.2",
+                                WidgetOption::ALIGN_CENTER,
+                            );
+                            ctx.label("Green:");
+                            ctx.slider_ex(
+                                &mut self.bg[1],
+                                0 as libc::c_int as Real,
+                                255 as libc::c_int as Real,
+                                0 as libc::c_int as Real,
+                                "%.2",
+                                WidgetOption::ALIGN_CENTER,
+                            );
+                            ctx.label("Blue:");
+                            ctx.slider_ex(
+                                &mut self.bg[2],
+                                0 as libc::c_int as Real,
+                                255 as libc::c_int as Real,
+                                0 as libc::c_int as Real,
+                                "%.2",
+                                WidgetOption::ALIGN_CENTER,
+                            );
+                        });
+                    });
+                    let r = ctx.next_cell();
+                    ctx.draw_rect(
+                        r,
+                        color(self.bg[0] as u8, self.bg[1] as u8, self.bg[2] as u8, 255),
+                    );
+                    let mut buff = FixedString::<128>::new();
+                    buff.add_str("#");
+                    buff.append_int("%02X", self.bg[0] as _);
+                    buff.append_int("%02X", self.bg[1] as _);
+                    buff.append_int("%02X", self.bg[2] as _);
+                    ctx.draw_control_text(
+                        buff.as_str(),
+                        r,
+                        ControlColor::Text,
+                        WidgetOption::ALIGN_CENTER,
                     );
                 });
-            }
-            if !ctx
-                .header_ex("Background Color", WidgetOption::EXPANDED)
-                .is_none()
-            {
-                ctx.row(&[-78, -1], 74);
-                ctx.column(|ctx| {
-                    ctx.row(&[46, -1], 0);
-                    ctx.label("Red:");
-                    ctx.slider_ex(
-                        &mut self.bg[0],
-                        0 as libc::c_int as Real,
-                        255 as libc::c_int as Real,
-                        0 as libc::c_int as Real,
-                        "%.2",
-                        WidgetOption::ALIGN_CENTER,
-                    );
-                    ctx.label("Green:");
-                    ctx.slider_ex(
-                        &mut self.bg[1],
-                        0 as libc::c_int as Real,
-                        255 as libc::c_int as Real,
-                        0 as libc::c_int as Real,
-                        "%.2",
-                        WidgetOption::ALIGN_CENTER,
-                    );
-                    ctx.label("Blue:");
-                    ctx.slider_ex(
-                        &mut self.bg[2],
-                        0 as libc::c_int as Real,
-                        255 as libc::c_int as Real,
-                        0 as libc::c_int as Real,
-                        "%.2",
-                        WidgetOption::ALIGN_CENTER,
-                    );
-                });
-                let r = ctx.next_cell();
-                ctx.draw_rect(
-                    r,
-                    color(self.bg[0] as u8, self.bg[1] as u8, self.bg[2] as u8, 255),
-                );
-                let mut buff = FixedString::<128>::new();
-                buff.add_str("#");
-                buff.append_int("%02X", self.bg[0] as _);
-                buff.append_int("%02X", self.bg[1] as _);
-                buff.append_int("%02X", self.bg[2] as _);
-                ctx.draw_control_text(
-                    buff.as_str(),
-                    r,
-                    ControlColor::Text,
-                    WidgetOption::ALIGN_CENTER,
-                );
-            }
+            });
         });
     }
 
@@ -348,40 +347,43 @@ impl<'a> State<'a> {
             Rect::new(350, 40, 300, 200),
             WidgetOption::NONE,
             |ctx| {
-                ctx.row(&[-1], -25);
-                ctx.panel_ex("Log Output", WidgetOption::NONE, |ctx| {
-                    let mut scroll = ctx.get_current_container_scroll();
-                    let content_size = ctx.get_current_container_content_size();
-                    ctx.row(&[-1], -1);
-                    ctx.text(self.logbuf.as_str());
-                    if self.logbuf_updated {
-                        scroll.y = content_size.y;
-                        ctx.set_current_container_scroll(&scroll);
-                        self.logbuf_updated = false;
-                    }
-                });
+                ctx.rows_with_line_config(&[-1], -25, |ctx| {
+                    ctx.panel_ex("Log Output", WidgetOption::NONE, |ctx| {
+                        let mut scroll = ctx.get_current_container_scroll();
+                        let content_size = ctx.get_current_container_content_size();
+                        ctx.rows_with_line_config(&[-1], -1, |ctx| {
+                            ctx.text(self.logbuf.as_str());
+                            if self.logbuf_updated {
+                                scroll.y = content_size.y;
+                                ctx.set_current_container_scroll(&scroll);
+                                self.logbuf_updated = false;
+                            }
+                        });
+                    });
 
-                let mut submitted = false;
-                ctx.row(&[-70, -1], 0);
-                if ctx
-                    .textbox_ex(&mut self.submit_buf, WidgetOption::NONE)
-                    .is_submitted()
-                {
-                    ctx.set_focus(ctx.last_id);
-                    submitted = true;
-                }
-                if !ctx
-                    .button_ex("Submit", Icon::None, WidgetOption::ALIGN_CENTER)
-                    .is_none()
-                {
-                    submitted = true;
-                }
-                if submitted {
-                    let mut buf = FixedString::<128>::new();
-                    buf.add_str(self.submit_buf.as_str());
-                    self.write_log(buf.as_str());
-                    self.submit_buf.clear();
-                }
+                    let mut submitted = false;
+                    ctx.rows_with_line_config(&[-70, -1], 0, |ctx| {
+                        if ctx
+                            .textbox_ex(&mut self.submit_buf, WidgetOption::NONE)
+                            .is_submitted()
+                        {
+                            ctx.set_focus(ctx.last_id);
+                            submitted = true;
+                        }
+                        if !ctx
+                            .button_ex("Submit", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .is_none()
+                        {
+                            submitted = true;
+                        }
+                        if submitted {
+                            let mut buf = FixedString::<128>::new();
+                            buf.add_str(self.submit_buf.as_str());
+                            self.write_log(buf.as_str());
+                            self.submit_buf.clear();
+                        }
+                    });
+                });
             },
         );
     }
@@ -419,18 +421,19 @@ impl<'a> State<'a> {
                 let style = ctx.style;
                 let sw: libc::c_int = (ctx.get_current_container_body().width as libc::c_double
                     * 0.14f64) as libc::c_int;
-                ctx.row(&[80, sw, sw, sw, sw, -1], 0);
-                for i in 0..self.label_colors.len() {
-                    ctx.label(self.label_colors[i].label);
-                    let color = &mut self.colors[i];
-                    Self::uint8_slider(ctx, &mut color.x, 0 as libc::c_int, 255 as libc::c_int);
-                    Self::uint8_slider(ctx, &mut color.y, 0 as libc::c_int, 255 as libc::c_int);
-                    Self::uint8_slider(ctx, &mut color.z, 0 as libc::c_int, 255 as libc::c_int);
-                    Self::uint8_slider(ctx, &mut color.w, 0 as libc::c_int, 255 as libc::c_int);
-                    ctx.style.colors[i] = *color;
-                    let r = ctx.next_cell();
-                    ctx.draw_rect(r, ctx.style.colors[i]);
-                }
+                ctx.rows_with_line_config(&[80, sw, sw, sw, sw, -1], 0, |ctx| {
+                    for i in 0..self.label_colors.len() {
+                        ctx.label(self.label_colors[i].label);
+                        let color = &mut self.colors[i];
+                        Self::uint8_slider(ctx, &mut color.x, 0 as libc::c_int, 255 as libc::c_int);
+                        Self::uint8_slider(ctx, &mut color.y, 0 as libc::c_int, 255 as libc::c_int);
+                        Self::uint8_slider(ctx, &mut color.z, 0 as libc::c_int, 255 as libc::c_int);
+                        Self::uint8_slider(ctx, &mut color.w, 0 as libc::c_int, 255 as libc::c_int);
+                        ctx.style.colors[i] = *color;
+                        let r = ctx.next_cell();
+                        ctx.draw_rect(r, ctx.style.colors[i]);
+                    }
+                });
             },
         );
     }
