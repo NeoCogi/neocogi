@@ -86,6 +86,8 @@ pub trait RendererBackEnd<P> {
     fn set_clip_rect(&mut self, rect: Recti);
 
     fn flush(&mut self);
+
+    fn frame_size(&self) -> (usize, usize);
 }
 
 #[derive(Copy, Clone)]
@@ -1299,7 +1301,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.pop_container();
     }
 
-    fn begin_window_ex(&mut self, title: &str, mut r: Recti, opt: WidgetOption) -> ResourceState {
+    fn begin_window(&mut self, title: &str, mut r: Recti, opt: WidgetOption) -> ResourceState {
         let id = self.get_id_from_str(title);
         let cnt_id = self.get_container_index_intern(id, opt);
         if cnt_id.is_none() || !self.containers[cnt_id.unwrap()].open {
@@ -1407,7 +1409,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             | WidgetOption::NO_SCROLL
             | WidgetOption::NO_TITLE
             | WidgetOption::CLOSED;
-        return self.begin_window_ex(name, Rect::new(0, 0, 0, 0), opt);
+        return self.begin_window(name, Rect::new(0, 0, 0, 0), opt);
     }
 
     fn end_popup(&mut self) {
@@ -1470,6 +1472,15 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     ////////////////////////////////////////////////////////////////////////////
+    // Queries
+    ////////////////////////////////////////////////////////////////////////////
+    pub fn frame_size(&self) -> (usize, usize) {
+        self.renderer.frame_size()
+    }
+
+    pub fn current_rect(&self) -> Recti { self.layout_stack.last_rect() }
+
+    ////////////////////////////////////////////////////////////////////////////
     // LAMBDA based context
     ////////////////////////////////////////////////////////////////////////////
 
@@ -1482,7 +1493,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         res
     }
 
-    pub fn treenode_ex<F: FnOnce(&mut Self)>(
+    pub fn treenode<F: FnOnce(&mut Self)>(
         &mut self,
         label: &str,
         opt: WidgetOption,
@@ -1496,14 +1507,14 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         res
     }
 
-    pub fn window_ex<F: FnOnce(&mut Self)>(
+    pub fn window<F: FnOnce(&mut Self)>(
         &mut self,
         title: &str,
         r: Recti,
         opt: WidgetOption,
         f: F,
     ) -> ResourceState {
-        let res = self.begin_window_ex(title, r, opt);
+        let res = self.begin_window(title, r, opt);
         if !res.is_none() {
             f(self);
             self.end_window();
@@ -1511,7 +1522,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         res
     }
 
-    pub fn panel_ex<F: FnOnce(&mut Self)>(&mut self, name: &str, opt: WidgetOption, f: F) {
+    pub fn panel<F: FnOnce(&mut Self)>(&mut self, name: &str, opt: WidgetOption, f: F) {
         self.begin_panel_ex(name, opt);
         f(self);
         self.end_panel();

@@ -32,7 +32,7 @@ use super::*;
 pub trait ControlProvider {
     fn text(&mut self, text: &str);
     fn label(&mut self, text: &str);
-    fn button_ex(&mut self, label: &str, icon: Icon, opt: WidgetOption) -> ResourceState;
+    fn button(&mut self, label: &str, icon: Icon, opt: WidgetOption) -> ResourceState;
     fn checkbox(&mut self, label: &str, state: &mut bool) -> ResourceState;
     fn textbox_raw(
         &mut self,
@@ -132,7 +132,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         self.draw_control_text(text, layout, ControlColor::Text, WidgetOption::NONE);
     }
 
-    fn button_ex(&mut self, label: &str, icon: Icon, opt: WidgetOption) -> ResourceState {
+    fn button(&mut self, label: &str, icon: Icon, opt: WidgetOption) -> ResourceState {
         let mut res = ResourceState::NONE;
         let id: Id = if label.len() > 0 {
             self.get_id_from_str(label)

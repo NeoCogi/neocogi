@@ -120,7 +120,7 @@ fn main() {
         let (width, height) = window.get_framebuffer_size();
 
         let mut pass = ctx.frame(width as _, height as _, |ctx| {
-            ctx.window_ex(
+            ctx.window(
                 "Navigation",
                 Rect::new(100, 100, 256, 128),
                 ui::WidgetOption::AUTO_SIZE,
@@ -128,14 +128,14 @@ fn main() {
                     let style = ctx.style;
                     ctx.column(|ctx| {
                         if ctx
-                            .button_ex("Orbit", ui::Icon::None, WidgetOption::NONE)
+                            .button("Orbit", ui::Icon::None, WidgetOption::NONE)
                             .is_submitted()
                         {
                             state.view.set_navigation_mode(NavigationMode::Orbit)
                         }
 
                         if ctx
-                            .button_ex("Pan", ui::Icon::None, WidgetOption::NONE)
+                            .button("Pan", ui::Icon::None, WidgetOption::NONE)
                             .is_submitted()
                         {
                             state.view.set_navigation_mode(NavigationMode::Pan)

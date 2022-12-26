@@ -45,7 +45,7 @@ render_data! {
     }
 
     uniforms Uniforms {
-        u_screen_size   : Vec2f,
+        u_transform   : Mat4f,
     }
 }
 
@@ -77,20 +77,15 @@ struct PaintTexture {
 
 const VS_SRC: &str = r#"
     #version 300 es
-    uniform vec2 u_screen_size;
+    uniform highp mat4 u_transform;
     in highp vec2 a_pos;
     in highp vec4 s_rgba;
     in highp vec2 a_tc;
-    in highp vec3 b;
     out highp vec4 v_rgba;
     out vec2 v_tc;
 
     void main() {
-        gl_Position = vec4(
-            2.0 * a_pos.x / u_screen_size.x - 1.0,
-            1.0 - 2.0 * a_pos.y / u_screen_size.y,
-            0.0,
-            1.0);
+        gl_Position = u_transform * vec4(a_pos, 0.0, 1.0);
         v_rgba = s_rgba;
         v_tc = a_tc;
     }
@@ -101,12 +96,11 @@ const FS_SRC: &str = r#"
     uniform lowp sampler2D u_sampler;
     in highp vec4 v_rgba;
     in highp vec2 v_tc;
-    in highp vec3 v_b;
     layout(location = 0) out lowp vec4 f_color;
 
     void main() {
         highp vec4 tcol = texture(u_sampler, v_tc).rrrr;
-        f_color = tcol * v_rgba;
+        f_color = vec4(v_rgba.rgb, tcol.a * v_rgba.a);
     }
 "#;
 
@@ -164,6 +158,14 @@ impl Renderer {
             divisor: 0,
         };
 
+        let blend = Blend {
+            src_factor_rgb: BlendFactor::SrcAlpha,
+            src_factor_alpha: BlendFactor::One,
+
+            dst_factor_rgb: BlendFactor::OneMinusSrcAlpha,
+            dst_factor_alpha: BlendFactor::Zero,
+        };
+
         let pipeline_desc = PipelineDesc {
             primitive_type: PrimitiveType::Triangles,
             shader: program,
@@ -174,7 +176,7 @@ impl Renderer {
             cull_mode: CullMode::None,
             depth_write: true,
             depth_test: false,
-            blend: BlendOp::Add(Blend::default()),
+            blend: BlendOp::Add(blend),
             polygon_offset: PolygonOffset::None,
         };
 
@@ -281,6 +283,10 @@ impl Renderer {
 }
 
 impl super::RendererBackEnd<Pass> for Renderer {
+    fn frame_size(&self) -> (usize, usize) {
+        (self.canvas_width as _, self.canvas_height as _)
+    }
+
     fn begin_frame(&mut self, width: usize, height: usize) {
         assert_eq!(self.pass.is_none(), true);
         self.canvas_width = width as _;
@@ -376,7 +382,7 @@ impl super::RendererBackEnd<Pass> for Renderer {
             };
 
             let u = Uniforms {
-                u_screen_size: Vec2f::new(self.canvas_width as f32, self.canvas_height as f32),
+                u_transform: transforms::ortho4(0.0, self.canvas_width as f32, self.canvas_height as f32, 0.0, -1.0, 0.0),
             };
             self.pass.as_mut().unwrap().draw(
                 &self.pipeline,

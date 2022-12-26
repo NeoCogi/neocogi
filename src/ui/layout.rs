@@ -223,4 +223,6 @@ impl LayoutStack {
         self.last_rect = res;
         self.last_rect
     }
+
+    pub fn last_rect(&self) -> Recti { self.last_rect }
 }

@@ -29,9 +29,6 @@
 //
 extern crate neocogi;
 
-use neocogi::glfw;
-use neocogi::glfw::Context;
-
 use neocogi::rs_math3d::*;
 use neocogi::*;
 
@@ -139,7 +136,7 @@ impl<'a> State<'a> {
 
     fn test_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
         ctx
-        .window_ex(
+        .window(
                 "Demo Window",
                 Rect::new(40, 40, 300, 450),
                 WidgetOption::NONE,
@@ -179,26 +176,26 @@ impl<'a> State<'a> {
                 ctx.rows_with_line_config(&[86, -110, -1], 0, |ctx| {
                     ctx.label("Test buttons 1:");
                     if !ctx
-                        .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         self.write_log("Pressed button 1");
                     }
                     if !ctx
-                        .button_ex("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         self.write_log("Pressed button 2");
                     }
                     ctx.label("Test buttons 2:");
                     if !ctx
-                        .button_ex("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         self.write_log("Pressed button 3");
                     }
                     if !ctx
-                        .button_ex("Popup", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button("Popup", Icon::None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         ctx.open_popup("Test Popup");
@@ -206,13 +203,13 @@ impl<'a> State<'a> {
 
                     ctx.popup("Test Popup", |ctx| {
                         if !ctx
-                            .button_ex("Hello", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .button("Hello", Icon::None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
                             self.write_log("Hello")
                         }
                         if !ctx
-                            .button_ex("World", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .button("World", Icon::None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
                             self.write_log("World")
@@ -223,55 +220,55 @@ impl<'a> State<'a> {
             ctx.header("Tree and Text", WidgetOption::EXPANDED, |ctx| {
                 ctx.rows_with_line_config(&[140, -1], 0, |ctx| {
                     ctx.column(|ctx| {
-                        ctx.treenode_ex("Test 1", WidgetOption::NONE, |ctx| {
-                            ctx.treenode_ex("Test 1a", WidgetOption::NONE, |ctx| {
+                        ctx.treenode("Test 1", WidgetOption::NONE, |ctx| {
+                            ctx.treenode("Test 1a", WidgetOption::NONE, |ctx| {
                                 ctx.label("Hello");
                                 ctx.label("world");
                             });
-                            ctx.treenode_ex("Test 1b", WidgetOption::NONE, |ctx| {
+                            ctx.treenode("Test 1b", WidgetOption::NONE, |ctx| {
                                 if !ctx
-                                    .button_ex("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 1");
                                 }
                                 if !ctx
-                                    .button_ex("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 2");
                                 }
                             });
                         });
-                        ctx.treenode_ex("Test 2", WidgetOption::NONE, |ctx| {
+                        ctx.treenode("Test 2", WidgetOption::NONE, |ctx| {
                             ctx.rows_with_line_config(&[54, 54], 0, |ctx| {
                                 if !ctx
-                                    .button_ex("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 3");
                                 }
                                 if !ctx
-                                    .button_ex("Button 4", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 4", Icon::None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 4");
                                 }
                                 if !ctx
-                                    .button_ex("Button 5", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 5", Icon::None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 5");
                                 }
                                 if !ctx
-                                    .button_ex("Button 6", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 6", Icon::None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 6");
                                 }
                             });
                         });
-                        ctx.treenode_ex("Test 3", WidgetOption::NONE, |ctx| {
+                        ctx.treenode("Test 3", WidgetOption::NONE, |ctx| {
                             ctx.checkbox("Checkbox 1", &mut self.checks[0]);
                             ctx.checkbox("Checkbox 2", &mut self.checks[1]);
                             ctx.checkbox("Checkbox 3", &mut self.checks[2]);
@@ -342,13 +339,13 @@ impl<'a> State<'a> {
     }
 
     fn log_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
-        ctx.window_ex(
+        ctx.window(
             "Log Window",
             Rect::new(350, 40, 300, 200),
             WidgetOption::NONE,
             |ctx| {
                 ctx.rows_with_line_config(&[-1], -25, |ctx| {
-                    ctx.panel_ex("Log Output", WidgetOption::NONE, |ctx| {
+                    ctx.panel("Log Output", WidgetOption::NONE, |ctx| {
                         let mut scroll = ctx.get_current_container_scroll();
                         let content_size = ctx.get_current_container_content_size();
                         ctx.rows_with_line_config(&[-1], -1, |ctx| {
@@ -371,7 +368,7 @@ impl<'a> State<'a> {
                             submitted = true;
                         }
                         if !ctx
-                            .button_ex("Submit", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .button("Submit", Icon::None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
                             submitted = true;
@@ -408,7 +405,7 @@ impl<'a> State<'a> {
         return res;
     }
     fn style_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
-        ctx.window_ex(
+        ctx.window(
             "Style Editor",
             Rect::new(
                 350 as libc::c_int,
