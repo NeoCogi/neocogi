@@ -382,7 +382,14 @@ impl super::RendererBackEnd<Pass> for Renderer {
             };
 
             let u = Uniforms {
-                u_transform: transforms::ortho4(0.0, self.canvas_width as f32, self.canvas_height as f32, 0.0, -1.0, 0.0),
+                u_transform: transforms::ortho4(
+                    0.0,
+                    self.canvas_width as f32,
+                    self.canvas_height as f32,
+                    0.0,
+                    -1.0,
+                    0.0,
+                ),
             };
             self.pass.as_mut().unwrap().draw(
                 &self.pipeline,

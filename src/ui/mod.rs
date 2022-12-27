@@ -507,7 +507,12 @@ pub fn color(r: u8, g: u8, b: u8, a: u8) -> Color4b {
 }
 
 pub fn expand_rect(r: Recti, n: i32) -> Recti {
-    Rect::new(r.x - n, r.y - n, r.width + n * 2, r.height + n * 2)
+    Rect::new(
+        r.x - n,
+        r.y - n,
+        i32::max(0, r.width + n * 2),
+        i32::max(0, r.height + n * 2),
+    )
 }
 
 pub fn intersect_rects(r1: Recti, r2: Recti) -> Recti {
@@ -796,8 +801,16 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     fn pop_container(&mut self) {
         let cnt = self.get_current_container();
         let layout = *self.layout_stack.top();
-        self.containers[cnt].content_size.x = layout.max.x - layout.body.x;
-        self.containers[cnt].content_size.y = layout.max.y - layout.body.y;
+        match layout.max {
+            Some(max) => {
+                self.containers[cnt].content_size.x = max.x - layout.body.x;
+                self.containers[cnt].content_size.y = max.y - layout.body.y;
+            }
+            None => {
+                self.containers[cnt].content_size.x = layout.body.x;
+                self.containers[cnt].content_size.y = layout.body.y;
+            }
+        }
 
         self.container_stack.pop();
         self.layout_stack.pop();
@@ -1269,10 +1282,10 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         if !opt.has_no_scroll() {
             self.scrollbars(cnt_idx, &mut body);
         }
-        self.layout_stack.push_rect_scroll(
-            expand_rect(body, -self.style.padding),
-            self.containers[cnt_idx].scroll,
-        );
+
+        let new_body = expand_rect(body, -self.style.padding);
+        self.layout_stack
+            .push_rect_scroll(new_body, self.containers[cnt_idx].scroll);
         self.containers[cnt_idx].body = body;
     }
 
@@ -1372,13 +1385,11 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             }
         }
         if opt.is_auto_sizing() {
-            let r_1 = self.layout_stack.top().body;
-            self.containers[cnt_id.unwrap()].rect.width =
-                self.containers[cnt_id.unwrap()].content_size.x
-                    + (self.containers[cnt_id.unwrap()].rect.width - r_1.width);
-            self.containers[cnt_id.unwrap()].rect.height =
-                self.containers[cnt_id.unwrap()].content_size.y
-                    + (self.containers[cnt_id.unwrap()].rect.height - r_1.height);
+            let r = self.layout_stack.top().body;
+            let max = self.layout_stack.top().max;
+            let container = &mut self.containers[cnt_id.unwrap()];
+            container.rect.width = container.content_size.x + (container.rect.width - r.width);
+            container.rect.height = container.content_size.y + (container.rect.height - r.height);
         }
 
         if opt.is_popup() && !self.mouse_pressed.is_none() && self.hover_root != cnt_id {
@@ -1478,7 +1489,9 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.renderer.frame_size()
     }
 
-    pub fn current_rect(&self) -> Recti { self.layout_stack.last_rect() }
+    pub fn current_rect(&self) -> Recti {
+        self.layout_stack.last_rect()
+    }
 
     ////////////////////////////////////////////////////////////////////////////
     // LAMBDA based context
