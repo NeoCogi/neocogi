@@ -198,7 +198,10 @@ impl LayoutStack {
                 // Now it's the following (expand) for the normal case, and the previous behaviour
                 // is maintained when there's no layout
                 //
-                res.width = i32::max(layout.body.width - style.padding * 2, style.size.x + style.padding * 2);
+                res.width = i32::max(
+                    layout.body.width - style.padding * 2,
+                    style.size.x + style.padding * 2,
+                );
             }
 
             if res.height == 0 {
