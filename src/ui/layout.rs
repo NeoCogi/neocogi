@@ -35,7 +35,7 @@ pub struct Layout {
     pub next: Recti,
     pub position: Vec2i,
     pub size: Vec2i,
-    pub max: Option<Vec2i>,
+    pub max: Vec2i,
     pub widths: [i32; 16],
     pub items: usize,
     pub item_index: usize,
@@ -65,7 +65,7 @@ pub struct LayoutStack {
 }
 
 impl LayoutStack {
-    pub fn push_rect_scroll(&mut self, body: Recti, scroll: Vec2i) {
+    pub fn push_rect_scroll(&mut self, body: Recti, scroll: Vec2i, autosize: bool) {
         let mut layout: Layout = Layout {
             body: Rect::new(
                 body.x - scroll.x,
@@ -81,7 +81,7 @@ impl LayoutStack {
             },
             position: Vec2i { x: 0, y: 0 },
             size: Vec2i { x: 0, y: 0 },
-            max: None,
+            max: Vec2i::new(-i32::MAX, -i32::MAX),
             widths: [0; 16],
             items: 0,
             item_index: 0,
@@ -115,7 +115,7 @@ impl LayoutStack {
 
     pub fn begin_column(&mut self, style: &Style) {
         let layout = self.next_cell(style);
-        self.push_rect_scroll(layout, vec2(0, 0));
+        self.push_rect_scroll(layout, vec2(0, 0), false);
     }
 
     pub fn end_column(&mut self) {
@@ -126,12 +126,7 @@ impl LayoutStack {
         let a = self.top_mut();
         a.position.x = i32::max(a.position.x, b.position.x + b.body.x - a.body.x);
         a.next_row = i32::max(a.next_row, b.next_row + b.body.y - a.body.y);
-        a.max = match (a.max, b.max) {
-            (Some(aa), Some(bb)) => Some(Vec2i::new(i32::max(aa.x, bb.x), i32::max(aa.y, bb.y))),
-            (Some(aa), None) => Some(aa),
-            (None, Some(bb)) => Some(bb),
-            _ => None,
-        };
+        a.max = Vec2i::new(i32::max(a.max.x, b.max.x), i32::max(a.max.y, b.max.y));
     }
 
     fn row_for_layout(layout: &mut Layout, widths: &[i32], height: i32) {
@@ -203,11 +198,9 @@ impl LayoutStack {
                 // Now it's the following (expand) for the normal case, and the previous behaviour
                 // is maintained when there's no layout
                 //
-                match layout.max {
-                    Some(_) => { res.width = layout.body.width - style.padding * 2; }
-                    None => { res.width = style.size.x + style.padding * 2 }
-                }
+                res.width = i32::max(layout.body.width - style.padding * 2, style.size.x + style.padding * 2);
             }
+
             if res.height == 0 {
                 res.height = style.size.y + style.padding * 2;
             }
@@ -217,6 +210,7 @@ impl LayoutStack {
             if res.height < 0 {
                 res.height += layout.body.height - res.y + 1;
             }
+
             layout.item_index += 1;
         }
 
@@ -229,13 +223,11 @@ impl LayoutStack {
         res.y += layout.body.y;
 
         // update max position
-        layout.max = match layout.max {
-            Some(lm) => Some(Vec2i::new(
-                i32::max(lm.x, res.x + res.width),
-                i32::max(lm.y, res.y + res.height),
-            )),
-            _ => Some(Vec2i::new(res.x + res.width, res.y + res.height)),
-        };
+        layout.max = Vec2i::new(
+            i32::max(layout.max.x, res.x + res.width),
+            i32::max(layout.max.y, res.y + res.height),
+        );
+
         self.last_rect = res;
         self.last_rect
     }

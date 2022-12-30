@@ -9,7 +9,7 @@ fn main() {
         let (_, height) = ctx.frame_size();
         ctx.window(
             "Tools",
-            Recti::new(0, 0, 128, height as _),
+            Recti::new(0, 0, 200, height as _),
             ui::WidgetOption::EXPANDED | ui::WidgetOption::NO_INTERACT | ui::WidgetOption::NO_CLOSE,
             |ctx| {
                 let r = ctx.current_rect();

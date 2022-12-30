@@ -801,16 +801,9 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     fn pop_container(&mut self) {
         let cnt = self.get_current_container();
         let layout = *self.layout_stack.top();
-        match layout.max {
-            Some(max) => {
-                self.containers[cnt].content_size.x = max.x - layout.body.x;
-                self.containers[cnt].content_size.y = max.y - layout.body.y;
-            }
-            None => {
-                self.containers[cnt].content_size.x = layout.body.x;
-                self.containers[cnt].content_size.y = layout.body.y;
-            }
-        }
+
+        self.containers[cnt].content_size.x = layout.max.x - layout.body.x;
+        self.containers[cnt].content_size.y = layout.max.y - layout.body.y;
 
         self.container_stack.pop();
         self.layout_stack.pop();
@@ -1284,8 +1277,11 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         }
 
         let new_body = expand_rect(body, -self.style.padding);
-        self.layout_stack
-            .push_rect_scroll(new_body, self.containers[cnt_idx].scroll);
+        self.layout_stack.push_rect_scroll(
+            new_body,
+            self.containers[cnt_idx].scroll,
+            if opt.is_auto_sizing() { true } else { false },
+        );
         self.containers[cnt_idx].body = body;
     }
 
@@ -1310,6 +1306,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.command_list[self.containers[cnt].head_idx.unwrap()] = Command::Jump {
             dst_idx: Some(self.command_list.len()),
         };
+
         self.pop_clip_rect();
         self.pop_container();
     }
@@ -1326,6 +1323,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             self.containers[cnt_id.unwrap()].rect = r;
         }
         self.begin_root_container(cnt_id.unwrap());
+
         let mut body = self.containers[cnt_id.unwrap()].rect;
         r = body;
         if !opt.has_no_frame() {
@@ -1363,6 +1361,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 }
             }
         }
+
         self.push_container_body(cnt_id.unwrap(), body, opt);
         if !opt.is_auto_sizing() {
             let sz = self.style.title_height;
@@ -1386,7 +1385,6 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         }
         if opt.is_auto_sizing() {
             let r = self.layout_stack.top().body;
-            let max = self.layout_stack.top().max;
             let container = &mut self.containers[cnt_id.unwrap()];
             container.rect.width = container.content_size.x + (container.rect.width - r.width);
             container.rect.height = container.content_size.y + (container.rect.height - r.height);
@@ -1396,6 +1394,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             self.containers[cnt_id.unwrap()].open = false;
         }
         self.push_clip_rect(self.containers[cnt_id.unwrap()].body);
+
         return ResourceState::ACTIVE;
     }
 
