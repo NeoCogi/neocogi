@@ -223,10 +223,9 @@ impl ResourceState {
 
 bitflags! {
     pub struct WidgetOption : u32 {
-        const EXPANDED = 4096;
-        const CLOSED = 2048;
-        const POPUP= 1024;
-        const AUTO_SIZE = 512;
+        const EXPANDED = 2048;
+        const CLOSED = 1024;
+        const POPUP= 512;
         const HOLD_FOCUS = 256;
         const NO_TITLE = 128;
         const NO_CLOSE = 64;
@@ -249,9 +248,6 @@ impl WidgetOption {
     }
     pub fn is_popup(&self) -> bool {
         self.intersects(WidgetOption::POPUP)
-    }
-    pub fn is_auto_sizing(&self) -> bool {
-        self.intersects(WidgetOption::AUTO_SIZE)
     }
     pub fn is_holding_focus(&self) -> bool {
         self.intersects(WidgetOption::HOLD_FOCUS)
@@ -1277,11 +1273,8 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         }
 
         let new_body = expand_rect(body, -self.style.padding);
-        self.layout_stack.push_rect_scroll(
-            new_body,
-            self.containers[cnt_idx].scroll,
-            if opt.is_auto_sizing() { true } else { false },
-        );
+        self.layout_stack
+            .push_rect_scroll(new_body, self.containers[cnt_idx].scroll);
         self.containers[cnt_idx].body = body;
     }
 
@@ -1319,8 +1312,20 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         }
         self.id_stack.push(id);
 
-        if self.containers[cnt_id.unwrap()].rect.width == 0 {
-            self.containers[cnt_id.unwrap()].rect = r;
+        {
+            let container = &mut  self.containers[cnt_id.unwrap()];
+            if container.rect.width == 0 {
+                container.rect.width = r.width;
+            }
+            if container.rect.height == 0 {
+                container.rect.height = r.height;
+            }
+            if container.rect.x == 0 {
+                container.rect.x = r.x;
+            }
+            if container.rect.y == 0 {
+                container.rect.y = r.y;
+            }
         }
         self.begin_root_container(cnt_id.unwrap());
 
@@ -1363,31 +1368,24 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         }
 
         self.push_container_body(cnt_id.unwrap(), body, opt);
-        if !opt.is_auto_sizing() {
-            let sz = self.style.title_height;
-            let id_2 = self.get_id_from_str("!resize");
-            let r_0 = Recti::new(r.x + r.width - sz, r.y + r.height - sz, sz, sz);
-            self.update_control(id_2, r_0, opt);
-            if Some(id_2) == self.focus && self.mouse_down.is_left() {
-                self.containers[cnt_id.unwrap()].rect.width =
-                    if 96 > self.containers[cnt_id.unwrap()].rect.width + self.mouse_delta.x {
-                        96
-                    } else {
-                        self.containers[cnt_id.unwrap()].rect.width + self.mouse_delta.x
-                    };
-                self.containers[cnt_id.unwrap()].rect.height =
-                    if 64 > self.containers[cnt_id.unwrap()].rect.height + self.mouse_delta.y {
-                        64
-                    } else {
-                        self.containers[cnt_id.unwrap()].rect.height + self.mouse_delta.y
-                    };
-            }
-        }
-        if opt.is_auto_sizing() {
-            let r = self.layout_stack.top().body;
-            let container = &mut self.containers[cnt_id.unwrap()];
-            container.rect.width = container.content_size.x + (container.rect.width - r.width);
-            container.rect.height = container.content_size.y + (container.rect.height - r.height);
+
+        let sz = self.style.title_height;
+        let id_2 = self.get_id_from_str("!resize");
+        let r_0 = Recti::new(r.x + r.width - sz, r.y + r.height - sz, sz, sz);
+        self.update_control(id_2, r_0, opt);
+        if Some(id_2) == self.focus && self.mouse_down.is_left() {
+            self.containers[cnt_id.unwrap()].rect.width =
+                if 96 > self.containers[cnt_id.unwrap()].rect.width + self.mouse_delta.x {
+                    96
+                } else {
+                    self.containers[cnt_id.unwrap()].rect.width + self.mouse_delta.x
+                };
+            self.containers[cnt_id.unwrap()].rect.height =
+                if 64 > self.containers[cnt_id.unwrap()].rect.height + self.mouse_delta.y {
+                    64
+                } else {
+                    self.containers[cnt_id.unwrap()].rect.height + self.mouse_delta.y
+                };
         }
 
         if opt.is_popup() && !self.mouse_pressed.is_none() && self.hover_root != cnt_id {
@@ -1407,19 +1405,18 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         let cnt = self.get_container_index(name);
         self.next_hover_root = cnt;
         self.hover_root = self.next_hover_root;
-        self.containers[cnt.unwrap()].rect = Rect::new(self.mouse_pos.x, self.mouse_pos.y, 1, 1);
+        self.containers[cnt.unwrap()].rect = Rect::new(self.mouse_pos.x, self.mouse_pos.y, 0, 0);
         self.containers[cnt.unwrap()].open = true;
         self.bring_to_front(cnt.unwrap());
     }
 
-    fn begin_popup(&mut self, name: &str) -> ResourceState {
+    fn begin_popup(&mut self, name: &str, rect: Recti) -> ResourceState {
         let opt = WidgetOption::POPUP
-            | WidgetOption::AUTO_SIZE
             | WidgetOption::NO_RESIZE
             | WidgetOption::NO_SCROLL
             | WidgetOption::NO_TITLE
             | WidgetOption::CLOSED;
-        return self.begin_window(name, Rect::new(0, 0, 0, 0), opt);
+        return self.begin_window(name, rect, opt);
     }
 
     fn end_popup(&mut self) {
@@ -1496,8 +1493,8 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     // LAMBDA based context
     ////////////////////////////////////////////////////////////////////////////
 
-    pub fn popup<F: FnOnce(&mut Self)>(&mut self, name: &str, f: F) -> ResourceState {
-        let res = self.begin_popup(name);
+    pub fn popup<F: FnOnce(&mut Self)>(&mut self, name: &str, rect: Recti, f: F) -> ResourceState {
+        let res = self.begin_popup(name, rect);
         if !res.is_none() {
             f(self);
             self.end_popup();

@@ -201,7 +201,7 @@ impl<'a> State<'a> {
                         ctx.open_popup("Test Popup");
                     }
 
-                    ctx.popup("Test Popup", |ctx| {
+                    ctx.popup("Test Popup", Recti::new(0, 0, 90, 90), |ctx| {
                         if !ctx
                             .button("Hello", Icon::None, WidgetOption::ALIGN_CENTER)
                             .is_none()

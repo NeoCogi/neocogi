@@ -65,7 +65,7 @@ pub struct LayoutStack {
 }
 
 impl LayoutStack {
-    pub fn push_rect_scroll(&mut self, body: Recti, scroll: Vec2i, autosize: bool) {
+    pub fn push_rect_scroll(&mut self, body: Recti, scroll: Vec2i) {
         let mut layout: Layout = Layout {
             body: Rect::new(
                 body.x - scroll.x,
@@ -115,7 +115,7 @@ impl LayoutStack {
 
     pub fn begin_column(&mut self, style: &Style) {
         let layout = self.next_cell(style);
-        self.push_rect_scroll(layout, vec2(0, 0), false);
+        self.push_rect_scroll(layout, vec2(0, 0));
     }
 
     pub fn end_column(&mut self) {

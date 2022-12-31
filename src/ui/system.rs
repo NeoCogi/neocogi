@@ -478,7 +478,7 @@ impl App {
         ));
         glfw.window_hint(glfw::WindowHint::DoubleBuffer(true));
         glfw.window_hint(glfw::WindowHint::Resizable(true));
-        glfw.window_hint(glfw::WindowHint::Floating(true));
+        //glfw.window_hint(glfw::WindowHint::Floating(true));
 
         let (mut window, events) = glfw
             .create_window(1024, 900, "ui Test", glfw::WindowMode::Windowed)

@@ -122,8 +122,8 @@ fn main() {
         let mut pass = ctx.frame(width as _, height as _, |ctx| {
             ctx.window(
                 "Navigation",
-                Rect::new(100, 100, 256, 128),
-                ui::WidgetOption::AUTO_SIZE,
+                Rect::new(100, 100, 100, 100),
+                ui::WidgetOption::NONE,
                 |ctx| {
                     let style = ctx.style;
                     ctx.column(|ctx| {
