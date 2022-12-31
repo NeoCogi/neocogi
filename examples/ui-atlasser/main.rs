@@ -10,11 +10,9 @@ fn main() {
         ctx.window(
             "Tools",
             Recti::new(0, 0, 200, height as _),
-            ui::WidgetOption::EXPANDED | ui::WidgetOption::NO_INTERACT | ui::WidgetOption::NO_CLOSE,
+            ui::WidgetOption::SET_SIZE | ui::WidgetOption::NO_INTERACT | ui::WidgetOption::NO_CLOSE,
             |ctx| {
                 let r = ctx.current_rect();
-                let padding = ctx.style.padding;
-                let ctl_provider = ctx as &mut dyn ui::ControlProvider;
                 for i in 0..10 {
                     let ctl_provider = ctx as &mut dyn ui::ControlProvider;
                     if !ctl_provider

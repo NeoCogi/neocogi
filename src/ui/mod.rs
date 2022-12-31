@@ -223,6 +223,7 @@ impl ResourceState {
 
 bitflags! {
     pub struct WidgetOption : u32 {
+        const SET_SIZE = 4096;
         const EXPANDED = 2048;
         const CLOSED = 1024;
         const POPUP= 512;
@@ -240,6 +241,9 @@ bitflags! {
 }
 
 impl WidgetOption {
+    pub fn is_setting_size(&self) -> bool {
+        self.intersects(WidgetOption::SET_SIZE)
+    }
     pub fn is_expanded(&self) -> bool {
         self.intersects(WidgetOption::EXPANDED)
     }
@@ -1312,21 +1316,25 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         }
         self.id_stack.push(id);
 
-        {
-            let container = &mut  self.containers[cnt_id.unwrap()];
-            if container.rect.width == 0 {
-                container.rect.width = r.width;
-            }
-            if container.rect.height == 0 {
-                container.rect.height = r.height;
-            }
-            if container.rect.x == 0 {
-                container.rect.x = r.x;
-            }
-            if container.rect.y == 0 {
-                container.rect.y = r.y;
-            }
+        let container = &mut self.containers[cnt_id.unwrap()];
+        if opt.is_setting_size() {
+            container.rect.width = r.width;
+            container.rect.height = r.height;
         }
+
+        if container.rect.width == 0 {
+            container.rect.width = r.width;
+        }
+        if container.rect.height == 0 {
+            container.rect.height = r.height;
+        }
+        if container.rect.x == 0 {
+            container.rect.x = r.x;
+        }
+        if container.rect.y == 0 {
+            container.rect.y = r.y;
+        }
+
         self.begin_root_container(cnt_id.unwrap());
 
         let mut body = self.containers[cnt_id.unwrap()].rect;
