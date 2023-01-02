@@ -56,8 +56,8 @@ crate::render_data! {
 }
 
 pub(crate) struct ReadbackDriver {
-    u_fb: FrameBufferPtr,
-    f_fb: FrameBufferPtr,
+    u_fb: Option<FrameBufferPtr>,
+    f_fb: Option<FrameBufferPtr>,
     u_pipeline: PipelinePtr, // unsigned intX pipeline
     f_pipeline: PipelinePtr, // floating point pipeline
     vb: DeviceBufferPtr,
@@ -145,8 +145,8 @@ impl ReadbackDriver {
         Self {
             vb: vb,
             ib: ib,
-            u_fb: Self::create_fb(driver, OrigSurfaceType::UInt),
-            f_fb: Self::create_fb(driver, OrigSurfaceType::Float),
+            u_fb: None, // Self::create_fb(driver, OrigSurfaceType::UInt),
+            f_fb: None, // Self::create_fb(driver, OrigSurfaceType::Float),
             u_pipeline: Self::create_copy_pipeline(driver, OrigSurfaceType::UInt),
             f_pipeline: Self::create_copy_pipeline(driver, OrigSurfaceType::Float),
 
@@ -208,6 +208,9 @@ impl ReadbackDriver {
         let caps = driver.get_caps();
         let width = caps.max_2d_surface_dimension.width as usize;
         let height = caps.max_2d_surface_dimension.height as usize;
+
+        println!("create readback buffers: 4 * 4 x {} x {}", width, height);
+        println!("memory: {} MB / buffer", (width * height * 4 * 4) / 1024 / 1024);
 
         let format = match orig_surface_type {
             OrigSurfaceType::UInt => PixelFormat::RGBA32U,
@@ -426,80 +429,99 @@ impl ReadbackDriver {
         h: u32,
     ) -> Option<ReadbackPayload> {
         unsafe {
+            let mut l = self.gles_driver.lock();
+            let me2 = l.as_deref_mut().unwrap();
+            let driver = &mut *(me2 as *mut dyn Driver as *mut Gles3Driver);
+
+            match self.f_fb {
+                Some(_) => (),
+                None => {
+                    self.f_fb = Some(Self::create_fb(driver, OrigSurfaceType::Float))
+                }
+            }
+
+            match self.u_fb {
+                Some(_) => (),
+                None => {
+                    self.u_fb = Some(Self::create_fb(driver, OrigSurfaceType::UInt))
+                }
+            }
+
             let (fb, pipeline) = match Self::texture_type(surface) {
                 OrigSurfaceType::Float => (&self.f_fb, &self.f_pipeline),
                 OrigSurfaceType::UInt => (&self.u_fb, &self.u_pipeline),
             };
 
-            let mut l = self.gles_driver.lock();
-            let me2 = l.as_deref_mut().unwrap();
-            let driver = &mut *(me2 as *mut dyn Driver as *mut Gles3Driver);
+            match fb {
+                Some(fb) => {
+                    let fbb = driver.get_framebuffer_gl_id(fb.res_id());
+                    let mut current_fb = 0;
+                    gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut current_fb);
+                    let mut viewport: [GLint; 4] = [0, 0, 0, 0];
+                    let mut scissor: [GLint; 4] = [0, 0, 0, 0];
 
-            let fbb = driver.get_framebuffer_gl_id(fb.res_id());
-            let mut current_fb = 0;
-            gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut current_fb);
-            let mut viewport: [GLint; 4] = [0, 0, 0, 0];
-            let mut scissor: [GLint; 4] = [0, 0, 0, 0];
+                    // TODO: scissor test flags and other related states
+                    gl::GetIntegerv(gl::VIEWPORT, &mut viewport as *mut [_] as *mut _);
+                    gl::GetIntegerv(gl::SCISSOR_BOX, &mut scissor as *mut [_] as *mut _);
 
-            // TODO: scissor test flags and other related states
-            gl::GetIntegerv(gl::VIEWPORT, &mut viewport as *mut [_] as *mut _);
-            gl::GetIntegerv(gl::SCISSOR_BOX, &mut scissor as *mut [_] as *mut _);
+                    gl::BindFramebuffer(gl::FRAMEBUFFER, fbb);
+                    Gles3Driver::check_gl_error();
 
-            gl::BindFramebuffer(gl::FRAMEBUFFER, fbb);
-            Gles3Driver::check_gl_error();
+                    let vw = surface.desc().sampler_desc.width() as GLsizei;
+                    let vh = surface.desc().sampler_desc.height() as GLsizei;
+                    gl::Viewport(0, 0, vw, vh);
+                    gl::Scissor(0, 0, vw, vh);
 
-            let vw = surface.desc().sampler_desc.width() as GLsizei;
-            let vh = surface.desc().sampler_desc.height() as GLsizei;
-            gl::Viewport(0, 0, vw, vh);
-            gl::Scissor(0, 0, vw, vh);
+                    let flags = gl::DEPTH_BUFFER_BIT | gl::COLOR_BUFFER_BIT;
+                    gl::ClearDepthf(1.0);
 
-            let flags = gl::DEPTH_BUFFER_BIT | gl::COLOR_BUFFER_BIT;
-            gl::ClearDepthf(1.0);
+                    let draw_buffer: [GLenum; 4] = [gl::COLOR_ATTACHMENT0, gl::NONE, gl::NONE, gl::NONE];
+                    gl::DrawBuffers(4, &draw_buffer as *const GLenum);
 
-            let draw_buffer: [GLenum; 4] = [gl::COLOR_ATTACHMENT0, gl::NONE, gl::NONE, gl::NONE];
-            gl::DrawBuffers(4, &draw_buffer as *const GLenum);
+                    let i_cols: [GLuint; 4] = [0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF];
+                    gl::ClearBufferuiv(gl::COLOR as GLenum, 0, i_cols.as_ptr() as *const GLuint);
+                    gl::Clear(flags);
 
-            let i_cols: [GLuint; 4] = [0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF];
-            gl::ClearBufferuiv(gl::COLOR as GLenum, 0, i_cols.as_ptr() as *const GLuint);
-            gl::Clear(flags);
+                    let bindings = Bindings {
+                        vertex_buffers: vec![self.vb.clone()],
+                        index_buffer: Some(self.ib.clone()),
 
-            let bindings = Bindings {
-                vertex_buffers: vec![self.vb.clone()],
-                index_buffer: Some(self.ib.clone()),
+                        vertex_images: Vec::from([]),
+                        pixel_images: Vec::from([surface.clone()]),
+                    };
+                    driver.draw(
+                        pipeline,
+                        &bindings,
+                        core::ptr::null() as *const c_void,
+                        2,
+                        1,
+                    );
 
-                vertex_images: Vec::from([]),
-                pixel_images: Vec::from([surface.clone()]),
-            };
-            driver.draw(
-                pipeline,
-                &bindings,
-                core::ptr::null() as *const c_void,
-                2,
-                1,
-            );
+                    // get the data
+                    let data = Self::alloc_pixels(surface, (w * 16) as usize, h as usize);
+                    assert_ne!(data, std::ptr::null_mut());
+                    let pf = Self::pixel_format(surface);
+                    gl::ReadBuffer(gl::COLOR_ATTACHMENT0 as GLenum);
+                    gl::BindBuffer(gl::PIXEL_PACK_BUFFER, 0);
+                    gl::ReadPixels(
+                        x as GLint,
+                        y as GLint,
+                        w as GLsizei,
+                        h as GLsizei,
+                        Self::gl_format(&pf),
+                        Self::gl_elem_type(&pf),
+                        data as *mut ::core::ffi::c_void,
+                    );
+                    Gles3Driver::check_gl_error();
+                    gl::BindFramebuffer(gl::FRAMEBUFFER, current_fb as GLuint);
+                    Gles3Driver::check_gl_error();
+                    gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+                    gl::Scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 
-            // get the data
-            let data = Self::alloc_pixels(surface, (w * 16) as usize, h as usize);
-            assert_ne!(data, std::ptr::null_mut());
-            let pf = Self::pixel_format(surface);
-            gl::ReadBuffer(gl::COLOR_ATTACHMENT0 as GLenum);
-            gl::BindBuffer(gl::PIXEL_PACK_BUFFER, 0);
-            gl::ReadPixels(
-                x as GLint,
-                y as GLint,
-                w as GLsizei,
-                h as GLsizei,
-                Self::gl_format(&pf),
-                Self::gl_elem_type(&pf),
-                data as *mut ::core::ffi::c_void,
-            );
-            Gles3Driver::check_gl_error();
-            gl::BindFramebuffer(gl::FRAMEBUFFER, current_fb as GLuint);
-            Gles3Driver::check_gl_error();
-            gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-            gl::Scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
-
-            Some(Self::data_to_readback(data, w as usize, h as usize, &pf))
+                    Some(Self::data_to_readback(data, w as usize, h as usize, &pf))
+                },
+                None => None
+            }
         }
     }
 }
@@ -631,7 +653,7 @@ pub fn get_driver() -> DriverPtr {
             range.as_mut_ptr(),
             &mut precision,
         );
-        println!("lowp int range: {:?} - precision: {}", range, precision);
+        println!("lowp int range: {:?} - prselfecision: {}", range, precision);
     }
     let mut drv = renderer::Gles3Driver::new();
     DriverPtr::from(Arc::new(Mutex::new(ReadbackDriver::new(&mut drv))))
