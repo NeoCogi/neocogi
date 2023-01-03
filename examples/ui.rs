@@ -40,9 +40,9 @@ use ui::*;
 struct State<'a> {
     label_colors: [LabelColor<'a>; 14],
     bg: [Real; 3],
-    logbuf: FixedString<65536>,
+    logbuf: String,
     logbuf_updated: bool,
-    submit_buf: FixedString<128>,
+    submit_buf: String,
     checks: [bool; 3],
     colors: [Color4b; 14],
 }
@@ -116,9 +116,9 @@ impl<'a> State<'a> {
                 },
             ],
             bg: [90.0, 95.0, 100.0],
-            logbuf: FixedString::new(),
+            logbuf: String::new(),
             logbuf_updated: false,
-            submit_buf: FixedString::new(),
+            submit_buf: String::new(),
             checks: [false, true, false],
             colors: [color4b(0, 0, 0, 0); 14],
         }
@@ -147,7 +147,7 @@ impl<'a> State<'a> {
 
             ctx.set_current_container_rect(&win);
 
-            let mut buff = FixedString::<128>::new();
+            let mut buff = String::new();
             let style = ctx.style;
 
             ctx.header("Window Info", WidgetOption::NONE, |ctx| {
@@ -157,7 +157,7 @@ impl<'a> State<'a> {
 
                     buff.clear();
                     buff.append_int("%d", win_0.x);
-                    buff.add_str(", ");
+                    buff.push_str(", ");
                     buff.append_int("%d", win_0.y);
 
                     ctx.label(buff.as_str());
@@ -165,7 +165,7 @@ impl<'a> State<'a> {
                     ctx.label("Size:");
 
                     buff.append_int("%d", win_0.width);
-                    buff.add_str(", ");
+                    buff.push_str(", ");
                     buff.append_int("%d", win_0.height);
 
                     ctx.label(buff.as_str());
@@ -322,8 +322,8 @@ impl<'a> State<'a> {
                         r,
                         color(self.bg[0] as u8, self.bg[1] as u8, self.bg[2] as u8, 255),
                     );
-                    let mut buff = FixedString::<128>::new();
-                    buff.add_str("#");
+                    let mut buff = String::new();
+                    buff.push_str("#");
                     buff.append_int("%02X", self.bg[0] as _);
                     buff.append_int("%02X", self.bg[1] as _);
                     buff.append_int("%02X", self.bg[2] as _);
@@ -374,8 +374,8 @@ impl<'a> State<'a> {
                             submitted = true;
                         }
                         if submitted {
-                            let mut buf = FixedString::<128>::new();
-                            buf.add_str(self.submit_buf.as_str());
+                            let mut buf = String::new();
+                            buf.push_str(self.submit_buf.as_str());
                             self.write_log(buf.as_str());
                             self.submit_buf.clear();
                         }

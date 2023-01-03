@@ -1,3 +1,5 @@
+use std::ops::Add;
+use std::ptr::slice_from_raw_parts;
 //
 // Copyright 2021-Present (c) Raja Lehtihet & Wael El Oraiby
 //
@@ -36,12 +38,12 @@ pub trait ControlProvider {
     fn checkbox(&mut self, label: &str, state: &mut bool) -> ResourceState;
     fn textbox_raw(
         &mut self,
-        buf: &mut dyn IString,
+        buf: &mut String,
         id: Id,
         r: Recti,
         opt: WidgetOption,
     ) -> ResourceState;
-    fn textbox_ex(&mut self, buf: &mut dyn IString, opt: WidgetOption) -> ResourceState;
+    fn textbox_ex(&mut self, buf: &mut String, opt: WidgetOption) -> ResourceState;
 
     fn slider_ex(
         &mut self,
@@ -179,7 +181,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
 
     fn textbox_raw(
         &mut self,
-        buf: &mut dyn IString,
+        buf: &mut String,
         id: Id,
         r: Recti,
         opt: WidgetOption,
@@ -189,8 +191,8 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         if self.focus == Some(id) {
             let mut len = buf.len();
 
-            if self.input_text.len() > 0 && self.input_text.len() + len < buf.capacity() {
-                buf.add_str(self.input_text.as_str());
+            if self.input_text.len() > 0 {
+                buf.push_str(self.input_text.as_str());
                 len += self.input_text.len() as usize;
                 res |= ResourceState::CHANGE
             }
@@ -229,7 +231,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         return res;
     }
 
-    fn textbox_ex(&mut self, buf: &mut dyn IString, opt: WidgetOption) -> ResourceState {
+    fn textbox_ex(&mut self, buf: &mut String, opt: WidgetOption) -> ResourceState {
         let id = self.get_id_from_ptr(buf);
         let r = self.layout_stack.next_cell(&self.style);
         return self.textbox_raw(buf, id, r, opt);
@@ -275,9 +277,12 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         let x = ((v - low) * (base.width - w) as Real / (high - low)) as i32;
         let thumb = Rect::new(base.x + x, base.y, w, base.height);
         self.draw_control_frame(id, thumb, ControlColor::Button, opt);
-        let mut buff = FixedString::<64>::new();
-        buff.append_real(fmt, *value);
-        self.draw_control_text(buff.as_str(), base, ControlColor::Text, opt);
+        self.slider_buff.clear();
+        self.slider_buff.append_real(fmt, *value);
+        let txt_ptr = self.slider_buff.as_str().as_ptr();
+        let txt_slice = slice_from_raw_parts(txt_ptr, self.slider_buff.as_str().len());
+        let txt = unsafe { std::str::from_utf8(&*txt_slice) }.unwrap();
+        self.draw_control_text(txt, base, ControlColor::Text, opt);
         return res;
     }
 
@@ -303,9 +308,12 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
             res |= ResourceState::CHANGE;
         }
         self.draw_control_frame(id, base, ControlColor::Base, opt);
-        let mut buff = FixedString::<64>::new();
-        buff.append_real(fmt, *value);
-        self.draw_control_text(buff.as_str(), base, ControlColor::Text, opt);
+        self.slider_buff.clear();
+        self.slider_buff.append_real(fmt, *value);
+        let txt_ptr = self.slider_buff.as_str().as_ptr();
+        let txt_slice = slice_from_raw_parts(txt_ptr, self.slider_buff.as_str().len());
+        let txt = unsafe { std::str::from_utf8(&*txt_slice) }.unwrap();
+        self.draw_control_text(txt, base, ControlColor::Text, opt);
         return res;
     }
 }

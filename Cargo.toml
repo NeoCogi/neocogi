@@ -25,4 +25,4 @@ scene = ["renderer"]
 editor = ["renderer", "scene", "ui"]
 
 [dev-dependencies]
-
+rectangle-pack = "0.4.2"

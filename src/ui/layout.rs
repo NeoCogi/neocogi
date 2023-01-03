@@ -60,7 +60,7 @@ impl Default for LayoutPosition {
 
 #[derive(Default, Clone)]
 pub struct LayoutStack {
-    stack: FixedVec<Layout, 16>,
+    stack: Vec<Layout>,
     last_rect: Recti,
 }
 
@@ -98,15 +98,15 @@ impl LayoutStack {
     }
 
     pub fn top(&self) -> &Layout {
-        return self.stack.top().unwrap();
+        return self.stack.last().unwrap();
     }
 
     pub fn top_mut(&mut self) -> &mut Layout {
-        return self.stack.top_mut().unwrap();
+        return self.stack.last_mut().unwrap();
     }
 
     pub fn pop(&mut self) {
-        self.stack.pop()
+        self.stack.pop();
     }
 
     pub fn len(&self) -> usize {

@@ -210,7 +210,10 @@ impl ReadbackDriver {
         let height = caps.max_2d_surface_dimension.height as usize;
 
         println!("create readback buffers: 4 * 4 x {} x {}", width, height);
-        println!("memory: {} MB / buffer", (width * height * 4 * 4) / 1024 / 1024);
+        println!(
+            "memory: {} MB / buffer",
+            (width * height * 4 * 4) / 1024 / 1024
+        );
 
         let format = match orig_surface_type {
             OrigSurfaceType::UInt => PixelFormat::RGBA32U,
@@ -435,16 +438,12 @@ impl ReadbackDriver {
 
             match self.f_fb {
                 Some(_) => (),
-                None => {
-                    self.f_fb = Some(Self::create_fb(driver, OrigSurfaceType::Float))
-                }
+                None => self.f_fb = Some(Self::create_fb(driver, OrigSurfaceType::Float)),
             }
 
             match self.u_fb {
                 Some(_) => (),
-                None => {
-                    self.u_fb = Some(Self::create_fb(driver, OrigSurfaceType::UInt))
-                }
+                None => self.u_fb = Some(Self::create_fb(driver, OrigSurfaceType::UInt)),
             }
 
             let (fb, pipeline) = match Self::texture_type(surface) {
@@ -475,7 +474,8 @@ impl ReadbackDriver {
                     let flags = gl::DEPTH_BUFFER_BIT | gl::COLOR_BUFFER_BIT;
                     gl::ClearDepthf(1.0);
 
-                    let draw_buffer: [GLenum; 4] = [gl::COLOR_ATTACHMENT0, gl::NONE, gl::NONE, gl::NONE];
+                    let draw_buffer: [GLenum; 4] =
+                        [gl::COLOR_ATTACHMENT0, gl::NONE, gl::NONE, gl::NONE];
                     gl::DrawBuffers(4, &draw_buffer as *const GLenum);
 
                     let i_cols: [GLuint; 4] = [0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF];
@@ -519,8 +519,8 @@ impl ReadbackDriver {
                     gl::Scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 
                     Some(Self::data_to_readback(data, w as usize, h as usize, &pf))
-                },
-                None => None
+                }
+                None => None,
             }
         }
     }

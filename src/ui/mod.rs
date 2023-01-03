@@ -53,9 +53,6 @@
 use core::ptr;
 use std::marker::PhantomData;
 
-mod fixed_collections;
-pub use fixed_collections::*;
-
 mod atlas;
 pub use atlas::*;
 
@@ -83,6 +80,7 @@ pub trait RendererBackEnd<P> {
     fn draw_rect(&mut self, rect: Recti, color: Color4b);
     fn draw_text(&mut self, text: &str, pos: Vec2i, color: Color4b);
     fn draw_icon(&mut self, id: Icon, r: Recti, color: Color4b);
+
     fn set_clip_rect(&mut self, rect: Recti);
 
     fn flush(&mut self);
@@ -353,15 +351,15 @@ pub struct Context<P, R: RendererBackEnd<P>> {
     pub hover_root: Option<usize>,
     pub next_hover_root: Option<usize>,
     pub scroll_target: Option<usize>,
-    pub number_edit_buf: FixedString<127>,
+    pub number_edit_buf: String,
     pub number_edit: Option<Id>,
-    pub command_list: FixedVec<Command, 4096>,
-    pub root_list: FixedVec<usize, 32>,
-    pub container_stack: FixedVec<usize, 32>,
-    pub clip_stack: FixedVec<Recti, 32>,
-    pub id_stack: FixedVec<Id, 32>,
+    pub command_list: Vec<Command>,
+    pub root_list: Vec<usize>,
+    pub container_stack: Vec<usize>,
+    pub clip_stack: Vec<Recti>,
+    pub id_stack: Vec<Id>,
     layout_stack: LayoutStack,
-    pub text_stack: FixedString<65536>,
+    pub text_stack: String,
     pub container_pool: Pool<48>,
     pub containers: [Container; 48],
     pub treenode_pool: Pool<48>,
@@ -373,7 +371,8 @@ pub struct Context<P, R: RendererBackEnd<P>> {
     pub mouse_pressed: MouseButton,
     pub key_down: KeyModifier,
     pub key_pressed: KeyModifier,
-    pub input_text: FixedString<32>,
+    pub input_text: String,
+    slider_buff: String,
     renderer: R,
     _unused: PhantomData<P>,
 }
@@ -556,6 +555,67 @@ fn hash_bytes(hash_0: &mut Id, s: &[u8]) {
     }
 }
 
+pub trait NumAppender {
+    fn append_real(&mut self, fmt: &str, r: f32);
+    fn append_int(&mut self, fmt: &str, i: i32);
+}
+
+impl NumAppender for String {
+    fn append_real(&mut self, fmt: &str, v: f32) {
+        unsafe {
+            let mut fmt_ascii = [0u8; 32];
+            let mut i = 0;
+            for c in fmt.chars() {
+                fmt_ascii[i] = c as u8;
+                i += 1;
+            }
+            fmt_ascii[i] = 0;
+
+            let mut number_ascii = [0u8; 32];
+            let number_ptr = number_ascii.as_mut_ptr();
+            libc::sprintf(
+                number_ptr as *mut libc::c_char,
+                fmt_ascii.as_ptr() as *const libc::c_char,
+                v as f64,
+            );
+            for c in 0..number_ascii.len() {
+                if number_ascii[c] != 0 {
+                    self.push(number_ascii[c] as char);
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    fn append_int(&mut self, fmt: &str, v: i32) {
+        unsafe {
+            let mut fmt_ascii = [0u8; 32];
+            let mut i = 0;
+            for c in fmt.chars() {
+                fmt_ascii[i] = c as u8;
+                i += 1;
+            }
+            fmt_ascii[i] = 0;
+
+            let mut number_ascii = [0u8; 32];
+            let number_ptr = number_ascii.as_mut_ptr();
+            libc::sprintf(
+                number_ptr as *mut libc::c_char,
+                fmt_ascii.as_ptr() as *const libc::c_char,
+                v,
+            );
+            for c in 0..number_ascii.len() {
+                if number_ascii[c] != 0 {
+                    self.push(number_ascii[c] as char);
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+}
+
 impl<P, R: RendererBackEnd<P>> Context<P, R> {
     pub fn new(renderer: R) -> Self {
         Self {
@@ -569,15 +629,15 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             hover_root: None,
             next_hover_root: None,
             scroll_target: None,
-            number_edit_buf: FixedString::default(),
+            number_edit_buf: String::default(),
             number_edit: None,
-            command_list: FixedVec::default(),
-            root_list: FixedVec::default(),
-            container_stack: FixedVec::default(),
-            clip_stack: FixedVec::default(),
-            id_stack: FixedVec::default(),
+            command_list: Vec::default(),
+            root_list: Vec::default(),
+            container_stack: Vec::default(),
+            clip_stack: Vec::default(),
+            id_stack: Vec::default(),
             layout_stack: LayoutStack::default(),
-            text_stack: FixedString::default(),
+            text_stack: String::default(),
             container_pool: Pool::default(),
             containers: [Container::default(); 48],
             treenode_pool: Pool::default(),
@@ -589,7 +649,8 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             mouse_pressed: MouseButton::NONE,
             key_down: KeyModifier::NONE,
             key_pressed: KeyModifier::NONE,
-            input_text: FixedString::default(),
+            input_text: String::default(),
+            slider_buff: String::new(),
             renderer,
             _unused: PhantomData::default(),
         }
@@ -647,14 +708,14 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         }
         self.key_pressed = KeyModifier::NONE;
         self.input_text.clear();
+        self.slider_buff.clear();
         self.mouse_pressed = MouseButton::NONE;
         self.scroll_delta = vec2(0, 0);
         self.last_mouse_pos = self.mouse_pos;
         let n = self.root_list.len();
         let containers = &self.containers;
-        quick_sort_by(self.root_list.as_slice_mut(), |a, b| {
-            containers[*a].zindex.cmp(&containers[*b].zindex)
-        });
+        self.root_list
+            .sort_by(|a, b| containers[*a].zindex.cmp(&containers[*b].zindex));
 
         for i in 0..n {
             if i == 0 {
@@ -721,7 +782,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn get_id_u32(&mut self, orig_id: u32) -> Id {
-        let mut res: Id = match self.id_stack.top() {
+        let mut res: Id = match self.id_stack.last() {
             Some(id) => *id,
             None => Id(2166136261),
         };
@@ -731,7 +792,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn get_id_from_ptr<T: ?Sized>(&mut self, orig_id: &T) -> Id {
-        let mut res: Id = match self.id_stack.top() {
+        let mut res: Id = match self.id_stack.last() {
             Some(id) => *id,
             None => Id(2166136261),
         };
@@ -743,7 +804,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn get_id_from_str(&mut self, s: &str) -> Id {
-        let mut res: Id = match self.id_stack.top() {
+        let mut res: Id = match self.id_stack.last() {
             Some(id) => *id,
             None => Id(2166136261),
         };
@@ -776,7 +837,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn get_clip_rect(&mut self) -> Recti {
-        *self.clip_stack.top().unwrap()
+        *self.clip_stack.last().unwrap()
     }
 
     pub fn check_clip(&mut self, r: Recti) -> Clip {
@@ -811,31 +872,31 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn get_current_container(&self) -> usize {
-        *self.container_stack.top().unwrap()
+        *self.container_stack.last().unwrap()
     }
 
     pub fn get_current_container_rect(&self) -> Recti {
-        self.containers[*self.container_stack.top().unwrap()].rect
+        self.containers[*self.container_stack.last().unwrap()].rect
     }
 
     pub fn set_current_container_rect(&mut self, rect: &Recti) {
-        self.containers[*self.container_stack.top().unwrap()].rect = *rect;
+        self.containers[*self.container_stack.last().unwrap()].rect = *rect;
     }
 
     pub fn get_current_container_scroll(&self) -> Vec2i {
-        self.containers[*self.container_stack.top().unwrap()].scroll
+        self.containers[*self.container_stack.last().unwrap()].scroll
     }
 
     pub fn set_current_container_scroll(&mut self, scroll: &Vec2i) {
-        self.containers[*self.container_stack.top().unwrap()].scroll = *scroll;
+        self.containers[*self.container_stack.last().unwrap()].scroll = *scroll;
     }
 
     pub fn get_current_container_content_size(&self) -> Vec2i {
-        self.containers[*self.container_stack.top().unwrap()].content_size
+        self.containers[*self.container_stack.last().unwrap()].content_size
     }
 
     pub fn get_current_container_body(&self) -> Recti {
-        self.containers[*self.container_stack.top().unwrap()].body
+        self.containers[*self.container_stack.last().unwrap()].body
     }
 
     fn get_container_index_intern(&mut self, id: Id, opt: WidgetOption) -> Option<usize> {
@@ -902,7 +963,9 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn push_command(&mut self, cmd: Command) -> (&mut Command, usize) {
-        self.command_list.push(cmd)
+        let id = self.command_list.len();
+        self.command_list.push(cmd);
+        (self.command_list.get_mut(id).unwrap(), id)
     }
 
     pub fn push_text(&mut self, str: &str) -> usize {

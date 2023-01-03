@@ -2,6 +2,7 @@ extern crate neocogi;
 
 use neocogi::rs_math3d::*;
 use neocogi::*;
+use rectangle_pack::*;
 
 fn main() {
     let mut app = ui::App::new();
