@@ -386,7 +386,7 @@ struct PoolItem {
 #[derive(Default, Copy, Clone, Eq, PartialEq)]
 pub struct Id(u32);
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Clone)]
 pub struct Container {
     pub head_idx: Option<usize>,
     pub tail_idx: Option<usize>,
@@ -639,7 +639,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             layout_stack: LayoutStack::default(),
             text_stack: String::default(),
             container_pool: Pool::default(),
-            containers: [Container::default(); 48],
+            containers: [(); 48].map(|_| Container::default()),
             treenode_pool: Pool::default(),
             mouse_pos: Vec2i::default(),
             last_mouse_pos: Vec2i::default(),
