@@ -876,7 +876,8 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn bring_to_front(&mut self, cnt: ContRef) {
-        self.last_zindex += 1;
+        // TODO: only increment by 1 once we have proper container nesting
+        self.last_zindex += 128;
         self.containers[cnt.0].zindex = self.last_zindex;
     }
 
@@ -1417,7 +1418,17 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.push_id_from_str(name);
         let cnt_id = self.get_container_index_intern(self.last_id.unwrap(), opt);
         let rect = self.layout_stack.next_cell(&self.style);
+        self.root_list.push(ContRef(cnt_id.unwrap()));
         self.containers[cnt_id.unwrap()].rect = rect;
+
+        //
+        // TODO: quick and dirty hack to solve the problem of nested container zindex ordering
+        //      Fix this when we have proper container nesting
+        //
+        let zindex = self.containers[self.container_stack.last().unwrap().0].zindex + 1;
+        self.containers[cnt_id.unwrap()].rect = rect;
+        self.containers[cnt_id.unwrap()].zindex = zindex;
+
         if !opt.has_no_frame() {
             self.draw_frame(rect, ControlColor::PanelBG);
         }
