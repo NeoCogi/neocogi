@@ -348,20 +348,20 @@ pub struct Context<P, R: RendererBackEnd<P>> {
     pub last_zindex: i32,
     pub updated_focus: bool,
     pub frame: usize,
-    pub hover_root: Option<usize>,
-    pub next_hover_root: Option<usize>,
-    pub scroll_target: Option<usize>,
+    pub hover_root: Option<ContRef>,
+    pub next_hover_root: Option<ContRef>,
+    pub scroll_target: Option<ContRef>,
     pub number_edit_buf: String,
     pub number_edit: Option<Id>,
-    pub root_list: Vec<usize>,
-    pub container_stack: Vec<usize>,
+    pub root_list: Vec<ContRef>,
+    pub container_stack: Vec<ContRef>,
     pub clip_stack: Vec<Recti>,
     pub id_stack: Vec<Id>,
     layout_stack: LayoutStack,
-    pub text_stack: String,
-    pub container_pool: Pool<48>,
-    pub containers: [Container; 48],
-    pub treenode_pool: Pool<48>,
+    text_stack: String,
+    container_pool: Pool<48>,
+    containers: [Container; 48],
+    treenode_pool: Pool<48>,
     pub mouse_pos: Vec2i,
     pub last_mouse_pos: Vec2i,
     pub mouse_delta: Vec2i,
@@ -384,6 +384,9 @@ struct PoolItem {
 
 #[derive(Default, Copy, Clone, Eq, PartialEq)]
 pub struct Id(u32);
+
+#[derive(Default, Copy, Clone, Eq, PartialEq)]
+pub struct ContRef(usize);
 
 #[derive(Default, Clone)]
 pub struct Container {
@@ -687,20 +690,29 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         assert_eq!(self.clip_stack.len(), 0);
         assert_eq!(self.id_stack.len(), 0);
         assert_eq!(self.layout_stack.len(), 0);
-        if !self.scroll_target.is_none() {
-            self.containers[self.scroll_target.unwrap()].scroll.x += self.scroll_delta.x;
-            self.containers[self.scroll_target.unwrap()].scroll.y += self.scroll_delta.y;
+        match self.scroll_target {
+            Some(cnt_ref) => {
+                let mut container = &mut self.containers[cnt_ref.0];
+                container.scroll.x += self.scroll_delta.x;
+                container.scroll.y += self.scroll_delta.y;
+            },
+            None => ()
         }
+
         if !self.updated_focus {
             self.focus = None;
         }
         self.updated_focus = false;
-        if !self.mouse_pressed.is_none()
-            && !self.next_hover_root.is_none()
-            && self.containers[self.next_hover_root.unwrap()].zindex < self.last_zindex
-            && self.containers[self.next_hover_root.unwrap()].zindex >= 0
-        {
-            self.bring_to_front(self.next_hover_root.unwrap());
+        match self.next_hover_root {
+            Some(cnt_ref)
+            if !self.mouse_pressed.is_none()
+                && self.containers[cnt_ref.0].zindex < self.last_zindex
+                && self.containers[cnt_ref.0].zindex >= 0 =>
+                {
+                    self.bring_to_front(cnt_ref);
+                }
+            ,
+            _ => ()
         }
         self.key_pressed = KeyModifier::NONE;
         self.input_text.clear();
@@ -711,7 +723,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         let n = self.root_list.len();
         let containers = &self.containers;
         self.root_list
-            .sort_by(|a, b| containers[*a].zindex.cmp(&containers[*b].zindex));
+            .sort_by(|a, b| containers[a.0].zindex.cmp(&containers[b.0].zindex));
 
         self.paint();
         self.renderer.end_frame()
@@ -804,40 +816,40 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         let cnt = self.get_current_container();
         let layout = *self.layout_stack.top();
 
-        self.containers[cnt].content_size.x = layout.max.x - layout.body.x;
-        self.containers[cnt].content_size.y = layout.max.y - layout.body.y;
+        self.containers[cnt.0].content_size.x = layout.max.x - layout.body.x;
+        self.containers[cnt.0].content_size.y = layout.max.y - layout.body.y;
 
         self.container_stack.pop();
         self.layout_stack.pop();
         self.pop_id();
     }
 
-    pub fn get_current_container(&self) -> usize {
+    pub fn get_current_container(&self) -> ContRef {
         *self.container_stack.last().unwrap()
     }
 
     pub fn get_current_container_rect(&self) -> Recti {
-        self.containers[*self.container_stack.last().unwrap()].rect
+        self.containers[self.container_stack.last().unwrap().0].rect
     }
 
     pub fn set_current_container_rect(&mut self, rect: &Recti) {
-        self.containers[*self.container_stack.last().unwrap()].rect = *rect;
+        self.containers[self.container_stack.last().unwrap().0].rect = *rect;
     }
 
     pub fn get_current_container_scroll(&self) -> Vec2i {
-        self.containers[*self.container_stack.last().unwrap()].scroll
+        self.containers[self.container_stack.last().unwrap().0].scroll
     }
 
     pub fn set_current_container_scroll(&mut self, scroll: &Vec2i) {
-        self.containers[*self.container_stack.last().unwrap()].scroll = *scroll;
+        self.containers[self.container_stack.last().unwrap().0].scroll = *scroll;
     }
 
     pub fn get_current_container_content_size(&self) -> Vec2i {
-        self.containers[*self.container_stack.last().unwrap()].content_size
+        self.containers[self.container_stack.last().unwrap().0].content_size
     }
 
     pub fn get_current_container_body(&self) -> Recti {
-        self.containers[*self.container_stack.last().unwrap()].body
+        self.containers[self.container_stack.last().unwrap().0].body
     }
 
     fn get_container_index_intern(&mut self, id: Id, opt: WidgetOption) -> Option<usize> {
@@ -854,7 +866,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         let idx = self.container_pool.alloc(id, self.frame);
         self.containers[idx] = Container::default();
         self.containers[idx].open = true;
-        self.bring_to_front(idx);
+        self.bring_to_front(ContRef(idx));
         Some(idx)
     }
 
@@ -863,9 +875,9 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.get_container_index_intern(id, WidgetOption::NONE)
     }
 
-    pub fn bring_to_front(&mut self, cnt: usize) {
+    pub fn bring_to_front(&mut self, cnt: ContRef) {
         self.last_zindex += 1;
-        self.containers[cnt].zindex = self.last_zindex;
+        self.containers[cnt.0].zindex = self.last_zindex;
     }
 
     pub fn input_mousemove(&mut self, x: i32, y: i32) {
@@ -903,10 +915,10 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
 
     pub fn push_command(&mut self, cmd: Command) -> &mut Command {
         let cnt = *self.container_stack.last().unwrap();
-        let id = self.containers[cnt].commands.len();
+        let id = self.containers[cnt.0].commands.len();
 
-        self.containers[cnt].commands.push(cmd);
-        self.containers[cnt].commands.get_mut(id).unwrap()
+        self.containers[cnt.0].commands.push(cmd);
+        self.containers[cnt.0].commands.get_mut(id).unwrap()
     }
 
     pub fn push_text(&mut self, str: &str) -> usize {
@@ -1209,7 +1221,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             thumb.y += self.containers[cnt_id].scroll.y * (base.height - thumb.height) / maxscroll;
             self.draw_frame(thumb, ControlColor::ScrollThumb);
             if self.mouse_over(body) {
-                self.scroll_target = Some(cnt_id);
+                self.scroll_target = Some(ContRef(cnt_id));
             }
         } else {
             self.containers[cnt_id].scroll.y = 0;
@@ -1238,7 +1250,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 self.containers[cnt_id].scroll.x * (base_0.width - thumb_0.width) / maxscroll_0;
             self.draw_frame(thumb_0, ControlColor::ScrollThumb);
             if self.mouse_over(body) {
-                self.scroll_target = Some(cnt_id);
+                self.scroll_target = Some(ContRef(cnt_id));
             }
         } else {
             self.containers[cnt_id].scroll.x = 0;
@@ -1258,15 +1270,15 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.containers[cnt_idx].body = body;
     }
 
-    fn begin_root_container(&mut self, cnt: usize) {
+    fn begin_root_container(&mut self, cnt: ContRef) {
         self.container_stack.push(cnt);
 
         self.root_list.push(cnt);
-        self.containers[cnt].commands.clear();
-        if rect_overlaps_vec2(self.containers[cnt].rect, self.mouse_pos)
+        self.containers[cnt.0].commands.clear();
+        if rect_overlaps_vec2(self.containers[cnt.0].rect, self.mouse_pos)
             && (self.next_hover_root.is_none()
-                || self.containers[cnt].zindex
-                    > self.containers[self.next_hover_root.unwrap()].zindex)
+                || self.containers[cnt.0].zindex
+                    > self.containers[self.next_hover_root.unwrap().0].zindex)
         {
             self.next_hover_root = Some(cnt);
         }
@@ -1305,7 +1317,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             container.rect.y = r.y;
         }
 
-        self.begin_root_container(cnt_id.unwrap());
+        self.begin_root_container(ContRef(cnt_id.unwrap()));
 
         let mut body = self.containers[cnt_id.unwrap()].rect;
         r = body;
@@ -1366,7 +1378,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 };
         }
 
-        if opt.is_popup() && !self.mouse_pressed.is_none() && self.hover_root != cnt_id {
+        if opt.is_popup() && !self.mouse_pressed.is_none() && self.hover_root != cnt_id.map(|x| ContRef(x)) {
             self.containers[cnt_id.unwrap()].open = false;
         }
         self.push_clip_rect(self.containers[cnt_id.unwrap()].body);
@@ -1381,11 +1393,11 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
 
     pub fn open_popup(&mut self, name: &str) {
         let cnt = self.get_container_index(name);
-        self.next_hover_root = cnt;
+        self.next_hover_root = cnt.map(|x| ContRef(x));
         self.hover_root = self.next_hover_root;
         self.containers[cnt.unwrap()].rect = Rect::new(self.mouse_pos.x, self.mouse_pos.y, 0, 0);
         self.containers[cnt.unwrap()].open = true;
-        self.bring_to_front(cnt.unwrap());
+        self.bring_to_front(ContRef(cnt.unwrap()));
     }
 
     fn begin_popup(&mut self, name: &str, rect: Recti) -> ResourceState {
@@ -1410,7 +1422,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             self.draw_frame(rect, ControlColor::PanelBG);
         }
 
-        self.container_stack.push(cnt_id.unwrap());
+        self.container_stack.push(ContRef(cnt_id.unwrap()));
         self.push_container_body(cnt_id.unwrap(), rect, opt);
         self.push_clip_rect(self.containers[cnt_id.unwrap()].body);
     }
@@ -1423,7 +1435,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     fn paint(&mut self) {
         let mut cmd_id = 0;
         for cnt in &self.root_list {
-            let container = &self.containers[*cnt];
+            let container = &self.containers[cnt.0];
             for command in &container.commands {
                 match *command {
                     Command::Text {
