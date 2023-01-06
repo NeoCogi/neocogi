@@ -353,7 +353,6 @@ pub struct Context<P, R: RendererBackEnd<P>> {
     pub scroll_target: Option<usize>,
     pub number_edit_buf: String,
     pub number_edit: Option<Id>,
-    pub command_list: Vec<Command>,
     pub root_list: Vec<usize>,
     pub container_stack: Vec<usize>,
     pub clip_stack: Vec<Recti>,
@@ -388,21 +387,17 @@ pub struct Id(u32);
 
 #[derive(Default, Clone)]
 pub struct Container {
-    pub head_idx: Option<usize>,
-    pub tail_idx: Option<usize>,
     pub rect: Recti,
     pub body: Recti,
     pub content_size: Vec2i,
     pub scroll: Vec2i,
     pub zindex: i32,
     pub open: bool,
+    pub commands: Vec<Command>,
 }
 
 #[derive(Copy, Clone)]
 pub enum Command {
-    Jump {
-        dst_idx: Option<usize>,
-    },
     Clip {
         rect: Recti,
     },
@@ -631,7 +626,6 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             scroll_target: None,
             number_edit_buf: String::default(),
             number_edit: None,
-            command_list: Vec::default(),
             root_list: Vec::default(),
             container_stack: Vec::default(),
             clip_stack: Vec::default(),
@@ -681,7 +675,9 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.next_hover_root = None;
         self.mouse_delta.x = self.mouse_pos.x - self.last_mouse_pos.x;
         self.mouse_delta.y = self.mouse_pos.y - self.last_mouse_pos.y;
-        self.command_list.clear();
+        for container in &mut self.containers {
+            container.commands.clear();
+        }
         self.frame += 1;
         self.renderer.begin_frame(width, height);
     }
@@ -716,61 +712,6 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         let containers = &self.containers;
         self.root_list
             .sort_by(|a, b| containers[*a].zindex.cmp(&containers[*b].zindex));
-
-        for i in 0..n {
-            if i == 0 {
-                // root container!
-                // if this is the first container then make the first command jump to it.
-                // otherwise set the previous container's tail to jump to this one
-
-                let cmd = &mut self.command_list[0];
-                assert!(match cmd {
-                    Command::Jump { .. } => true,
-                    _ => false,
-                });
-                let dst_idx = self.containers[self.root_list[i as usize]]
-                    .head_idx
-                    .unwrap()
-                    + 1;
-                *cmd = Command::Jump {
-                    dst_idx: Some(dst_idx),
-                };
-                assert!(dst_idx < self.command_list.len());
-            } else {
-                let prev = &self.containers[self.root_list[i - 1]];
-                self.command_list[prev.tail_idx.unwrap()] = Command::Jump {
-                    dst_idx: Some(
-                        self.containers[self.root_list[i as usize]]
-                            .head_idx
-                            .unwrap()
-                            + 1,
-                    ),
-                };
-            }
-            if i == n - 1 {
-                assert!(
-                    self.containers[self.root_list[i as usize]]
-                        .tail_idx
-                        .unwrap()
-                        < self.command_list.len()
-                );
-                assert!(
-                    match self.command_list[self.containers[self.root_list[i as usize]]
-                        .tail_idx
-                        .unwrap()]
-                    {
-                        Command::Jump { .. } => true,
-                        _ => false,
-                    }
-                );
-                self.command_list[self.containers[self.root_list[i as usize]]
-                    .tail_idx
-                    .unwrap()] = Command::Jump {
-                    dst_idx: Some(self.command_list.len()),
-                };
-                // the snake eats its tail
-            }
-        }
 
         self.paint();
         self.renderer.end_frame()
@@ -912,8 +853,6 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         }
         let idx = self.container_pool.alloc(id, self.frame);
         self.containers[idx] = Container::default();
-        self.containers[idx].head_idx = None;
-        self.containers[idx].tail_idx = None;
         self.containers[idx].open = true;
         self.bring_to_front(idx);
         Some(idx)
@@ -962,10 +901,12 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.input_text += text;
     }
 
-    pub fn push_command(&mut self, cmd: Command) -> (&mut Command, usize) {
-        let id = self.command_list.len();
-        self.command_list.push(cmd);
-        (self.command_list.get_mut(id).unwrap(), id)
+    pub fn push_command(&mut self, cmd: Command) -> &mut Command {
+        let cnt = *self.container_stack.last().unwrap();
+        let id = self.containers[cnt].commands.len();
+
+        self.containers[cnt].commands.push(cmd);
+        self.containers[cnt].commands.get_mut(id).unwrap()
     }
 
     pub fn push_text(&mut self, str: &str) -> usize {
@@ -974,28 +915,6 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             self.text_stack.push(c);
         }
         return str_start;
-    }
-
-    ///
-    /// returns the next command to execute and the next index to use
-    ///
-    pub fn mu_next_command(&mut self, mut cmd_id: usize) -> Option<(Command, usize)> {
-        if cmd_id >= self.command_list.len() {
-            cmd_id = 0
-        }
-
-        while cmd_id != self.command_list.len() {
-            match self.command_list[cmd_id] {
-                Command::Jump { dst_idx } => cmd_id = dst_idx.unwrap(),
-                _ => return Some((self.command_list[cmd_id], cmd_id + 1)),
-            }
-        }
-        None
-    }
-
-    fn push_jump(&mut self, dst_idx: Option<usize>) -> usize {
-        let (_, pos) = self.push_command(Command::Jump { dst_idx });
-        pos
     }
 
     pub fn set_clip(&mut self, rect: Recti) {
@@ -1072,12 +991,6 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 for i in 0..len {
                     if self.container_stack[len - i - 1] == hover_root {
                         return true;
-                    }
-                    if self.containers[self.container_stack[len - i - 1]]
-                        .head_idx
-                        .is_some()
-                    {
-                        break;
                     }
                 }
                 false
@@ -1349,7 +1262,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.container_stack.push(cnt);
 
         self.root_list.push(cnt);
-        self.containers[cnt].head_idx = Some(self.push_jump(None));
+        self.containers[cnt].commands.clear();
         if rect_overlaps_vec2(self.containers[cnt].rect, self.mouse_pos)
             && (self.next_hover_root.is_none()
                 || self.containers[cnt].zindex
@@ -1361,12 +1274,6 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     fn end_root_container(&mut self) {
-        let cnt = self.get_current_container();
-        self.containers[cnt].tail_idx = Some(self.push_jump(None));
-        self.command_list[self.containers[cnt].head_idx.unwrap()] = Command::Jump {
-            dst_idx: Some(self.command_list.len()),
-        };
-
         self.pop_clip_rect();
         self.pop_container();
     }
@@ -1515,34 +1422,31 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
 
     fn paint(&mut self) {
         let mut cmd_id = 0;
-        loop {
-            match self.mu_next_command(cmd_id) {
-                Some((command, id)) => {
-                    match command {
-                        Command::Text {
-                            str_start,
-                            str_len,
-                            pos,
-                            color,
-                            ..
-                        } => {
-                            let str = &self.text_stack[str_start..str_start + str_len];
-                            self.renderer.draw_text(str, pos, color);
-                        }
-                        Command::Rect { rect, color } => {
-                            self.renderer.draw_rect(rect, color);
-                        }
-                        Command::Icon { id, rect, color } => {
-                            self.renderer.draw_icon(id, rect, color);
-                        }
-                        Command::Clip { rect } => {
-                            self.renderer.set_clip_rect(rect);
-                        }
-                        _ => {}
+        for cnt in &self.root_list {
+            let container = &self.containers[*cnt];
+            for command in &container.commands {
+                match *command {
+                    Command::Text {
+                        str_start,
+                        str_len,
+                        pos,
+                        color,
+                        ..
+                    } => {
+                        let str = &self.text_stack[str_start..str_start + str_len];
+                        self.renderer.draw_text(str, pos, color);
                     }
-                    cmd_id = id;
+                    Command::Rect { rect, color } => {
+                        self.renderer.draw_rect(rect, color);
+                    }
+                    Command::Icon { id, rect, color } => {
+                        self.renderer.draw_icon(id, rect, color);
+                    }
+                    Command::Clip { rect } => {
+                        self.renderer.set_clip_rect(rect);
+                    }
+                    _ => {}
                 }
-                None => break,
             }
         }
 
@@ -1552,6 +1456,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     ////////////////////////////////////////////////////////////////////////////
     // Queries
     ////////////////////////////////////////////////////////////////////////////
+
     pub fn frame_size(&self) -> (usize, usize) {
         self.renderer.frame_size()
     }
