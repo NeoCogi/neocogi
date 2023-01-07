@@ -121,6 +121,8 @@ pub struct Renderer {
     indices: Vec<u16>,
 
     pass: Option<Pass>,
+
+    clip: Recti,
 }
 
 pub struct Input<P, R: super::RendererBackEnd<P>> {
@@ -217,6 +219,7 @@ impl Renderer {
             vertices: Vec::new(),
             indices: Vec::new(),
             pass: None,
+            clip: Recti { x: 0, y: 0, width: canvas_width as _, height: canvas_height as _ }
         }
     }
 
@@ -241,7 +244,49 @@ impl Renderer {
         self.vertices.push(v3.clone());
     }
 
+    pub fn clip_rect(dst_r: Recti, src_r: Recti, clip_r: Recti) -> Option<(Recti, Recti)> {
+
+        match dst_r.intersect(&clip_r) {
+            Some(rect) if rect.width != 0 && rect.height != 0 => {
+                let dx = dst_r.x as f32;
+                let dy = dst_r.y as f32;
+                let dw = dst_r.width as f32;
+                let dh = dst_r.height as f32;
+
+                let rx = rect.x as f32;
+                let ry = rect.y as f32;
+                let rw = rect.width as f32;
+                let rh = rect.height as f32;
+
+                let tx = (rx - dx) / dw;
+                let ty = (ry - dy) / dh;
+                let tw = (rx + rw - dx) / dw;
+                let th = (ry + rh - dy) / dh;
+
+                let sx = src_r.x as f32;
+                let sy = src_r.y as f32;
+                let sw = src_r.width as f32;
+                let sh = src_r.height as f32;
+
+                let st_x = sx + tx * sw;
+                let st_y = sy + ty * sh;
+                let st_w = sx + tw * sw - st_x;
+                let st_h = sy + th * sh - st_y;
+
+
+                Some((rect, Recti::new(st_x as _, st_y as _, st_w as _, st_h as _)))
+            }
+            _ => None
+        }
+    }
+
+
     pub fn push_rect(&mut self, dst: Recti, src: Recti, color: Color4b) {
+        let (dst, src) = match Self::clip_rect(dst, src, self.clip) {
+            None => return,
+            Some((d, s)) => (d, s)
+        };
+
         let x = src.x as f32 / ATLAS_WIDTH as f32;
         let y = src.y as f32 / ATLAS_HEIGHT as f32;
         let w = src.width as f32 / ATLAS_WIDTH as f32;
@@ -344,12 +389,13 @@ impl super::RendererBackEnd<Pass> for Renderer {
 
     fn set_clip_rect(&mut self, rect: Recti) {
         self.flush();
-        self.pass.as_mut().unwrap().set_scissor(
-            rect.x as u32,
-            (self.canvas_height as i32 - (rect.y + rect.height)) as u32,
-            rect.width as u32,
-            rect.height as u32,
-        );
+        self.clip = rect;
+        // self.pass.as_mut().unwrap().set_scissor(
+        //     rect.x as u32,
+        //     (self.canvas_height as i32 - (rect.y + rect.height)) as u32,
+        //     rect.width as u32,
+        //     rect.height as u32,
+        // );
     }
 
     fn get_char_width(&self, _font: FontId, c: char) -> usize {
