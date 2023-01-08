@@ -459,6 +459,10 @@ impl super::RendererBackEnd<Pass> for Renderer {
         self.vertices.clear();
         self.indices.clear();
     }
+
+    fn set_atlas(atlas: &Atlas) {
+        todo!()
+    }
 }
 
 impl<P: Sized, R: super::RendererBackEnd<P>> Input<P, R> {

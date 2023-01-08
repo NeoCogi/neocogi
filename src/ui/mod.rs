@@ -71,8 +71,9 @@ use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 use bitflags::*;
 
 pub struct AtlasFont<'a> {
-    name: &'a str,
-    char_def: &'a [(char, Recti)]
+    name: &'a str, // font name
+    height: usize, // height size in pixels
+    char_def: &'a [(char, Recti)],
 }
 
 pub struct AtlasImageEntry<'a> {
@@ -81,7 +82,7 @@ pub struct AtlasImageEntry<'a> {
 }
 
 pub trait Atlas {
-    fn get_size(&self)-> (usize, usize);
+    fn get_size(&self) -> (usize, usize);
     fn get_pixels(&self) -> &[u8];
     fn get_fonts(&self) -> &[AtlasFont];
     fn get_image_entries(&self) -> &[AtlasImageEntry];
@@ -103,6 +104,8 @@ pub trait RendererBackEnd<P> {
     fn flush(&mut self);
 
     fn frame_size(&self) -> (usize, usize);
+
+    fn set_atlas(atlas: &Atlas);
 }
 
 #[derive(Copy, Clone)]
@@ -1592,5 +1595,9 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             f(self);
         }
         res
+    }
+
+    fn set_atlas(atlas: &dyn Atlas) {
+        todo!()
     }
 }
