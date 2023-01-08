@@ -123,6 +123,8 @@ pub struct Renderer {
     pass: Option<Pass>,
 
     clip: Recti,
+
+    draw_call_count: usize,
 }
 
 pub struct Input<P, R: super::RendererBackEnd<P>> {
@@ -219,7 +221,13 @@ impl Renderer {
             vertices: Vec::new(),
             indices: Vec::new(),
             pass: None,
-            clip: Recti { x: 0, y: 0, width: canvas_width as _, height: canvas_height as _ }
+            clip: Recti {
+                x: 0,
+                y: 0,
+                width: canvas_width as _,
+                height: canvas_height as _,
+            },
+            draw_call_count: 0,
         }
     }
 
@@ -245,7 +253,6 @@ impl Renderer {
     }
 
     pub fn clip_rect(dst_r: Recti, src_r: Recti, clip_r: Recti) -> Option<(Recti, Recti)> {
-
         match dst_r.intersect(&clip_r) {
             Some(rect) if rect.width != 0 && rect.height != 0 => {
                 let dx = dst_r.x as f32;
@@ -273,18 +280,16 @@ impl Renderer {
                 let st_w = sx + tw * sw - st_x;
                 let st_h = sy + th * sh - st_y;
 
-
                 Some((rect, Recti::new(st_x as _, st_y as _, st_w as _, st_h as _)))
             }
-            _ => None
+            _ => None,
         }
     }
-
 
     pub fn push_rect(&mut self, dst: Recti, src: Recti, color: Color4b) {
         let (dst, src) = match Self::clip_rect(dst, src, self.clip) {
             None => return,
-            Some((d, s)) => (d, s)
+            Some((d, s)) => (d, s),
         };
 
         let x = src.x as f32 / ATLAS_WIDTH as f32;
@@ -325,6 +330,10 @@ impl Renderer {
 
         self.push_quad_vertices(&v0, &v1, &v2, &v3);
     }
+
+    pub fn get_draw_call_count(&self) -> usize {
+        self.draw_call_count
+    }
 }
 
 impl super::RendererBackEnd<Pass> for Renderer {
@@ -352,7 +361,8 @@ impl super::RendererBackEnd<Pass> for Renderer {
 
         pass.set_viewport(0, 0, self.canvas_width, self.canvas_height);
 
-        self.pass = Some(pass)
+        self.pass = Some(pass);
+        self.draw_call_count = 0;
     }
 
     fn end_frame(&mut self) -> Pass {
@@ -388,8 +398,8 @@ impl super::RendererBackEnd<Pass> for Renderer {
     }
 
     fn set_clip_rect(&mut self, rect: Recti) {
-        self.flush();
         self.clip = rect;
+        // self.flush();
         // self.pass.as_mut().unwrap().set_scissor(
         //     rect.x as u32,
         //     (self.canvas_height as i32 - (rect.y + rect.height)) as u32,
@@ -444,6 +454,7 @@ impl super::RendererBackEnd<Pass> for Renderer {
                 (self.indices.len() / 3) as u32,
                 1,
             );
+            self.draw_call_count += 1;
         }
         self.vertices.clear();
         self.indices.clear();

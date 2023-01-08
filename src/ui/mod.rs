@@ -712,8 +712,8 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 let mut container = &mut self.containers[cnt_ref.0];
                 container.scroll.x += self.scroll_delta.x;
                 container.scroll.y += self.scroll_delta.y;
-            },
-            None => ()
+            }
+            None => (),
         }
 
         if !self.updated_focus {
@@ -722,14 +722,13 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.updated_focus = false;
         match self.next_hover_root {
             Some(cnt_ref)
-            if !self.mouse_pressed.is_none()
-                && self.containers[cnt_ref.0].zindex < self.last_zindex
-                && self.containers[cnt_ref.0].zindex >= 0 =>
-                {
-                    self.bring_to_front(cnt_ref);
-                }
-            ,
-            _ => ()
+                if !self.mouse_pressed.is_none()
+                    && self.containers[cnt_ref.0].zindex < self.last_zindex
+                    && self.containers[cnt_ref.0].zindex >= 0 =>
+            {
+                self.bring_to_front(cnt_ref);
+            }
+            _ => (),
         }
         self.key_pressed = KeyModifier::NONE;
         self.input_text.clear();
@@ -1396,7 +1395,10 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 };
         }
 
-        if opt.is_popup() && !self.mouse_pressed.is_none() && self.hover_root != cnt_id.map(|x| ContRef(x)) {
+        if opt.is_popup()
+            && !self.mouse_pressed.is_none()
+            && self.hover_root != cnt_id.map(|x| ContRef(x))
+        {
             self.containers[cnt_id.unwrap()].open = false;
         }
         self.push_clip_rect(self.containers[cnt_id.unwrap()].body);
