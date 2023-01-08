@@ -70,6 +70,23 @@ use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 
 use bitflags::*;
 
+pub struct AtlasFont<'a> {
+    name: &'a str,
+    char_def: &'a [(char, Recti)]
+}
+
+pub struct AtlasImageEntry<'a> {
+    name: &'a str,
+    rect: Recti,
+}
+
+pub trait Atlas {
+    fn get_size(&self)-> (usize, usize);
+    fn get_pixels(&self) -> &[u8];
+    fn get_fonts(&self) -> &[AtlasFont];
+    fn get_image_entries(&self) -> &[AtlasImageEntry];
+}
+
 pub trait RendererBackEnd<P> {
     fn get_char_width(&self, _font: FontId, c: char) -> usize;
     fn get_font_height(&self, _font: FontId) -> usize;
