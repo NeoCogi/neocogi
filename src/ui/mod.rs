@@ -51,6 +51,7 @@
 // IN THE SOFTWARE.
 //
 use core::ptr;
+use std::iter::FromIterator;
 use std::marker::PhantomData;
 
 mod atlas;
@@ -71,14 +72,14 @@ use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 use bitflags::*;
 
 pub struct AtlasFont<'a> {
-    name: &'a str, // font name
-    height: usize, // height size in pixels
-    char_def: &'a [(char, Recti)],
+    pub name: &'a str, // font name
+    pub height: usize, // height size in pixels
+    pub char_def: &'a [(char, Recti)],
 }
 
 pub struct AtlasImageEntry<'a> {
-    name: &'a str,
-    rect: Recti,
+    pub name: &'a str,
+    pub rect: Recti,
 }
 
 pub trait Atlas {
@@ -574,63 +575,91 @@ fn hash_bytes(hash_0: &mut Id, s: &[u8]) {
 }
 
 pub trait NumAppender {
-    fn append_real(&mut self, fmt: &str, r: f32);
-    fn append_int(&mut self, fmt: &str, i: i32);
+    fn append_real(&mut self, precision: usize, r: f32);
+    fn append_int(&mut self, base: usize, i: i32); // base < 16
+}
+
+const DIGITS: [char; 32] = [
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I',
+    'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+];
+
+// base should be <= 32
+fn print_int(base: usize, i: i32) -> String {
+    assert!(base <= 32);
+    let mut int_str = Vec::new();
+    let mut i = (i.signum() * i) as usize;
+    while i != 0 {
+        int_str.push(DIGITS[i % base]);
+        i /= base;
+    }
+
+    if i < 0 {
+        int_str.push('-')
+    }
+
+    int_str.reverse();
+    String::from_iter(int_str)
+}
+
+fn print_float(f: f64, p: usize) -> String {
+    let mut int_str = Vec::new();
+    let mut c = 0;
+    let mut i = (f.signum() * f) as usize;
+    while i != 0 {
+        int_str.push(DIGITS[i % 10]);
+        i /= 10;
+        c += 1;
+    }
+
+    if int_str.len() == 0 {
+        int_str.push('0');
+    }
+
+    if f < 0.0 {
+        int_str.push('-')
+    }
+
+    int_str.reverse();
+
+    let mut pow_10 = 1;
+    for i in 0..p {
+        pow_10 *= 10;
+    }
+
+    // i2 = i * 10^p
+    // d2 = f * 10^p
+    // i = 10^p + (d2 - i2) <- needed so we can get the number of leading 0 right
+    let int2_part = ((f.signum() * f) as usize) * pow_10;
+    let mut dec2_part = pow_10 + ((f.signum() * f) * (pow_10 as f64)) as usize - int2_part;
+
+    if dec2_part == pow_10 || p == 0 {
+        return String::from_iter(int_str);
+    }
+
+    int_str.push('.');
+
+    let mut dec_str = Vec::new();
+    for _ in 0..p {
+        dec_str.push(DIGITS[dec2_part % 10]);
+        dec2_part /= 10;
+        c += 1;
+    }
+    dec_str.reverse();
+
+    int_str.append(&mut dec_str);
+    String::from_iter(int_str)
 }
 
 impl NumAppender for String {
-    fn append_real(&mut self, fmt: &str, v: f32) {
-        unsafe {
-            let mut fmt_ascii = [0u8; 32];
-            let mut i = 0;
-            for c in fmt.chars() {
-                fmt_ascii[i] = c as u8;
-                i += 1;
-            }
-            fmt_ascii[i] = 0;
-
-            let mut number_ascii = [0u8; 32];
-            let number_ptr = number_ascii.as_mut_ptr();
-            libc::sprintf(
-                number_ptr as *mut libc::c_char,
-                fmt_ascii.as_ptr() as *const libc::c_char,
-                v as f64,
-            );
-            for c in 0..number_ascii.len() {
-                if number_ascii[c] != 0 {
-                    self.push(number_ascii[c] as char);
-                } else {
-                    break;
-                }
-            }
-        }
+    fn append_real(&mut self, precision: usize, v: f32) {
+        let s = print_float(v as f64, precision);
+        self.push_str(s.as_str());
     }
 
-    fn append_int(&mut self, fmt: &str, v: i32) {
-        unsafe {
-            let mut fmt_ascii = [0u8; 32];
-            let mut i = 0;
-            for c in fmt.chars() {
-                fmt_ascii[i] = c as u8;
-                i += 1;
-            }
-            fmt_ascii[i] = 0;
-
-            let mut number_ascii = [0u8; 32];
-            let number_ptr = number_ascii.as_mut_ptr();
-            libc::sprintf(
-                number_ptr as *mut libc::c_char,
-                fmt_ascii.as_ptr() as *const libc::c_char,
-                v,
-            );
-            for c in 0..number_ascii.len() {
-                if number_ascii[c] != 0 {
-                    self.push(number_ascii[c] as char);
-                } else {
-                    break;
-                }
-            }
-        }
+    fn append_int(&mut self, base: usize, v: i32) {
+        let s = print_int(base, v);
+        self.push_str(s.as_str());
     }
 }
 

@@ -51,7 +51,7 @@ pub trait ControlProvider {
         low: Real,
         high: Real,
         step: Real,
-        fmt: &str,
+        precision: usize,
         opt: WidgetOption,
     ) -> ResourceState;
 
@@ -59,7 +59,7 @@ pub trait ControlProvider {
         &mut self,
         value: &mut Real,
         step: Real,
-        fmt: &str,
+        precision: usize,
         opt: WidgetOption,
     ) -> ResourceState;
 }
@@ -69,7 +69,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         if self.mouse_pressed.is_left() && self.key_down.is_shift() && self.hover == Some(id) {
             self.number_edit = Some(id);
             self.number_edit_buf.clear();
-            self.number_edit_buf.append_real("%.3f", *value);
+            self.number_edit_buf.append_real(3, *value);
         }
 
         if self.number_edit == Some(id) {
@@ -243,7 +243,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         low: Real,
         high: Real,
         step: Real,
-        fmt: &str,
+        precision: usize,
         opt: WidgetOption,
     ) -> ResourceState {
         let mut res = ResourceState::NONE;
@@ -278,7 +278,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         let thumb = Rect::new(base.x + x, base.y, w, base.height);
         self.draw_control_frame(id, thumb, ControlColor::Button, opt);
         self.slider_buff.clear();
-        self.slider_buff.append_real(fmt, *value);
+        self.slider_buff.append_real(precision, *value);
         let txt_ptr = self.slider_buff.as_str().as_ptr();
         let txt_slice = slice_from_raw_parts(txt_ptr, self.slider_buff.as_str().len());
         let txt = unsafe { std::str::from_utf8(&*txt_slice) }.unwrap();
@@ -290,7 +290,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         &mut self,
         value: &mut Real,
         step: Real,
-        fmt: &str,
+        precision: usize,
         opt: WidgetOption,
     ) -> ResourceState {
         let mut res = ResourceState::NONE;
@@ -309,7 +309,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         }
         self.draw_control_frame(id, base, ControlColor::Base, opt);
         self.slider_buff.clear();
-        self.slider_buff.append_real(fmt, *value);
+        self.slider_buff.append_real(precision, *value);
         let txt_ptr = self.slider_buff.as_str().as_ptr();
         let txt_slice = slice_from_raw_parts(txt_ptr, self.slider_buff.as_str().len());
         let txt = unsafe { std::str::from_utf8(&*txt_slice) }.unwrap();

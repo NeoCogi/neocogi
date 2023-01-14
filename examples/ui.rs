@@ -156,17 +156,17 @@ impl<'a> State<'a> {
                     ctx.label("Position:");
 
                     buff.clear();
-                    buff.append_int("%d", win_0.x);
+                    buff.append_int(10, win_0.x);
                     buff.push_str(", ");
-                    buff.append_int("%d", win_0.y);
+                    buff.append_int(10, win_0.y);
 
                     ctx.label(buff.as_str());
                     buff.clear();
                     ctx.label("Size:");
 
-                    buff.append_int("%d", win_0.width);
+                    buff.append_int(10, win_0.width);
                     buff.push_str(", ");
-                    buff.append_int("%d", win_0.height);
+                    buff.append_int(10, win_0.height);
 
                     ctx.label(buff.as_str());
                 });
@@ -294,7 +294,7 @@ impl<'a> State<'a> {
                                 0 as libc::c_int as Real,
                                 255 as libc::c_int as Real,
                                 0 as libc::c_int as Real,
-                                "%.2",
+                                0,
                                 WidgetOption::ALIGN_CENTER,
                             );
                             ctx.label("Green:");
@@ -303,7 +303,7 @@ impl<'a> State<'a> {
                                 0 as libc::c_int as Real,
                                 255 as libc::c_int as Real,
                                 0 as libc::c_int as Real,
-                                "%.2",
+                                0,
                                 WidgetOption::ALIGN_CENTER,
                             );
                             ctx.label("Blue:");
@@ -312,7 +312,7 @@ impl<'a> State<'a> {
                                 0 as libc::c_int as Real,
                                 255 as libc::c_int as Real,
                                 0 as libc::c_int as Real,
-                                "%.2",
+                                0,
                                 WidgetOption::ALIGN_CENTER,
                             );
                         });
@@ -324,9 +324,9 @@ impl<'a> State<'a> {
                     );
                     let mut buff = String::new();
                     buff.push_str("#");
-                    buff.append_int("%02X", self.bg[0] as _);
-                    buff.append_int("%02X", self.bg[1] as _);
-                    buff.append_int("%02X", self.bg[2] as _);
+                    buff.append_int(16, self.bg[0] as _);
+                    buff.append_int(16, self.bg[1] as _);
+                    buff.append_int(16, self.bg[2] as _);
                     ctx.draw_control_text(
                         buff.as_str(),
                         r,
@@ -397,7 +397,7 @@ impl<'a> State<'a> {
             low as Real,
             high as Real,
             0 as libc::c_int as Real,
-            "%.2f",
+            0,
             WidgetOption::ALIGN_CENTER,
         );
         *value = tmp as libc::c_uchar;
