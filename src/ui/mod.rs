@@ -576,7 +576,78 @@ fn hash_bytes(hash_0: &mut Id, s: &[u8]) {
 
 pub trait NumAppender {
     fn append_real(&mut self, precision: usize, r: f32);
-    fn append_int(&mut self, base: usize, i: i32); // base < 16
+    fn append_int(&mut self, base: usize, leading_zeros: usize, i: i32); // base < 16
+}
+
+fn is_digit(ch: char) -> bool {
+    let c = ch as usize;
+    c >= '0' as usize && c <= '9' as usize
+}
+
+fn digit_to_num(ch: char) -> i32 {
+    ch as i32 - '0' as i32
+}
+
+fn int_parser(s: &str) -> Result<i32, ()> {
+    let mut v: i32 = 0;
+    for c in s.chars() {
+        match c {
+            c if is_digit(c) => v = v * 10 + digit_to_num(c),
+            _ => return Result::Err(()),
+        }
+    }
+    Result::Ok(v)
+}
+
+fn parse_decimal(s: &str) -> Result<f64, ()> {
+    let mut sign = 1.0;
+    let mut p = s.chars().peekable();
+    match p.peek() {
+        Some('+') => {
+            p.next();
+        }
+        Some('-') => {
+            p.next();
+            sign = -1.0
+        }
+        Some(c) if is_digit(*c) => (),
+        _ => return Err(()),
+    }
+
+    // consume the leading zeros
+    'zeros: loop {
+        match p.peek() {
+            Some('0') => {
+                p.next();
+            }
+            _ => break 'zeros,
+        }
+    }
+
+    let mut int_part = 0;
+
+    'int_part: loop {
+        match p.next() {
+            Some(c) if is_digit(c) => int_part = int_part * 10 + digit_to_num(c),
+            Some('.') => break 'int_part,
+            None => return Ok((int_part as f64) * sign),
+            _ => return Err(()),
+        }
+    }
+
+    let mut decimal_part = 0.0;
+    let mut power = 10.0;
+    loop {
+        match p.next() {
+            Some(c) if is_digit(c) => {
+                decimal_part += digit_to_num(c) as f64 / power;
+                power *= 10.0;
+            }
+
+            None => return Ok((int_part as f64) * sign + decimal_part),
+            _ => return Err(()),
+        }
+    }
 }
 
 const DIGITS: [char; 32] = [
@@ -585,13 +656,17 @@ const DIGITS: [char; 32] = [
 ];
 
 // base should be <= 32
-fn print_int(base: usize, i: i32) -> String {
+fn print_int(base: usize, leading_zeros: usize, i: i32) -> String {
     assert!(base <= 32);
     let mut int_str = Vec::new();
     let mut i = (i.signum() * i) as usize;
     while i != 0 {
         int_str.push(DIGITS[i % base]);
         i /= base;
+    }
+
+    for i in int_str.len()..leading_zeros {
+        int_str.push('0');
     }
 
     if i < 0 {
@@ -657,9 +732,33 @@ impl NumAppender for String {
         self.push_str(s.as_str());
     }
 
-    fn append_int(&mut self, base: usize, v: i32) {
-        let s = print_int(base, v);
+    fn append_int(&mut self, base: usize, leading_zeros: usize, v: i32) {
+        let s = print_int(base, leading_zeros, v);
         self.push_str(s.as_str());
+    }
+}
+
+pub trait FromDecimal {
+    fn from_decimal(s: &str) -> Result<Self, ()>
+    where
+        Self: Sized;
+}
+
+impl FromDecimal for f64 {
+    fn from_decimal(s: &str) -> Result<Self, ()>
+    where
+        Self: Sized,
+    {
+        parse_decimal(s)
+    }
+}
+
+impl FromDecimal for f32 {
+    fn from_decimal(s: &str) -> Result<Self, ()>
+    where
+        Self: Sized,
+    {
+        parse_decimal(s).map(|x| x as _)
     }
 }
 

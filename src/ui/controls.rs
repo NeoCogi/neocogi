@@ -65,11 +65,17 @@ pub trait ControlProvider {
 }
 
 impl<P, R: RendererBackEnd<P>> Context<P, R> {
-    fn number_textbox(&mut self, value: &mut Real, r: Recti, id: Id) -> ResourceState {
+    fn number_textbox(
+        &mut self,
+        precision: usize,
+        value: &mut Real,
+        r: Recti,
+        id: Id,
+    ) -> ResourceState {
         if self.mouse_pressed.is_left() && self.key_down.is_shift() && self.hover == Some(id) {
             self.number_edit = Some(id);
             self.number_edit_buf.clear();
-            self.number_edit_buf.append_real(3, *value);
+            self.number_edit_buf.append_real(precision, *value);
         }
 
         if self.number_edit == Some(id) {
@@ -77,21 +83,13 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             let res: ResourceState = self.textbox_raw(&mut temp, id, r, WidgetOption::NONE);
             self.number_edit_buf = temp;
             if res.is_submitted() || self.focus != Some(id) {
-                let mut ascii = [0u8; 32];
-                let mut i = 0;
-                for c in self.number_edit_buf.as_str().chars() {
-                    ascii[i] = c as u8;
-                    i += 1;
+                match Real::from_decimal(self.number_edit_buf.as_str()) {
+                    Ok(v) => {
+                        *value = v as Real;
+                        self.number_edit = None;
+                    }
+                    _ => (),
                 }
-                ascii[i] = '\0' as u8;
-                let v = unsafe {
-                    libc::strtod(
-                        ascii.as_ptr() as *const libc::c_char,
-                        ptr::null_mut() as *mut *mut libc::c_char,
-                    )
-                };
-                *value = v as Real;
-                self.number_edit = None;
             } else {
                 return ResourceState::ACTIVE;
             }
@@ -251,7 +249,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         let mut v = last;
         let id = self.get_id_from_ptr(value);
         let base = self.layout_stack.next_cell(&self.style);
-        if !self.number_textbox(&mut v, base, id).is_none() {
+        if !self.number_textbox(precision, &mut v, base, id).is_none() {
             return res;
         }
         self.update_control(id, base, opt);
@@ -297,7 +295,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         let id: Id = self.get_id_from_ptr(value);
         let base = self.layout_stack.next_cell(&self.style);
         let last: Real = *value;
-        if !self.number_textbox(value, base, id).is_none() {
+        if !self.number_textbox(precision, value, base, id).is_none() {
             return res;
         }
         self.update_control(id, base, opt);
