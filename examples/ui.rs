@@ -291,27 +291,27 @@ impl<'a> State<'a> {
                             ctx.label("Red:");
                             ctx.slider_ex(
                                 &mut self.bg[0],
-                                0 as libc::c_int as Real,
-                                255 as libc::c_int as Real,
-                                0 as libc::c_int as Real,
+                                0.0,
+                                255.0,
+                                0.0,
                                 0,
                                 WidgetOption::ALIGN_CENTER,
                             );
                             ctx.label("Green:");
                             ctx.slider_ex(
                                 &mut self.bg[1],
-                                0 as libc::c_int as Real,
-                                255 as libc::c_int as Real,
-                                0 as libc::c_int as Real,
+                                0.0,
+                                255.0,
+                                0.0,
                                 0,
                                 WidgetOption::ALIGN_CENTER,
                             );
                             ctx.label("Blue:");
                             ctx.slider_ex(
                                 &mut self.bg[2],
-                                0 as libc::c_int as Real,
-                                255 as libc::c_int as Real,
-                                0 as libc::c_int as Real,
+                                0.0,
+                                255.0,
+                                0.0,
                                 0,
                                 WidgetOption::ALIGN_CENTER,
                             );
@@ -396,36 +396,30 @@ impl<'a> State<'a> {
             &mut tmp,
             low as Real,
             high as Real,
-            0 as libc::c_int as Real,
+            0.0,
             0,
             WidgetOption::ALIGN_CENTER,
         );
-        *value = tmp as libc::c_uchar;
+        *value = tmp as u8;
         ctx.pop_id();
         return res;
     }
     fn style_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
         ctx.window(
             "Style Editor",
-            Rect::new(
-                350 as libc::c_int,
-                250 as libc::c_int,
-                300 as libc::c_int,
-                240 as libc::c_int,
-            ),
+            Rect::new(350, 250, 300, 240),
             WidgetOption::NONE,
             |ctx| {
                 let style = ctx.style;
-                let sw: libc::c_int = (ctx.get_current_container_body().width as libc::c_double
-                    * 0.14f64) as libc::c_int;
+                let sw = (ctx.get_current_container_body().width as f64 * 0.14f64) as i32;
                 ctx.rows_with_line_config(&[80, sw, sw, sw, sw, -1], 0, |ctx| {
                     for i in 0..self.label_colors.len() {
                         ctx.label(self.label_colors[i].label);
                         let color = &mut self.colors[i];
-                        Self::uint8_slider(ctx, &mut color.x, 0 as libc::c_int, 255 as libc::c_int);
-                        Self::uint8_slider(ctx, &mut color.y, 0 as libc::c_int, 255 as libc::c_int);
-                        Self::uint8_slider(ctx, &mut color.z, 0 as libc::c_int, 255 as libc::c_int);
-                        Self::uint8_slider(ctx, &mut color.w, 0 as libc::c_int, 255 as libc::c_int);
+                        Self::uint8_slider(ctx, &mut color.x, 0, 255);
+                        Self::uint8_slider(ctx, &mut color.y, 0, 255);
+                        Self::uint8_slider(ctx, &mut color.z, 0, 255);
+                        Self::uint8_slider(ctx, &mut color.w, 0, 255);
                         ctx.style.colors[i] = *color;
                         let r = ctx.next_cell();
                         ctx.draw_rect(r, ctx.style.colors[i]);

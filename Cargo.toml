@@ -12,7 +12,6 @@ repository = "https://github.com/NeoCogi/neocogi"
 rs-math3d = { version = "0.9.21" }
 glfw = { version="0.47.0", default-features=false, optional=true }
 bitflags = "1.3.2"
-libc = "0.2.138"
 
 [build-dependencies]
 gl_generator = "0.14.0"
