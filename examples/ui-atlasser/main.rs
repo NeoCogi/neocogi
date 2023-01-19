@@ -19,7 +19,7 @@ fn main() {
                     if !ctl_provider
                         .button(
                             format!("Hello {}", i).as_str(),
-                            ui::Icon::None,
+                            None,
                             ui::WidgetOption::NONE | ui::WidgetOption::ALIGN_CENTER,
                         )
                         .is_none()

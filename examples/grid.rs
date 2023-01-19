@@ -43,13 +43,6 @@ use neocogi::ui::*;
 
 use neocogi::scene::utility_mesh::*;
 
-pub fn r_get_char_width(_font: FontId, c: char) -> usize {
-    ATLAS[ATLAS_FONT as usize + c as usize].width as usize
-}
-pub fn r_get_font_height(_font: FontId) -> usize {
-    18
-}
-
 pub struct State {
     view: View3D,
 }
@@ -127,17 +120,11 @@ fn main() {
                 |ctx| {
                     let style = ctx.style;
                     ctx.column(|ctx| {
-                        if ctx
-                            .button("Orbit", ui::Icon::None, WidgetOption::NONE)
-                            .is_submitted()
-                        {
+                        if ctx.button("Orbit", None, WidgetOption::NONE).is_submitted() {
                             state.view.set_navigation_mode(NavigationMode::Orbit)
                         }
 
-                        if ctx
-                            .button("Pan", ui::Icon::None, WidgetOption::NONE)
-                            .is_submitted()
-                        {
+                        if ctx.button("Pan", None, WidgetOption::NONE).is_submitted() {
                             state.view.set_navigation_mode(NavigationMode::Pan)
                         }
                     });
