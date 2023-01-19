@@ -54,8 +54,8 @@ use core::ptr;
 use std::iter::FromIterator;
 use std::marker::PhantomData;
 
-mod atlas;
-pub use atlas::*;
+mod atlas_data;
+pub use atlas_data::*;
 
 mod layout;
 use layout::*;
@@ -97,8 +97,8 @@ pub trait RendererBackEnd<P> {
     fn end_frame(&mut self) -> P;
 
     fn draw_rect(&mut self, rect: Recti, color: Color4b);
-    fn draw_text(&mut self, text: &str, pos: Vec2i, color: Color4b);
-    fn draw_icon(&mut self, id: Icon, r: Recti, color: Color4b);
+    fn draw_text(&mut self, font: FontId, text: &str, pos: Vec2i, color: Color4b);
+    fn draw_icon(&mut self, id: usize, r: Recti, color: Color4b);
 
     fn set_clip_rect(&mut self, rect: Recti);
 
@@ -203,17 +203,6 @@ impl ControlColor {
             _ => *self,
         }
     }
-}
-
-#[derive(PartialEq, Copy, Clone)]
-#[repr(u32)]
-pub enum Icon {
-    Max = 5,
-    Expanded = 4,
-    Collapsed = 3,
-    Check = 2,
-    Close = 1,
-    None = 0,
 }
 
 bitflags! {
@@ -438,7 +427,7 @@ pub enum Command {
     },
     Icon {
         rect: Recti,
-        id: Icon,
+        id: usize,
         color: Color4b,
     },
     Custom {
@@ -465,7 +454,8 @@ pub struct FontId(pub usize);
 
 #[derive(Copy, Clone)]
 pub struct Style {
-    pub font: FontId,
+    pub window_font: FontId,
+    pub control_font: FontId,
     pub size: Vec2i,
     pub padding: i32,
     pub spacing: i32,
@@ -488,7 +478,8 @@ static UNCLIPPED_RECT: Recti = Recti {
 impl Default for Style {
     fn default() -> Self {
         Self {
-            font: FontId(0),
+            window_font: FontId(1),
+            control_font: FontId(0),
             size: Vec2i { x: 68, y: 10 },
             padding: 5,
             spacing: 4,
@@ -1128,7 +1119,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         }
     }
 
-    pub fn draw_icon(&mut self, id: Icon, rect: Recti, color: Color4b) {
+    pub fn draw_icon(&mut self, id: usize, rect: Recti, color: Color4b) {
         let clipped = self.check_clip(rect);
         match clipped {
             Clip::All => return,
@@ -1180,13 +1171,13 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
 
     pub fn draw_control_text(
         &mut self,
+        font: FontId,
         str: &str,
         rect: Recti,
         colorid: ControlColor,
         opt: WidgetOption,
     ) {
         let mut pos: Vec2i = Vec2i { x: 0, y: 0 };
-        let font = self.style.font;
         let tw = self.get_text_width(font, str);
         self.push_clip_rect(rect);
         pos.y = rect.y + (rect.height - self.get_text_height(font, str)) / 2;
@@ -1243,7 +1234,12 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 res = usize::max(res, acc);
                 acc = 0;
             }
-            acc += self.renderer.get_char_width(font, c);
+            //acc += self.renderer.get_char_width(font, c);
+            if (c as usize) < 127 {
+                let chr = usize::min(c as usize, 127);
+                let entry = &ATLAS.fonts[font.0].1.entries[chr - 32];
+                acc += entry.advance.x as usize;
+            }
         }
         res = usize::max(res, acc);
         res as i32
@@ -1264,6 +1260,8 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         let id: Id = self.get_id_from_str(label);
         let idx = self.treenode_pool.get(id);
         let mut expanded = 0;
+        let window_font = self.style.window_font;
+
         self.rows_with_line_config(&[-1], 0, |ctx| {
             let mut active = idx.is_some() as i32;
             expanded = if opt.is_expanded() {
@@ -1292,17 +1290,19 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 ctx.draw_control_frame(id, r, ControlColor::Button, WidgetOption::NONE);
             }
             ctx.draw_icon(
-                if expanded != 0 {
-                    Icon::Expanded
-                } else {
-                    Icon::Collapsed
-                },
+                if expanded != 0 { COLLAPSE } else { EXPAND },
                 Rect::new(r.x, r.y, r.height, r.height),
                 ctx.style.colors[ControlColor::Text as usize],
             );
             r.x += r.height - ctx.style.padding;
             r.width -= r.height - ctx.style.padding;
-            ctx.draw_control_text(label, r, ControlColor::Text, WidgetOption::NONE);
+            ctx.draw_control_text(
+                window_font,
+                label,
+                r,
+                ControlColor::Text,
+                WidgetOption::NONE,
+            );
         });
         return if expanded != 0 {
             ResourceState::ACTIVE
@@ -1481,7 +1481,13 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
             if !opt.has_no_title() {
                 let id = self.get_id_from_str("!title");
                 self.update_control(id, tr, opt);
-                self.draw_control_text(title, tr, ControlColor::TitleText, opt);
+                self.draw_control_text(
+                    self.style.window_font,
+                    title,
+                    tr,
+                    ControlColor::TitleText,
+                    opt,
+                );
                 if Some(id) == self.focus && self.mouse_down.is_left() {
                     self.containers[cnt_id.unwrap()].rect.x += self.mouse_delta.x;
                     self.containers[cnt_id.unwrap()].rect.y += self.mouse_delta.y;
@@ -1494,7 +1500,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 let r = Rect::new(tr.x + tr.width - tr.height, tr.y, tr.height, tr.height);
                 tr.width -= r.width;
                 self.draw_icon(
-                    Icon::Close,
+                    CLOSE,
                     r,
                     self.style.colors[ControlColor::TitleText as usize],
                 );
@@ -1604,10 +1610,10 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                         str_len,
                         pos,
                         color,
-                        ..
+                        font,
                     } => {
                         let str = &self.text_stack[str_start..str_start + str_len];
-                        self.renderer.draw_text(str, pos, color);
+                        self.renderer.draw_text(font, str, pos, color);
                     }
                     Command::Rect { rect, color } => {
                         self.renderer.draw_rect(rect, color);
