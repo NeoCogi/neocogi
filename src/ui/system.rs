@@ -199,14 +199,14 @@ impl Renderer {
             .unwrap();
 
         let tex_desc = TextureDesc {
-            sampler_desc: SamplerDesc::default(ATLAS_WIDTH as usize, ATLAS_HEIGHT as usize)
+            sampler_desc: SamplerDesc::default(ATLAS.width, ATLAS.height)
                 .with_pixel_format(PixelFormat::R8(
                     MinMagFilter::default()
                         .with_mag_filter(Filter::Nearest)
                         .with_min_filter(Filter::Nearest),
                 ))
                 .with_wrap_mode(WrapMode::ClampToEdge),
-            payload: Some(Arc::new(ATLAS_TEXTURE.to_vec())),
+            payload: Some(Arc::new(ATLAS.pixels.to_vec())),
         };
 
         let ui_texture = drv.create_texture(tex_desc).unwrap();
@@ -292,10 +292,10 @@ impl Renderer {
             Some((d, s)) => (d, s),
         };
 
-        let x = src.x as f32 / ATLAS_WIDTH as f32;
-        let y = src.y as f32 / ATLAS_HEIGHT as f32;
-        let w = src.width as f32 / ATLAS_WIDTH as f32;
-        let h = src.height as f32 / ATLAS_HEIGHT as f32;
+        let x = src.x as f32 / ATLAS.width as f32;
+        let y = src.y as f32 / ATLAS.height as f32;
+        let w = src.width as f32 / ATLAS.width as f32;
+        let h = src.height as f32 / ATLAS.height as f32;
 
         let mut v0 = Vertex::default();
         let mut v1 = Vertex::default();
@@ -373,25 +373,31 @@ impl super::RendererBackEnd<Pass> for Renderer {
     }
 
     fn draw_rect(&mut self, rect: Recti, color: Color4b) {
-        self.push_rect(rect, ATLAS[ATLAS_WHITE as usize], color);
+        self.push_rect(rect, ATLAS.icons[WHITE].1.rect, color);
     }
 
-    fn draw_text(&mut self, text: &str, pos: Vec2i, color: Color4b) {
+    fn draw_text(&mut self, font: FontId, text: &str, pos: Vec2i, color: Color4b) {
+        let font_size = ATLAS.fonts[font.0].1.line_size as i32;
         let mut dst = Rect::new(pos.x, pos.y, 0, 0);
         for p in text.chars() {
             if (p as usize) < 127 {
                 let chr = usize::min(p as usize, 127);
-                let src = ATLAS[ATLAS_FONT as usize + chr];
+                let entry = &ATLAS.fonts[font.0].1.entries[chr - 32];
+                let src = entry.rect;
                 dst.width = src.width;
                 dst.height = src.height;
-                self.push_rect(dst, src, color);
-                dst.x += dst.width;
+                let mut d = dst;
+                d.x += entry.offset.x;
+                d.y += font_size - entry.rect.height - entry.offset.y;
+
+                self.push_rect(d, src, color);
+                dst.x += entry.advance.x;
             }
         }
     }
 
-    fn draw_icon(&mut self, id: Icon, r: Recti, color: Color4b) {
-        let src = ATLAS[id as usize];
+    fn draw_icon(&mut self, id: usize, r: Recti, color: Color4b) {
+        let src = ATLAS.icons[id as usize].1.rect;
         let x = r.x + (r.width - src.width) / 2;
         let y = r.y + (r.height - src.height) / 2;
         self.push_rect(Rect::new(x, y, src.width, src.height), src, color);
@@ -408,12 +414,12 @@ impl super::RendererBackEnd<Pass> for Renderer {
         // );
     }
 
-    fn get_char_width(&self, _font: FontId, c: char) -> usize {
-        ATLAS[ATLAS_FONT as usize + c as usize].width as usize
+    fn get_char_width(&self, font: FontId, c: char) -> usize {
+        ATLAS.fonts[font.0].1.entries[c as usize - 32].rect.width as usize
     }
 
-    fn get_font_height(&self, _font: FontId) -> usize {
-        18
+    fn get_font_height(&self, font: FontId) -> usize {
+        ATLAS.fonts[font.0].1.font_size
     }
 
     fn flush(&mut self) {

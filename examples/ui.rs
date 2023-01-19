@@ -152,7 +152,7 @@ impl<'a> State<'a> {
 
             ctx.header("Window Info", WidgetOption::NONE, |ctx| {
                 let win_0 = ctx.get_current_container_rect();
-                ctx.rows_with_line_config(&[54, -1], 0, |ctx| {
+                ctx.rows_with_line_config(&[96, -1], 0, |ctx| {
                     ctx.label("Position:");
 
                     buff.clear();
@@ -173,29 +173,29 @@ impl<'a> State<'a> {
             });
             ctx
             .header("Test Buttons", WidgetOption::EXPANDED, |ctx| {
-                ctx.rows_with_line_config(&[86, -110, -1], 0, |ctx| {
+                ctx.rows_with_line_config(&[120, -110, -1], 0, |ctx| {
                     ctx.label("Test buttons 1:");
                     if !ctx
-                        .button("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button("Button 1", None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         self.write_log("Pressed button 1");
                     }
                     if !ctx
-                        .button("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button("Button 2", None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         self.write_log("Pressed button 2");
                     }
                     ctx.label("Test buttons 2:");
                     if !ctx
-                        .button("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button("Button 3", None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         self.write_log("Pressed button 3");
                     }
                     if !ctx
-                        .button("Popup", Icon::None, WidgetOption::ALIGN_CENTER)
+                        .button("Popup", None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         ctx.open_popup("Test Popup");
@@ -203,13 +203,13 @@ impl<'a> State<'a> {
 
                     ctx.popup("Test Popup", Recti::new(0, 0, 90, 90), |ctx| {
                         if !ctx
-                            .button("Hello", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .button("Hello", None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
                             self.write_log("Hello")
                         }
                         if !ctx
-                            .button("World", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .button("World", None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
                             self.write_log("World")
@@ -227,13 +227,13 @@ impl<'a> State<'a> {
                             });
                             ctx.treenode("Test 1b", WidgetOption::NONE, |ctx| {
                                 if !ctx
-                                    .button("Button 1", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 1", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 1");
                                 }
                                 if !ctx
-                                    .button("Button 2", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 2", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 2");
@@ -243,25 +243,25 @@ impl<'a> State<'a> {
                         ctx.treenode("Test 2", WidgetOption::NONE, |ctx| {
                             ctx.rows_with_line_config(&[54, 54], 0, |ctx| {
                                 if !ctx
-                                    .button("Button 3", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 3", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 3");
                                 }
                                 if !ctx
-                                    .button("Button 4", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 4", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 4");
                                 }
                                 if !ctx
-                                    .button("Button 5", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 5", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 5");
                                 }
                                 if !ctx
-                                    .button("Button 6", Icon::None, WidgetOption::ALIGN_CENTER)
+                                    .button("Button 6", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 6");
@@ -327,7 +327,9 @@ impl<'a> State<'a> {
                     buff.append_int(16, 2, self.bg[0] as _);
                     buff.append_int(16, 2, self.bg[1] as _);
                     buff.append_int(16, 2, self.bg[2] as _);
+                    let font = FontId(0);
                     ctx.draw_control_text(
+                        font,
                         buff.as_str(),
                         r,
                         ControlColor::Text,
@@ -368,7 +370,7 @@ impl<'a> State<'a> {
                             submitted = true;
                         }
                         if !ctx
-                            .button("Submit", Icon::None, WidgetOption::ALIGN_CENTER)
+                            .button("Submit", None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
                             submitted = true;
