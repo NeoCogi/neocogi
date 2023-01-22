@@ -454,8 +454,9 @@ pub struct FontId(pub usize);
 
 #[derive(Copy, Clone)]
 pub struct Style {
-    pub window_font: FontId,
-    pub control_font: FontId,
+    pub bold_font: FontId,
+    pub normal_font: FontId,
+    pub console_font: FontId,
     pub size: Vec2i,
     pub padding: i32,
     pub spacing: i32,
@@ -478,8 +479,9 @@ static UNCLIPPED_RECT: Recti = Recti {
 impl Default for Style {
     fn default() -> Self {
         Self {
-            window_font: FontId(1),
-            control_font: FontId(0),
+            bold_font: FontId(BOLD),
+            normal_font: FontId(NORMAL),
+            console_font: FontId(CONSOLE),
             size: Vec2i { x: 68, y: 10 },
             padding: 5,
             spacing: 4,
@@ -1253,6 +1255,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
 
     fn header_internal(
         &mut self,
+        font: FontId,
         label: &str,
         is_treenode: bool,
         opt: WidgetOption,
@@ -1260,7 +1263,6 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         let id: Id = self.get_id_from_str(label);
         let idx = self.treenode_pool.get(id);
         let mut expanded = 0;
-        let window_font = self.style.window_font;
 
         self.rows_with_line_config(&[-1], 0, |ctx| {
             let mut active = idx.is_some() as i32;
@@ -1290,19 +1292,13 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 ctx.draw_control_frame(id, r, ControlColor::Button, WidgetOption::NONE);
             }
             ctx.draw_icon(
-                if expanded != 0 { COLLAPSE } else { EXPAND },
+                if expanded != 0 { MINUS } else { PLUS },
                 Rect::new(r.x, r.y, r.height, r.height),
                 ctx.style.colors[ControlColor::Text as usize],
             );
             r.x += r.height - ctx.style.padding;
             r.width -= r.height - ctx.style.padding;
-            ctx.draw_control_text(
-                window_font,
-                label,
-                r,
-                ControlColor::Text,
-                WidgetOption::NONE,
-            );
+            ctx.draw_control_text(font, label, r, ControlColor::Text, WidgetOption::NONE);
         });
         return if expanded != 0 {
             ResourceState::ACTIVE
@@ -1311,12 +1307,12 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         };
     }
 
-    fn header_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
-        self.header_internal(label, false, opt)
+    fn header_ex(&mut self, font: FontId, label: &str, opt: WidgetOption) -> ResourceState {
+        self.header_internal(font, label, false, opt)
     }
 
     fn begin_treenode_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
-        let res = self.header_internal(label, true, opt);
+        let res = self.header_internal(self.style.normal_font, label, true, opt);
         if res.is_active() && self.last_id.is_some() {
             self.layout_stack.top_mut().indent += self.style.indent;
             self.id_stack.push(self.last_id.unwrap());
@@ -1482,7 +1478,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                 let id = self.get_id_from_str("!title");
                 self.update_control(id, tr, opt);
                 self.draw_control_text(
-                    self.style.window_font,
+                    self.style.bold_font,
                     title,
                     tr,
                     ControlColor::TitleText,
@@ -1724,7 +1720,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         opt: WidgetOption,
         f: F,
     ) -> ResourceState {
-        let res = self.header_internal(label, false, opt);
+        let res = self.header_internal(self.style.bold_font, label, false, opt);
         if res.is_active() && self.last_id.is_some() {
             f(self);
         }

@@ -100,7 +100,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
 
 impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
     fn text(&mut self, text: &str) {
-        let font = self.style.control_font;
+        let font = self.style.normal_font;
         let color = self.style.colors[ControlColor::Text as usize];
         let style = self.style;
         self.column(|ctx| {
@@ -130,7 +130,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
     fn label(&mut self, text: &str) {
         let layout = self.layout_stack.next_cell(&self.style);
         self.draw_control_text(
-            self.style.control_font,
+            self.style.normal_font,
             text,
             layout,
             ControlColor::Text,
@@ -152,7 +152,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         }
         self.draw_control_frame(id, r, ControlColor::Button, opt);
         if label.len() > 0 {
-            self.draw_control_text(self.style.control_font, label, r, ControlColor::Text, opt);
+            self.draw_control_text(self.style.normal_font, label, r, ControlColor::Text, opt);
         }
         if icon.is_some() {
             self.draw_icon(
@@ -174,23 +174,13 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
             res |= ResourceState::CHANGE;
             *state = *state == false;
         }
-        //self.draw_control_frame(id, box_0, ControlColor::Base, WidgetOption::NONE);
+        self.draw_control_frame(id, box_0, ControlColor::Base, WidgetOption::NONE);
         if *state {
-            self.draw_icon(
-                CHECKBOX_CHECKED,
-                box_0,
-                self.style.colors[ControlColor::Text as usize],
-            );
-        } else {
-            self.draw_icon(
-                CHECKBOX_UNCHECKED,
-                box_0,
-                self.style.colors[ControlColor::Text as usize],
-            );
+            self.draw_icon(CHECK, box_0, self.style.colors[ControlColor::Text as usize]);
         }
         r = Rect::new(r.x + box_0.width, r.y, r.width - box_0.width, r.height);
         self.draw_control_text(
-            self.style.control_font,
+            self.style.normal_font,
             label,
             r,
             ControlColor::Text,
@@ -230,7 +220,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         self.draw_control_frame(id, r, ControlColor::Base, opt);
         if self.focus == Some(id) {
             let color = self.style.colors[ControlColor::Text as usize];
-            let font = self.style.control_font;
+            let font = self.style.normal_font;
             let textw = self.get_text_width(font, buf.as_str());
             let texth = self.get_text_height(font, buf.as_str());
             let ofx = r.width - self.style.padding - textw - 1;
@@ -247,7 +237,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
             self.pop_clip_rect();
         } else {
             self.draw_control_text(
-                self.style.control_font,
+                self.style.normal_font,
                 buf.as_str(),
                 r,
                 ControlColor::Text,
@@ -308,7 +298,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         let txt_ptr = self.slider_buff.as_str().as_ptr();
         let txt_slice = slice_from_raw_parts(txt_ptr, self.slider_buff.as_str().len());
         let txt = unsafe { std::str::from_utf8(&*txt_slice) }.unwrap();
-        self.draw_control_text(self.style.control_font, txt, base, ControlColor::Text, opt);
+        self.draw_control_text(self.style.normal_font, txt, base, ControlColor::Text, opt);
         return res;
     }
 
@@ -339,7 +329,7 @@ impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         let txt_ptr = self.slider_buff.as_str().as_ptr();
         let txt_slice = slice_from_raw_parts(txt_ptr, self.slider_buff.as_str().len());
         let txt = unsafe { std::str::from_utf8(&*txt_slice) }.unwrap();
-        self.draw_control_text(self.style.control_font, txt, base, ControlColor::Text, opt);
+        self.draw_control_text(self.style.normal_font, txt, base, ControlColor::Text, opt);
         return res;
     }
 }

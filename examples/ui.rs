@@ -172,7 +172,7 @@ impl<'a> State<'a> {
                 });
             });
             ctx
-            .header("Test Buttons", WidgetOption::EXPANDED, |ctx| {
+            .header( "Test Buttons", WidgetOption::EXPANDED, |ctx| {
                 ctx.rows_with_line_config(&[120, -110, -1], 0, |ctx| {
                     ctx.label("Test buttons 1:");
                     if !ctx
@@ -217,7 +217,7 @@ impl<'a> State<'a> {
                     });
                 });
             });
-            ctx.header("Tree and Text", WidgetOption::EXPANDED, |ctx| {
+            ctx.header( "Tree and Text", WidgetOption::EXPANDED, |ctx| {
                 ctx.rows_with_line_config(&[140, -1], 0, |ctx| {
                     ctx.column(|ctx| {
                         ctx.treenode("Test 1", WidgetOption::NONE, |ctx| {
