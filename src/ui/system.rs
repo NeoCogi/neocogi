@@ -120,18 +120,18 @@ pub struct Renderer {
     vertices: Vec<Vertex>,
     indices: Vec<u16>,
 
-    pass: Option<Pass>,
+    queue: Option<PassCommandQueue>,
 
     clip: Recti,
 
     draw_call_count: usize,
 }
 
-pub struct Input<P, R: super::RendererBackEnd<P>> {
+pub struct Input<P: Default, R: super::RendererBackEnd<P>> {
     _unused: PhantomData<(P, R)>,
 }
 
-impl<P, R: super::RendererBackEnd<P>> Input<P, R> {
+impl<P: Default, R: super::RendererBackEnd<P>> Input<P, R> {
     pub fn new() -> Self {
         Self {
             _unused: PhantomData::default(),
@@ -220,7 +220,7 @@ impl Renderer {
             ui_texture,
             vertices: Vec::new(),
             indices: Vec::new(),
-            pass: None,
+            queue: None,
             clip: Recti {
                 x: 0,
                 y: 0,
@@ -336,40 +336,28 @@ impl Renderer {
     }
 }
 
-impl super::RendererBackEnd<Pass> for Renderer {
+impl super::RendererBackEnd<PassCommandQueue> for Renderer {
     fn frame_size(&self) -> (usize, usize) {
         (self.canvas_width as _, self.canvas_height as _)
     }
 
     fn begin_frame(&mut self, width: usize, height: usize) {
-        assert_eq!(self.pass.is_none(), true);
+        assert_eq!(self.queue.is_none(), true);
         self.canvas_width = width as _;
         self.canvas_height = height as _;
 
-        let mut pass = Pass::new(
-            width as usize,
-            height as usize,
-            None,
-            [
-                ColorPassAction::Clear(color4b(0x7F, 0x7F, 0x7F, 0xFF)),
-                ColorPassAction::Previous,
-                ColorPassAction::Previous,
-                ColorPassAction::Previous,
-            ],
-            DepthPassAction::Clear(1.0),
-        );
+        let mut queue = PassCommandQueue::new();
+        queue.set_viewport(0, 0, self.canvas_width, self.canvas_height);
 
-        pass.set_viewport(0, 0, self.canvas_width, self.canvas_height);
-
-        self.pass = Some(pass);
+        self.queue = Some(queue);
         self.draw_call_count = 0;
     }
 
-    fn end_frame(&mut self) -> Pass {
+    fn end_frame(&mut self) -> PassCommandQueue {
         self.flush();
-        let mut pass = None;
-        core::mem::swap(&mut self.pass, &mut pass);
-        pass.unwrap()
+        let mut queue = None;
+        core::mem::swap(&mut self.queue, &mut queue);
+        queue.unwrap()
     }
 
     fn draw_rect(&mut self, rect: Recti, color: Color4b) {
@@ -414,6 +402,11 @@ impl super::RendererBackEnd<Pass> for Renderer {
         // );
     }
 
+    fn add_render_pass_commands(&mut self, commands: PassCommandQueue) {
+        self.flush();
+        self.queue.as_mut().unwrap().append(commands);
+    }
+
     fn get_char_width(&self, font: FontId, c: char) -> usize {
         ATLAS.fonts[font.0].1.entries[c as usize - 32].rect.width as usize
     }
@@ -424,12 +417,12 @@ impl super::RendererBackEnd<Pass> for Renderer {
 
     fn flush(&mut self) {
         if self.vertices.len() != 0 && self.indices.len() != 0 {
-            self.pass.as_mut().unwrap().update_device_buffer(
+            self.queue.as_mut().unwrap().update_device_buffer(
                 &mut self.vertex_buffer,
                 0,
                 Arc::new(self.vertices.clone()),
             );
-            self.pass.as_mut().unwrap().update_device_buffer(
+            self.queue.as_mut().unwrap().update_device_buffer(
                 &mut self.index_buffer,
                 0,
                 Arc::new(self.indices.clone()),
@@ -453,7 +446,7 @@ impl super::RendererBackEnd<Pass> for Renderer {
                     0.0,
                 ),
             };
-            self.pass.as_mut().unwrap().draw(
+            self.queue.as_mut().unwrap().draw(
                 &self.pipeline,
                 &bindings,
                 Arc::new(GenPayload::from(u)),
@@ -469,13 +462,9 @@ impl super::RendererBackEnd<Pass> for Renderer {
     fn set_atlas(atlas: &Atlas) {
         todo!()
     }
-
-    fn get_pass_mut(&mut self) -> &mut Pass {
-        self.pass.as_mut().unwrap()
-    }
 }
 
-impl<P: Sized, R: super::RendererBackEnd<P>> Input<P, R> {
+impl<P: Sized + Default, R: super::RendererBackEnd<P>> Input<P, R> {
     pub fn handle_event(
         &mut self,
         event: glfw::WindowEvent,
@@ -532,8 +521,8 @@ pub struct App {
     glfw: glfw::Glfw,
     window: glfw::Window,
     driver: DriverPtr,
-    context: super::Context<Pass, Renderer>,
-    input: Input<Pass, Renderer>,
+    context: super::Context<PassCommandQueue, Renderer>,
+    input: Input<PassCommandQueue, Renderer>,
     events: std::sync::mpsc::Receiver<(f64, glfw::WindowEvent)>,
 }
 
@@ -578,7 +567,7 @@ impl App {
         }
     }
 
-    pub fn run<F: FnMut(&mut DriverPtr, &mut super::Context<Pass, Renderer>)>(
+    pub fn run<F: FnMut(&mut DriverPtr, &mut super::Context<PassCommandQueue, Renderer>)>(
         mut self,
         mut process_frame: F,
     ) {
@@ -586,10 +575,23 @@ impl App {
             let (width, height) = self.window.get_framebuffer_size();
 
             let mut driver = self.driver.clone();
-            let mut pass = self.context.frame(width as _, height as _, |ctx| {
+            let queue = self.context.frame(width as _, height as _, |ctx| {
                 process_frame(&mut driver, ctx)
             });
 
+            let mut pass = Pass::new(
+                width as usize,
+                height as usize,
+                None,
+                [
+                    ColorPassAction::Clear(color4b(0x7F, 0x7F, 0x7F, 0xFF)),
+                    ColorPassAction::Previous,
+                    ColorPassAction::Previous,
+                    ColorPassAction::Previous,
+                ],
+                DepthPassAction::Clear(1.0),
+            );
+            pass.queue.append(queue);
             self.driver.render_pass(&mut pass);
             self.window.swap_buffers();
 

@@ -211,7 +211,7 @@ impl<'a> State<'a> {
     fn tri_window(
         &mut self,
         driver: &mut DriverPtr,
-        ctx: &mut ui::Context<Pass, system::Renderer>,
+        ctx: &mut ui::Context<PassCommandQueue, system::Renderer>,
     ) {
         match self.tri_pipeline {
             Some(_) => (),
@@ -266,8 +266,8 @@ impl<'a> State<'a> {
                     let size = ctx.frame_size();
                     ctx.render_custom(|pass, clip| {
                         pass.set_viewport(
-                            win.x as _,
-                            size.1 as u32 - win.height as u32 - win.y as u32,
+                            win.x,
+                            size.1 as i32 - win.height - win.y,
                             clip.width as _,
                             win.height as u32,
                         );
@@ -290,7 +290,7 @@ impl<'a> State<'a> {
         );
     }
 
-    fn test_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
+    fn test_window(&mut self, ctx: &mut ui::Context<PassCommandQueue, system::Renderer>) {
         ctx
         .window(
                 "Demo Window",
@@ -496,7 +496,7 @@ impl<'a> State<'a> {
         });
     }
 
-    fn log_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
+    fn log_window(&mut self, ctx: &mut ui::Context<PassCommandQueue, system::Renderer>) {
         ctx.window(
             "Log Window",
             Rect::new(350, 40, 300, 200),
@@ -543,7 +543,7 @@ impl<'a> State<'a> {
         );
     }
     fn uint8_slider(
-        ctx: &mut ui::Context<Pass, system::Renderer>,
+        ctx: &mut ui::Context<PassCommandQueue, system::Renderer>,
         value: &mut u8,
         low: i32,
         high: i32,
@@ -562,7 +562,7 @@ impl<'a> State<'a> {
         ctx.pop_id();
         return res;
     }
-    fn style_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
+    fn style_window(&mut self, ctx: &mut ui::Context<PassCommandQueue, system::Renderer>) {
         ctx.window(
             "Style Editor",
             Rect::new(350, 250, 300, 240),
@@ -590,7 +590,7 @@ impl<'a> State<'a> {
     fn process_frame(
         &mut self,
         drv: &mut DriverPtr,
-        ctx: &mut ui::Context<Pass, system::Renderer>,
+        ctx: &mut ui::Context<PassCommandQueue, system::Renderer>,
     ) {
         self.style_window(ctx);
         self.log_window(ctx);

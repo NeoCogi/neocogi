@@ -276,6 +276,7 @@ impl ScreenQuad {
             OrigSurfaceType::Float => &self.f_pipeline,
         };
 
-        pass.draw(pipeline, &bindings, Arc::new(Vec::<Vec3f>::new()), 2, 1);
+        pass.queue
+            .draw(pipeline, &bindings, Arc::new(Vec::<Vec3f>::new()), 2, 1);
     }
 }

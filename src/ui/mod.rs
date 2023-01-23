@@ -69,6 +69,7 @@ pub use system::*;
 
 use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 
+use crate::renderer::{Pass, PassCommandQueue, RenderPassCommand};
 use bitflags::*;
 
 pub struct AtlasFont<'a> {
@@ -99,6 +100,7 @@ pub trait RendererBackEnd<P> {
     fn draw_rect(&mut self, rect: Recti, color: Color4b);
     fn draw_text(&mut self, font: FontId, text: &str, pos: Vec2i, color: Color4b);
     fn draw_icon(&mut self, id: usize, r: Recti, color: Color4b);
+    fn add_render_pass_commands(&mut self, commands: P);
 
     fn set_clip_rect(&mut self, rect: Recti);
 
@@ -107,8 +109,6 @@ pub trait RendererBackEnd<P> {
     fn frame_size(&self) -> (usize, usize);
 
     fn set_atlas(atlas: &Atlas);
-
-    fn get_pass_mut(&mut self) -> &mut P;
 }
 
 #[derive(Copy, Clone)]
@@ -352,7 +352,7 @@ impl KeyModifier {
 }
 
 #[repr(C)]
-pub struct Context<P, R: RendererBackEnd<P>> {
+pub struct Context<P: Default, R: RendererBackEnd<P>> {
     pub style: Style,
     pub hover: Option<Id>,
     pub focus: Option<Id>,
@@ -372,7 +372,7 @@ pub struct Context<P, R: RendererBackEnd<P>> {
     layout_stack: LayoutStack,
     text_stack: String,
     container_pool: Pool<48>,
-    containers: [Container; 48],
+    containers: [Container<P>; 48],
     treenode_pool: Pool<48>,
     pub mouse_pos: Vec2i,
     pub last_mouse_pos: Vec2i,
@@ -400,19 +400,18 @@ pub struct Id(u32);
 #[derive(Default, Copy, Clone, Eq, PartialEq)]
 pub struct ContRef(usize);
 
-#[derive(Default, Clone)]
-pub struct Container {
+#[derive(Default)]
+pub struct Container<P: Default> {
     pub rect: Recti,
     pub body: Recti,
     pub content_size: Vec2i,
     pub scroll: Vec2i,
     pub zindex: i32,
     pub open: bool,
-    pub commands: Vec<Command>,
+    pub commands: Vec<Command<P>>,
 }
 
-#[derive(Copy, Clone)]
-pub enum Command {
+pub enum Command<P: Default> {
     Clip {
         rect: Recti,
     },
@@ -432,10 +431,13 @@ pub enum Command {
         id: usize,
         color: Color4b,
     },
+    DirectRenderPassCommands {
+        pass: P,
+    },
     None,
 }
 
-impl Default for Command {
+impl<P: Default> Default for Command<P> {
     fn default() -> Self {
         Command::None
     }
@@ -753,7 +755,7 @@ impl FromDecimal for f32 {
     }
 }
 
-impl<P, R: RendererBackEnd<P>> Context<P, R> {
+impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     pub fn new(renderer: R) -> Self {
         Self {
             style: Style::default(),
@@ -1052,7 +1054,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         self.input_text += text;
     }
 
-    pub fn push_command(&mut self, cmd: Command) -> &mut Command {
+    pub fn push_command(&mut self, cmd: Command<P>) -> &mut Command<P> {
         let cnt = *self.container_stack.last().unwrap();
         let id = self.containers[cnt.0].commands.len();
 
@@ -1596,9 +1598,11 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     fn paint(&mut self) {
         let mut cmd_id = 0;
         for cnt in &self.root_list {
-            let container = &self.containers[cnt.0];
-            for command in &container.commands {
-                match *command {
+            let container = &mut self.containers[cnt.0];
+            let mut commands = Vec::new();
+            std::mem::swap(&mut commands, &mut container.commands);
+            for command in commands {
+                match command {
                     Command::Text {
                         str_start,
                         str_len,
@@ -1618,7 +1622,10 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
                     Command::Clip { rect } => {
                         self.renderer.set_clip_rect(rect);
                     }
-                    _ => {}
+                    Command::DirectRenderPassCommands { pass } => {
+                        self.renderer.add_render_pass_commands(pass);
+                    }
+                    Command::None => (),
                 }
             }
         }
@@ -1736,7 +1743,8 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
         // get the viewport
         let clip = self.clip_stack.last().unwrap();
 
-        let pass = self.renderer.get_pass_mut();
-        f(pass, clip);
+        let mut queue = P::default();
+        f(&mut queue, clip);
+        self.push_command(Command::DirectRenderPassCommands { pass: queue });
     }
 }

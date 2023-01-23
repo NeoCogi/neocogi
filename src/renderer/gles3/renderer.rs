@@ -1070,11 +1070,11 @@ impl Gles3Driver {
         }
     }
 
-    fn set_viewport(&mut self, x: u32, y: u32, w: u32, h: u32) {
+    fn set_viewport(&mut self, x: i32, y: i32, w: u32, h: u32) {
         unsafe { gl::Viewport(x as GLint, y as GLint, w as GLsizei, h as GLsizei) }
     }
 
-    fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32) {
+    fn set_scissor(&mut self, x: i32, y: i32, w: u32, h: u32) {
         unsafe { gl::Scissor(x as GLint, y as GLint, w as GLsizei, h as GLsizei) }
     }
 
@@ -1613,7 +1613,7 @@ impl Driver for Gles3Driver {
                 }
             }
 
-            for mut cmd in &mut pass.commands {
+            for mut cmd in &mut pass.queue.commands {
                 match &mut cmd {
                     RenderPassCommand::Viewport(x, y, w, h) => self.set_viewport(*x, *y, *w, *h),
                     RenderPassCommand::Scissor(x, y, w, h) => self.set_scissor(*x, *y, *w, *h),
@@ -1633,7 +1633,7 @@ impl Driver for Gles3Driver {
                 }
             }
 
-            pass.drain();
+            pass.queue.drain();
         }
     }
 

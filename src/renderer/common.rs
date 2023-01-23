@@ -1160,8 +1160,8 @@ pub(crate) struct UpdateTextureCommand {
 }
 
 pub(crate) enum RenderPassCommand {
-    Viewport(u32, u32, u32, u32),
-    Scissor(u32, u32, u32, u32),
+    Viewport(i32, i32, u32, u32),
+    Scissor(i32, i32, u32, u32),
     Draw(DrawCommand),
     UpdateDeviceBuffer(UpdateDeviceBufferCommand),
     UpdateTexture(UpdateTextureCommand),
@@ -1173,33 +1173,26 @@ pub struct Pass {
     pub frame_buffer: Option<FrameBufferPtr>,
     pub color_actions: [ColorPassAction; 4],
     pub depth_action: DepthPassAction,
+    pub queue: PassCommandQueue,
+}
 
+#[derive(Default)]
+pub struct PassCommandQueue {
     pub(crate) commands: Vec<RenderPassCommand>,
 }
 
-impl Pass {
-    pub fn new(
-        width: usize,
-        height: usize,
-        frame_buffer: Option<FrameBufferPtr>,
-        color_actions: [ColorPassAction; 4],
-        depth_action: DepthPassAction,
-    ) -> Self {
+impl PassCommandQueue {
+    pub fn new() -> Self {
         Self {
-            width,
-            height,
-            frame_buffer,
-            color_actions,
-            depth_action,
             commands: Vec::new(),
         }
     }
 
-    pub fn set_viewport(&mut self, x: u32, y: u32, w: u32, h: u32) {
+    pub fn set_viewport(&mut self, x: i32, y: i32, w: u32, h: u32) {
         self.commands.push(RenderPassCommand::Viewport(x, y, w, h));
     }
 
-    pub fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32) {
+    pub fn set_scissor(&mut self, x: i32, y: i32, w: u32, h: u32) {
         self.commands.push(RenderPassCommand::Scissor(x, y, w, h))
     }
 
@@ -1247,9 +1240,36 @@ impl Pass {
         self.commands.clear();
     }
 
+    pub fn append(&mut self, mut other: PassCommandQueue) {
+        self.commands.append(&mut other.commands);
+    }
+}
+
+impl Pass {
+    pub fn new(
+        width: usize,
+        height: usize,
+        frame_buffer: Option<FrameBufferPtr>,
+        color_actions: [ColorPassAction; 4],
+        depth_action: DepthPassAction,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            frame_buffer,
+            color_actions,
+            depth_action,
+            queue: PassCommandQueue {
+                commands: Vec::new(),
+            },
+        }
+    }
+
     pub fn clone_with_no_commands(&self) -> Self {
         Self {
-            commands: Vec::new(),
+            queue: PassCommandQueue {
+                commands: Vec::new(),
+            },
             frame_buffer: self.frame_buffer.clone(),
             ..*self
         }

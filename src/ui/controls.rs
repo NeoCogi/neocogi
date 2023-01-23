@@ -64,7 +64,7 @@ pub trait ControlProvider {
     ) -> ResourceState;
 }
 
-impl<P, R: RendererBackEnd<P>> Context<P, R> {
+impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     fn number_textbox(
         &mut self,
         precision: usize,
@@ -98,7 +98,7 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
     }
 }
 
-impl<P, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
+impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
     fn text(&mut self, text: &str) {
         let font = self.style.normal_font;
         let color = self.style.colors[ControlColor::Text as usize];

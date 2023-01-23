@@ -906,7 +906,8 @@ impl UMRenderer {
 
             let pl = elems[start_chnk_idx..start_chnk_idx + count].to_vec();
 
-            pass.update_device_buffer(&mut self.vb, 0, Arc::new(pl));
+            pass.queue
+                .update_device_buffer(&mut self.vb, 0, Arc::new(pl));
             let bindings = Bindings {
                 vertex_buffers: vec![self.vb.clone()],
                 index_buffer: None,
@@ -915,7 +916,7 @@ impl UMRenderer {
                 pixel_images: Vec::new(),
             };
 
-            pass.draw(
+            pass.queue.draw(
                 pipeline,
                 &bindings,
                 Arc::new(GenPayload::from(pvm.clone())),
