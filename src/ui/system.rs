@@ -469,6 +469,10 @@ impl super::RendererBackEnd<Pass> for Renderer {
     fn set_atlas(atlas: &Atlas) {
         todo!()
     }
+
+    fn get_pass_mut(&mut self) -> &mut Pass {
+        self.pass.as_mut().unwrap()
+    }
 }
 
 impl<P: Sized, R: super::RendererBackEnd<P>> Input<P, R> {
@@ -574,13 +578,17 @@ impl App {
         }
     }
 
-    pub fn run<F: FnMut(&mut super::Context<Pass, Renderer>)>(mut self, mut process_frame: F) {
+    pub fn run<F: FnMut(&mut DriverPtr, &mut super::Context<Pass, Renderer>)>(
+        mut self,
+        mut process_frame: F,
+    ) {
         'running: while !self.window.should_close() {
             let (width, height) = self.window.get_framebuffer_size();
 
-            let mut pass = self
-                .context
-                .frame(width as _, height as _, |ctx| process_frame(ctx));
+            let mut driver = self.driver.clone();
+            let mut pass = self.context.frame(width as _, height as _, |ctx| {
+                process_frame(&mut driver, ctx)
+            });
 
             self.driver.render_pass(&mut pass);
             self.window.swap_buffers();

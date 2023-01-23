@@ -107,6 +107,8 @@ pub trait RendererBackEnd<P> {
     fn frame_size(&self) -> (usize, usize);
 
     fn set_atlas(atlas: &Atlas);
+
+    fn get_pass_mut(&mut self) -> &mut P;
 }
 
 #[derive(Copy, Clone)]
@@ -429,10 +431,6 @@ pub enum Command {
         rect: Recti,
         id: usize,
         color: Color4b,
-    },
-    Custom {
-        rect: Recti,
-        render_fn_id: usize,
     },
     None,
 }
@@ -1729,5 +1727,16 @@ impl<P, R: RendererBackEnd<P>> Context<P, R> {
 
     fn set_atlas(atlas: &dyn Atlas) {
         todo!()
+    }
+
+    pub fn render_custom<F: FnOnce(&mut P, &Recti)>(&mut self, f: F) {
+        // first flush everything
+        self.renderer.flush();
+
+        // get the viewport
+        let clip = self.clip_stack.last().unwrap();
+
+        let pass = self.renderer.get_pass_mut();
+        f(pass, clip);
     }
 }

@@ -6,7 +6,7 @@ use rectangle_pack::*;
 
 fn main() {
     let mut app = ui::App::new();
-    app.run(|ctx| {
+    app.run(|drv, ctx| {
         let (_, height) = ctx.frame_size();
         ctx.window(
             "Tools",

@@ -31,11 +31,39 @@ extern crate neocogi;
 
 use neocogi::rs_math3d::*;
 use neocogi::*;
+use std::sync::Arc;
 
 use neocogi::renderer::*;
 
 use neocogi::ui;
 use ui::*;
+
+static VERTEX_SHADER: &'static str = "
+#version 300 es
+in  highp   vec4        position;
+in  highp   vec4        color;
+out highp   vec4        v_color;
+void main() {
+    gl_Position = position;
+    v_color     = color;
+}";
+
+static PIXEL_SHADER: &'static str = "
+#version 300 es
+precision mediump float;
+        in highp    vec4        v_color;
+layout(location = 0) out lowp  vec4     color_buffer;
+void main() {
+    highp vec4 col  = v_color;
+    color_buffer    = col;
+}";
+
+render_data! {
+    vertex Vertex {
+        position: Vec4f,
+        color   : Vec4f,
+    }
+}
 
 struct State<'a> {
     label_colors: [LabelColor<'a>; 14],
@@ -45,6 +73,8 @@ struct State<'a> {
     submit_buf: String,
     checks: [bool; 3],
     colors: [Color4b; 14],
+    tri_pipeline: Option<PipelinePtr>,
+    vb: Option<DeviceBufferPtr>,
 }
 
 #[derive(Copy, Clone)]
@@ -121,7 +151,51 @@ impl<'a> State<'a> {
             submit_buf: String::new(),
             checks: [false, true, false],
             colors: [color4b(0, 0, 0, 0); 14],
+            tri_pipeline: None,
+            vb: None,
         }
+    }
+
+    fn init_render_objects(driver: &mut DriverPtr) -> PipelinePtr {
+        let mut model_attribs = Vec::new();
+        model_attribs.push(Vertex::get_attribute_names());
+
+        let model_shader_desc = ShaderDesc {
+            vertex_shader: String::from(VERTEX_SHADER),
+            pixel_shader: String::from(PIXEL_SHADER),
+
+            vertex_attributes: model_attribs,
+            vertex_uniforms: Vec::new(),
+            vertex_surfaces: Vec::new(),
+
+            pixel_uniforms: Vec::new(),
+            pixel_surfaces: Vec::new(),
+        };
+
+        let model_program = driver.create_shader(model_shader_desc).unwrap();
+
+        let vertex_layout = VertexBufferLayout {
+            buffer_id: 0,
+            vertex_attributes: Vertex::get_attribute_descriptors(),
+            stride: Vertex::stride(),
+            divisor: 0,
+        };
+
+        let tri_pipeline_desc = PipelineDesc {
+            primitive_type: PrimitiveType::Triangles,
+            shader: model_program.clone(),
+            buffer_layouts: vec![vertex_layout.clone()],
+            uniform_descs: Vec::new(),
+            index_type: IndexType::None,
+            face_winding: FaceWinding::CCW,
+            cull_mode: CullMode::None,
+            depth_write: true,
+            depth_test: true,
+            blend: BlendOp::None,
+            polygon_offset: PolygonOffset::None,
+        };
+
+        driver.create_pipeline(tri_pipeline_desc).unwrap()
     }
 
     fn write_log(&mut self, text: &str) {
@@ -132,6 +206,88 @@ impl<'a> State<'a> {
             self.logbuf.push(c);
         }
         self.logbuf_updated = true;
+    }
+
+    fn tri_window(
+        &mut self,
+        driver: &mut DriverPtr,
+        ctx: &mut ui::Context<Pass, system::Renderer>,
+    ) {
+        match self.tri_pipeline {
+            Some(_) => (),
+            None => {
+                let pipleine = Self::init_render_objects(driver);
+                self.tri_pipeline = Some(pipleine);
+            }
+        }
+
+        match self.vb {
+            Some(_) => (),
+            None => {
+                let vertex_buffer = driver
+                    .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(
+                        3 * std::mem::size_of::<Vertex>(),
+                    )))
+                    .unwrap();
+                self.vb = Some(vertex_buffer);
+            }
+        }
+
+        ctx.window(
+            "Triangle Window",
+            Rect::new(40, 500, 300, 300),
+            WidgetOption::NONE,
+            |ctx| {
+                ctx.column(|ctx| {
+                    let mut win = ctx.get_current_container_rect();
+                    let bindings = Bindings {
+                        vertex_buffers: vec![self.vb.as_ref().unwrap().clone()],
+                        index_buffer: None,
+
+                        vertex_images: Vec::new(),
+                        pixel_images: Vec::new(),
+                    };
+
+                    let vertices = vec![
+                        Vertex {
+                            position: Vec4f::new(-0.5, -0.5, 0.0, 1.0),
+                            color: Vec4f::new(1.0, 0.0, 0.0, 1.0),
+                        },
+                        Vertex {
+                            position: Vec4f::new(0.5, -0.5, 0.0, 1.0),
+                            color: Vec4f::new(0.0, 0.0, 1.0, 1.0),
+                        },
+                        Vertex {
+                            position: Vec4f::new(0.0, 0.5, 0.0, 1.0),
+                            color: Vec4f::new(0.0, 1.0, 0.0, 1.0),
+                        },
+                    ];
+
+                    let size = ctx.frame_size();
+                    ctx.render_custom(|pass, clip| {
+                        pass.set_viewport(
+                            win.x as _,
+                            size.1 as u32 - win.height as u32 - win.y as u32,
+                            clip.width as _,
+                            win.height as u32,
+                        );
+                        pass.update_device_buffer(
+                            self.vb.as_mut().unwrap(),
+                            0,
+                            Arc::new(vertices.to_vec()),
+                        );
+                        pass.draw(
+                            self.tri_pipeline.as_ref().unwrap(),
+                            &bindings,
+                            Arc::new(Vec::<Vec3f>::new()),
+                            1,
+                            1,
+                        );
+                        pass.set_viewport(0, 0, size.0 as _, size.1 as _);
+                    });
+                });
+            },
+        );
     }
 
     fn test_window(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
@@ -431,9 +587,14 @@ impl<'a> State<'a> {
         );
     }
 
-    fn process_frame(&mut self, ctx: &mut ui::Context<Pass, system::Renderer>) {
+    fn process_frame(
+        &mut self,
+        drv: &mut DriverPtr,
+        ctx: &mut ui::Context<Pass, system::Renderer>,
+    ) {
         self.style_window(ctx);
         self.log_window(ctx);
+        self.tri_window(drv, ctx);
         self.test_window(ctx);
     }
 }
@@ -449,7 +610,7 @@ fn main() {
         state.colors[i] = style.colors[i];
     }
 
-    app.run(|ctx| {
-        state.process_frame(ctx);
+    app.run(|drv, ctx| {
+        state.process_frame(drv, ctx);
     });
 }
