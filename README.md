@@ -1,5 +1,6 @@
 # NeoCogi's core libraries
 
+![UI+3D Triangle Example](docs/ui-screenshot.png)
 A repo containing open source NeoCogi libraries:
 
 - [x] Renderer
@@ -10,6 +11,10 @@ A repo containing open source NeoCogi libraries:
 - [ ] Pixel readback (example)
 - [ ] Partial texture updates: Not sure how wise it is to support it
 - [ ] Stall detection on resource update commands (guard with a mutex?)
+- [x] Immediate mode UI
+- [x] UI Examples
+- [x] Direct bypass rendering commands
+
 
 ## License
 
