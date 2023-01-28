@@ -490,7 +490,6 @@ impl<P: Sized + Default, R: super::RendererBackEnd<P>> Input<P, R> {
             }
             glfw::WindowEvent::Scroll(x, y) => ctx.input_scroll(x as i32, y as i32),
             glfw::WindowEvent::Key(key, scancode, action, modifiers) => {
-                println!("Key: {:?}, action: {:?}, mod: {:?}", key, action, modifiers);
                 let mut keymod = KeyModifier::NONE;
                 if key == glfw::Key::Enter {
                     keymod |= KeyModifier::RETURN

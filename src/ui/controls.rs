@@ -106,7 +106,7 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         self.column(|ctx| {
             let h = ctx.renderer.get_font_height(font) as i32;
             ctx.rows_with_line_config(&[-1], h, |ctx| {
-                let mut r = ctx.layout_stack.next_cell(&ctx.style);
+                let mut r = ctx.next_cell();
                 for line in text.lines() {
                     let mut rx = r.x;
                     let words = line.split_inclusive(' ');
@@ -117,18 +117,18 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
                             ctx.draw_text(font, w, vec2(rx, r.y), color);
                             rx += tw;
                         } else {
-                            r = ctx.layout_stack.next_cell(&ctx.style);
+                            r = ctx.next_cell();
                             rx = r.x;
                         }
                     }
-                    r = ctx.layout_stack.next_cell(&ctx.style);
+                    r = ctx.next_cell();
                 }
             });
         });
     }
 
     fn label(&mut self, text: &str) {
-        let layout = self.layout_stack.next_cell(&self.style);
+        let layout = self.next_cell();
         self.draw_control_text(
             self.style.normal_font,
             text,
@@ -145,7 +145,7 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         } else {
             self.get_id_u32(icon.unwrap() as u32)
         };
-        let r = self.layout_stack.next_cell(&self.style);
+        let r = self.next_cell();
         self.update_control(id, r, opt);
         if self.mouse_pressed.is_left() && self.focus == Some(id) {
             res |= ResourceState::SUBMIT;
@@ -167,7 +167,7 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
     fn checkbox(&mut self, label: &str, state: &mut bool) -> ResourceState {
         let mut res = ResourceState::NONE;
         let id: Id = self.get_id_from_ptr(state);
-        let mut r = self.layout_stack.next_cell(&self.style);
+        let mut r = self.next_cell();
         let box_0 = Rect::new(r.x, r.y, r.height, r.height);
         self.update_control(id, r, WidgetOption::NONE);
         if self.mouse_pressed.is_left() && self.focus == Some(id) {
@@ -249,7 +249,7 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
 
     fn textbox_ex(&mut self, buf: &mut String, opt: WidgetOption) -> ResourceState {
         let id = self.get_id_from_ptr(buf);
-        let r = self.layout_stack.next_cell(&self.style);
+        let r = self.next_cell();
         return self.textbox_raw(buf, id, r, opt);
     }
 
@@ -266,7 +266,7 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         let last = *value;
         let mut v = last;
         let id = self.get_id_from_ptr(value);
-        let base = self.layout_stack.next_cell(&self.style);
+        let base = self.next_cell();
         if !self.number_textbox(precision, &mut v, base, id).is_none() {
             return res;
         }
@@ -311,7 +311,7 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
     ) -> ResourceState {
         let mut res = ResourceState::NONE;
         let id: Id = self.get_id_from_ptr(value);
-        let base = self.layout_stack.next_cell(&self.style);
+        let base = self.next_cell();
         let last: Real = *value;
         if !self.number_textbox(precision, value, base, id).is_none() {
             return res;

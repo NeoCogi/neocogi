@@ -369,7 +369,6 @@ pub struct Context<P: Default, R: RendererBackEnd<P>> {
     pub container_stack: Vec<ContRef>,
     pub clip_stack: Vec<Recti>,
     pub id_stack: Vec<Id>,
-    layout_stack: LayoutStack,
     text_stack: String,
     container_pool: Pool<48>,
     containers: [Container<P>; 48],
@@ -409,6 +408,38 @@ pub struct Container<P: Default> {
     pub zindex: i32,
     pub open: bool,
     pub commands: Vec<Command<P>>,
+
+    layout_stack: LayoutStack,
+}
+
+impl<P: Default> Container<P> {
+    pub fn next_cell(&mut self, style: &Style) -> Recti {
+        self.layout_stack.next_cell(style)
+    }
+
+    pub fn layout(&self) -> &Layout {
+        self.layout_stack.top()
+    }
+
+    pub fn layout_mut(&mut self) -> &mut Layout {
+        self.layout_stack.top_mut()
+    }
+
+    pub fn push_rect_scroll(&mut self, body: Recti) {
+        self.layout_stack.push_rect_scroll(body, self.scroll)
+    }
+
+    pub fn begin_column(&mut self, style: &Style) {
+        self.layout_stack.begin_column(style)
+    }
+
+    pub fn end_column(&mut self) {
+        self.layout_stack.end_column()
+    }
+
+    pub fn row_config(&mut self, widths: &[i32], height: i32) {
+        self.layout_stack.row_config(widths, height)
+    }
 }
 
 pub enum Command<P: Default> {
@@ -774,7 +805,6 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
             container_stack: Vec::default(),
             clip_stack: Vec::default(),
             id_stack: Vec::default(),
-            layout_stack: LayoutStack::default(),
             text_stack: String::default(),
             container_pool: Pool::default(),
             containers: [(); 48].map(|_| Container::default()),
@@ -830,7 +860,6 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         assert_eq!(self.container_stack.len(), 0);
         assert_eq!(self.clip_stack.len(), 0);
         assert_eq!(self.id_stack.len(), 0);
-        assert_eq!(self.layout_stack.len(), 0);
         match self.scroll_target {
             Some(cnt_ref) => {
                 let mut container = &mut self.containers[cnt_ref.0];
@@ -954,13 +983,13 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 
     fn pop_container(&mut self) {
         let cnt = self.get_current_container();
-        let layout = *self.layout_stack.top();
-
-        self.containers[cnt.0].content_size.x = layout.max.x - layout.body.x;
-        self.containers[cnt.0].content_size.y = layout.max.y - layout.body.y;
+        let layout = self.containers[cnt.0].layout();
+        let cx = layout.max.x - layout.body.x;
+        let cy = layout.max.y - layout.body.y;
+        self.containers[cnt.0].content_size.x = cx;
+        self.containers[cnt.0].content_size.y = cy;
 
         self.container_stack.pop();
-        self.layout_stack.pop();
         self.pop_id();
     }
 
@@ -1271,7 +1300,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
             } else {
                 active
             };
-            let mut r = ctx.layout_stack.next_cell(&ctx.style);
+            let mut r = ctx.next_cell();
             ctx.update_control(id, r, WidgetOption::NONE);
             active ^= (ctx.mouse_pressed.is_left() && ctx.focus == Some(id)) as i32;
             if idx.is_some() {
@@ -1314,14 +1343,14 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     fn begin_treenode_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
         let res = self.header_internal(self.style.normal_font, label, true, opt);
         if res.is_active() && self.last_id.is_some() {
-            self.layout_stack.top_mut().indent += self.style.indent;
+            self.layout_mut().indent += self.style.indent;
             self.id_stack.push(self.last_id.unwrap());
         }
         return res;
     }
 
     fn end_treenode(&mut self) {
-        self.layout_stack.top_mut().indent -= self.style.indent;
+        self.layout_mut().indent -= self.style.indent;
         self.pop_id();
     }
 
@@ -1409,8 +1438,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         }
 
         let new_body = expand_rect(body, -self.style.padding);
-        self.layout_stack
-            .push_rect_scroll(new_body, self.containers[cnt_idx].scroll);
+        self.containers[cnt_idx].push_rect_scroll(new_body);
         self.containers[cnt_idx].body = body;
     }
 
@@ -1569,7 +1597,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     fn begin_panel_ex(&mut self, name: &str, opt: WidgetOption) {
         self.push_id_from_str(name);
         let cnt_id = self.get_container_index_intern(self.last_id.unwrap(), opt);
-        let rect = self.layout_stack.next_cell(&self.style);
+        let rect = self.next_cell();
         self.root_list.push(ContRef(cnt_id.unwrap()));
         self.containers[cnt_id.unwrap()].rect = rect;
 
@@ -1642,7 +1670,9 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn current_rect(&self) -> Recti {
-        self.layout_stack.last_rect()
+        self.containers[self.container_stack.last().unwrap().0]
+            .layout_stack
+            .last_rect()
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -1700,9 +1730,10 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn column<F: FnOnce(&mut Self)>(&mut self, f: F) {
-        self.layout_stack.begin_column(&self.style);
+        let style = self.style.clone();
+        self.top_container_mut().begin_column(&style);
         f(self);
-        self.layout_stack.end_column()
+        self.top_container_mut().end_column()
     }
 
     pub fn rows_with_line_config<F: FnOnce(&mut Self)>(
@@ -1711,12 +1742,21 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         height: i32,
         f: F,
     ) {
-        self.layout_stack.row_config(widths, height);
+        self.top_container_mut().row_config(widths, height);
         f(self);
     }
 
     pub fn next_cell(&mut self) -> Recti {
-        self.layout_stack.next_cell(&self.style)
+        let style = self.style.clone();
+        self.top_container_mut().next_cell(&style)
+    }
+
+    pub fn layout_mut(&mut self) -> &mut Layout {
+        self.top_container_mut().layout_mut()
+    }
+
+    pub fn top_container_mut(&mut self) -> &mut Container<P> {
+        &mut self.containers[self.container_stack.last().unwrap().0]
     }
 
     pub fn header<F: FnOnce(&mut Self)>(
