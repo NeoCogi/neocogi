@@ -483,7 +483,7 @@ pub trait Font {
 #[derive(Copy, Clone)]
 pub struct FontId(pub usize);
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Style {
     pub bold_font: FontId,
     pub normal_font: FontId,
@@ -1747,6 +1747,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     pub fn next_cell(&mut self) -> Recti {
+        // TODO: this is highly inefficient
         let style = self.style.clone();
         self.top_container_mut().next_cell(&style)
     }

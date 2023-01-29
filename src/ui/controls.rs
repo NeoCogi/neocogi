@@ -102,7 +102,6 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
     fn text(&mut self, text: &str) {
         let font = self.style.normal_font;
         let color = self.style.colors[ControlColor::Text as usize];
-        let style = self.style;
         self.column(|ctx| {
             let h = ctx.renderer.get_font_height(font) as i32;
             ctx.rows_with_line_config(&[-1], h, |ctx| {

@@ -31,6 +31,8 @@ extern crate neocogi;
 
 use neocogi::rs_math3d::*;
 use neocogi::*;
+use std::borrow::BorrowMut;
+use std::ops::DerefMut;
 use std::sync::Arc;
 
 use neocogi::renderer::*;
@@ -304,7 +306,6 @@ impl<'a> State<'a> {
             ctx.set_current_container_rect(&win);
 
             let mut buff = String::new();
-            let style = ctx.style;
 
             ctx.header("Window Info", WidgetOption::NONE, |ctx| {
                 let win_0 = ctx.get_current_container_rect();
@@ -568,7 +569,7 @@ impl<'a> State<'a> {
             Rect::new(350, 250, 300, 240),
             WidgetOption::NONE,
             |ctx| {
-                let style = ctx.style;
+                let mut style = ctx.style.clone();
                 let sw = (ctx.get_current_container_body().width as f64 * 0.14f64) as i32;
                 ctx.rows_with_line_config(&[80, sw, sw, sw, sw, -1], 0, |ctx| {
                     for i in 0..self.label_colors.len() {
