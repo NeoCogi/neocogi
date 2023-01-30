@@ -72,24 +72,6 @@ use rs_math3d::{color4b, Color4b, Rect, Recti, Vec2i};
 use crate::renderer::{Pass, PassCommandQueue, RenderPassCommand};
 use bitflags::*;
 
-pub struct AtlasFont<'a> {
-    pub name: &'a str, // font name
-    pub height: usize, // height size in pixels
-    pub char_def: &'a [(char, Recti)],
-}
-
-pub struct AtlasImageEntry<'a> {
-    pub name: &'a str,
-    pub rect: Recti,
-}
-
-pub trait Atlas {
-    fn get_size(&self) -> (usize, usize);
-    fn get_pixels(&self) -> &[u8];
-    fn get_fonts(&self) -> &[AtlasFont];
-    fn get_image_entries(&self) -> &[AtlasImageEntry];
-}
-
 pub trait RendererBackEnd<P> {
     fn get_char_width(&self, _font: FontId, c: char) -> usize;
     fn get_font_height(&self, _font: FontId) -> usize;
@@ -353,7 +335,6 @@ impl KeyModifier {
 
 #[repr(C)]
 pub struct Context<P: Default, R: RendererBackEnd<P>> {
-    pub style: Style,
     pub hover: Option<Id>,
     pub focus: Option<Id>,
     pub last_id: Option<Id>,
@@ -789,7 +770,6 @@ impl FromDecimal for f32 {
 impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     pub fn new(renderer: R) -> Self {
         Self {
-            style: Style::default(),
             hover: None,
             focus: None,
             last_id: None,
@@ -824,19 +804,19 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         }
     }
 
-    fn draw_frame(&mut self, rect: Recti, colorid: ControlColor) {
-        self.draw_rect(rect, self.style.colors[colorid as usize]);
+    fn draw_frame(&mut self, style: &Style, rect: Recti, colorid: ControlColor) {
+        self.draw_rect(rect, style.colors[colorid as usize]);
         if colorid == ControlColor::ScrollBase
             || colorid == ControlColor::ScrollThumb
             || colorid == ControlColor::TitleBG
         {
             return;
         }
-        if self.style.colors[ControlColor::Border as usize].w != 0 {
+        if style.colors[ControlColor::Border as usize].w != 0 {
             // alpha
             self.draw_box(
                 expand_rect(rect, 1),
-                self.style.colors[ControlColor::Border as usize],
+                style.colors[ControlColor::Border as usize],
             );
         }
     }
@@ -1183,6 +1163,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 
     pub fn draw_control_frame(
         &mut self,
+        style: &Style,
         id: Id,
         rect: Recti,
         mut colorid: ControlColor,
@@ -1197,11 +1178,12 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         } else if self.hover == Some(id) {
             colorid.hover()
         }
-        self.draw_frame(rect, colorid);
+        self.draw_frame(style, rect, colorid);
     }
 
     pub fn draw_control_text(
         &mut self,
+        style: &Style,
         font: FontId,
         str: &str,
         rect: Recti,
@@ -1215,11 +1197,11 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         if opt.is_aligned_center() {
             pos.x = rect.x + (rect.width - tw) / 2;
         } else if opt.is_aligned_right() {
-            pos.x = rect.x + rect.width - tw - self.style.padding;
+            pos.x = rect.x + rect.width - tw - style.padding;
         } else {
-            pos.x = rect.x + self.style.padding;
+            pos.x = rect.x + style.padding;
         }
-        self.draw_text(font, str, pos, self.style.colors[colorid as usize]);
+        self.draw_text(font, str, pos, style.colors[colorid as usize]);
         self.pop_clip_rect();
     }
 
@@ -1284,6 +1266,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 
     fn header_internal(
         &mut self,
+        style: &Style,
         font: FontId,
         label: &str,
         is_treenode: bool,
@@ -1293,14 +1276,14 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         let idx = self.treenode_pool.get(id);
         let mut expanded = 0;
 
-        self.rows_with_line_config(&[-1], 0, |ctx| {
+        self.rows_with_line_config(style, &[-1], 0, |ctx, style| {
             let mut active = idx.is_some() as i32;
             expanded = if opt.is_expanded() {
                 (active == 0) as i32
             } else {
                 active
             };
-            let mut r = ctx.next_cell();
+            let mut r = ctx.next_cell(style);
             ctx.update_control(id, r, WidgetOption::NONE);
             active ^= (ctx.mouse_pressed.is_left() && ctx.focus == Some(id)) as i32;
             if idx.is_some() {
@@ -1315,19 +1298,26 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 
             if is_treenode {
                 if ctx.hover == Some(id) {
-                    ctx.draw_frame(r, ControlColor::ButtonHover);
+                    ctx.draw_frame(style, r, ControlColor::ButtonHover);
                 }
             } else {
-                ctx.draw_control_frame(id, r, ControlColor::Button, WidgetOption::NONE);
+                ctx.draw_control_frame(style, id, r, ControlColor::Button, WidgetOption::NONE);
             }
             ctx.draw_icon(
                 if expanded != 0 { MINUS } else { PLUS },
                 Rect::new(r.x, r.y, r.height, r.height),
-                ctx.style.colors[ControlColor::Text as usize],
+                style.colors[ControlColor::Text as usize],
             );
-            r.x += r.height - ctx.style.padding;
-            r.width -= r.height - ctx.style.padding;
-            ctx.draw_control_text(font, label, r, ControlColor::Text, WidgetOption::NONE);
+            r.x += r.height - style.padding;
+            r.width -= r.height - style.padding;
+            ctx.draw_control_text(
+                style,
+                font,
+                label,
+                r,
+                ControlColor::Text,
+                WidgetOption::NONE,
+            );
         });
         return if expanded != 0 {
             ResourceState::ACTIVE
@@ -1336,21 +1326,32 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         };
     }
 
-    fn header_ex(&mut self, font: FontId, label: &str, opt: WidgetOption) -> ResourceState {
-        self.header_internal(font, label, false, opt)
+    fn header_ex(
+        &mut self,
+        style: &Style,
+        font: FontId,
+        label: &str,
+        opt: WidgetOption,
+    ) -> ResourceState {
+        self.header_internal(style, font, label, false, opt)
     }
 
-    fn begin_treenode_ex(&mut self, label: &str, opt: WidgetOption) -> ResourceState {
-        let res = self.header_internal(self.style.normal_font, label, true, opt);
+    fn begin_treenode_ex(
+        &mut self,
+        style: &Style,
+        label: &str,
+        opt: WidgetOption,
+    ) -> ResourceState {
+        let res = self.header_internal(style, style.normal_font, label, true, opt);
         if res.is_active() && self.last_id.is_some() {
-            self.layout_mut().indent += self.style.indent;
+            self.layout_mut().indent += style.indent;
             self.id_stack.push(self.last_id.unwrap());
         }
         return res;
     }
 
-    fn end_treenode(&mut self) {
-        self.layout_mut().indent -= self.style.indent;
+    fn end_treenode(&mut self, style: &Style) {
+        self.layout_mut().indent -= style.indent;
         self.pop_id();
     }
 
@@ -1358,11 +1359,11 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         i32::min(b, i32::max(a, x))
     }
 
-    fn scrollbars(&mut self, cnt_id: usize, body: &mut Recti) {
-        let sz = self.style.scrollbar_size;
+    fn scrollbars(&mut self, style: &Style, cnt_id: usize, body: &mut Recti) {
+        let sz = style.scrollbar_size;
         let mut cs: Vec2i = self.containers[cnt_id].content_size;
-        cs.x += self.style.padding * 2;
-        cs.y += self.style.padding * 2;
+        cs.x += style.padding * 2;
+        cs.y += style.padding * 2;
         self.push_clip_rect(body.clone());
         if cs.y > self.containers[cnt_id].body.height {
             body.width -= sz;
@@ -1376,7 +1377,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
             let id: Id = self.get_id_from_str("!scrollbary");
             let mut base = body;
             base.x = body.x + body.width;
-            base.width = self.style.scrollbar_size;
+            base.width = style.scrollbar_size;
             self.update_control(id, base, WidgetOption::NONE);
             if self.focus == Some(id) && self.mouse_down.is_left() {
                 self.containers[cnt_id].scroll.y += self.mouse_delta.y * cs.y / base.height;
@@ -1384,15 +1385,15 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
             self.containers[cnt_id].scroll.y =
                 Self::clamp(self.containers[cnt_id].scroll.y, 0, maxscroll);
 
-            self.draw_frame(base, ControlColor::ScrollBase);
+            self.draw_frame(style, base, ControlColor::ScrollBase);
             let mut thumb = base;
-            thumb.height = if self.style.thumb_size > base.height * body.height / cs.y {
-                self.style.thumb_size
+            thumb.height = if style.thumb_size > base.height * body.height / cs.y {
+                style.thumb_size
             } else {
                 base.height * body.height / cs.y
             };
             thumb.y += self.containers[cnt_id].scroll.y * (base.height - thumb.height) / maxscroll;
-            self.draw_frame(thumb, ControlColor::ScrollThumb);
+            self.draw_frame(style, thumb, ControlColor::ScrollThumb);
             if self.mouse_over(body) {
                 self.scroll_target = Some(ContRef(cnt_id));
             }
@@ -1404,7 +1405,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
             let id_0: Id = self.get_id_from_str("!scrollbarx");
             let mut base_0 = body;
             base_0.y = body.y + body.height;
-            base_0.height = self.style.scrollbar_size;
+            base_0.height = style.scrollbar_size;
             self.update_control(id_0, base_0, WidgetOption::NONE);
             if self.focus == Some(id_0) && self.mouse_down.is_left() {
                 self.containers[cnt_id].scroll.x += self.mouse_delta.x * cs.x / base_0.width;
@@ -1412,16 +1413,16 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
             self.containers[cnt_id].scroll.x =
                 Self::clamp(self.containers[cnt_id].scroll.x, 0, maxscroll_0);
 
-            self.draw_frame(base_0, ControlColor::ScrollBase);
+            self.draw_frame(style, base_0, ControlColor::ScrollBase);
             let mut thumb_0 = base_0;
-            thumb_0.width = if self.style.thumb_size > base_0.width * body.width / cs.x {
-                self.style.thumb_size
+            thumb_0.width = if style.thumb_size > base_0.width * body.width / cs.x {
+                style.thumb_size
             } else {
                 base_0.width * body.width / cs.x
             };
             thumb_0.x +=
                 self.containers[cnt_id].scroll.x * (base_0.width - thumb_0.width) / maxscroll_0;
-            self.draw_frame(thumb_0, ControlColor::ScrollThumb);
+            self.draw_frame(style, thumb_0, ControlColor::ScrollThumb);
             if self.mouse_over(body) {
                 self.scroll_target = Some(ContRef(cnt_id));
             }
@@ -1431,13 +1432,19 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         self.pop_clip_rect();
     }
 
-    fn push_container_body(&mut self, cnt_idx: usize, body: Recti, opt: WidgetOption) {
+    fn push_container_body(
+        &mut self,
+        style: &Style,
+        cnt_idx: usize,
+        body: Recti,
+        opt: WidgetOption,
+    ) {
         let mut body = body;
         if !opt.has_no_scroll() {
-            self.scrollbars(cnt_idx, &mut body);
+            self.scrollbars(style, cnt_idx, &mut body);
         }
 
-        let new_body = expand_rect(body, -self.style.padding);
+        let new_body = expand_rect(body, -style.padding);
         self.containers[cnt_idx].push_rect_scroll(new_body);
         self.containers[cnt_idx].body = body;
     }
@@ -1462,7 +1469,13 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         self.pop_container();
     }
 
-    fn begin_window(&mut self, title: &str, mut r: Recti, opt: WidgetOption) -> ResourceState {
+    fn begin_window(
+        &mut self,
+        style: &Style,
+        title: &str,
+        mut r: Recti,
+        opt: WidgetOption,
+    ) -> ResourceState {
         let id = self.get_id_from_str(title);
         let cnt_id = self.get_container_index_intern(id, opt);
         if cnt_id.is_none() || !self.containers[cnt_id.unwrap()].open {
@@ -1494,19 +1507,20 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         let mut body = self.containers[cnt_id.unwrap()].rect;
         r = body;
         if !opt.has_no_frame() {
-            self.draw_frame(r, ControlColor::WindowBG);
+            self.draw_frame(style, r, ControlColor::WindowBG);
         }
         if !opt.has_no_title() {
             let mut tr = r;
-            tr.height = self.style.title_height;
-            self.draw_frame(tr, ControlColor::TitleBG);
+            tr.height = style.title_height;
+            self.draw_frame(style, tr, ControlColor::TitleBG);
 
             // TODO: Is this necessary?
             if !opt.has_no_title() {
                 let id = self.get_id_from_str("!title");
                 self.update_control(id, tr, opt);
                 self.draw_control_text(
-                    self.style.bold_font,
+                    style,
+                    style.bold_font,
                     title,
                     tr,
                     ControlColor::TitleText,
@@ -1523,11 +1537,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
                 let id = self.get_id_from_str("!close");
                 let r = Rect::new(tr.x + tr.width - tr.height, tr.y, tr.height, tr.height);
                 tr.width -= r.width;
-                self.draw_icon(
-                    CLOSE,
-                    r,
-                    self.style.colors[ControlColor::TitleText as usize],
-                );
+                self.draw_icon(CLOSE, r, style.colors[ControlColor::TitleText as usize]);
                 self.update_control(id, r, opt);
                 if self.mouse_pressed.is_left() && Some(id) == self.focus {
                     self.containers[cnt_id.unwrap()].open = false;
@@ -1535,9 +1545,9 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
             }
         }
 
-        self.push_container_body(cnt_id.unwrap(), body, opt);
+        self.push_container_body(style, cnt_id.unwrap(), body, opt);
 
-        let sz = self.style.title_height;
+        let sz = style.title_height;
         let id_2 = self.get_id_from_str("!resize");
         let r_0 = Recti::new(r.x + r.width - sz, r.y + r.height - sz, sz, sz);
         self.update_control(id_2, r_0, opt);
@@ -1581,23 +1591,23 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         self.bring_to_front(ContRef(cnt.unwrap()));
     }
 
-    fn begin_popup(&mut self, name: &str, rect: Recti) -> ResourceState {
+    fn begin_popup(&mut self, style: &Style, name: &str, rect: Recti) -> ResourceState {
         let opt = WidgetOption::POPUP
             | WidgetOption::NO_RESIZE
             | WidgetOption::NO_SCROLL
             | WidgetOption::NO_TITLE
             | WidgetOption::CLOSED;
-        return self.begin_window(name, rect, opt);
+        return self.begin_window(style, name, rect, opt);
     }
 
     fn end_popup(&mut self) {
         self.end_window();
     }
 
-    fn begin_panel_ex(&mut self, name: &str, opt: WidgetOption) {
+    fn begin_panel_ex(&mut self, style: &Style, name: &str, opt: WidgetOption) {
         self.push_id_from_str(name);
         let cnt_id = self.get_container_index_intern(self.last_id.unwrap(), opt);
-        let rect = self.next_cell();
+        let rect = self.next_cell(style);
         self.root_list.push(ContRef(cnt_id.unwrap()));
         self.containers[cnt_id.unwrap()].rect = rect;
 
@@ -1610,11 +1620,11 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         self.containers[cnt_id.unwrap()].zindex = zindex;
 
         if !opt.has_no_frame() {
-            self.draw_frame(rect, ControlColor::PanelBG);
+            self.draw_frame(style, rect, ControlColor::PanelBG);
         }
 
         self.container_stack.push(ContRef(cnt_id.unwrap()));
-        self.push_container_body(cnt_id.unwrap(), rect, opt);
+        self.push_container_body(style, cnt_id.unwrap(), rect, opt);
         self.push_clip_rect(self.containers[cnt_id.unwrap()].body);
     }
 
@@ -1679,77 +1689,100 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     // LAMBDA based context
     ////////////////////////////////////////////////////////////////////////////
 
-    pub fn popup<F: FnOnce(&mut Self)>(&mut self, name: &str, rect: Recti, f: F) -> ResourceState {
-        let res = self.begin_popup(name, rect);
+    pub fn popup<Res, F: FnOnce(&mut Self, &Style) -> Res>(
+        &mut self,
+        style: &Style,
+        name: &str,
+        rect: Recti,
+        f: F,
+    ) -> (ResourceState, Option<Res>) {
+        let res = self.begin_popup(style, name, rect);
         if !res.is_none() {
-            f(self);
+            let r = f(self, style);
             self.end_popup();
+            return (res, Some(r));
         }
-        res
+        (res, None)
     }
 
-    pub fn treenode<F: FnOnce(&mut Self)>(
+    pub fn treenode<Res, F: FnOnce(&mut Self, &Style) -> Res>(
         &mut self,
+        style: &Style,
         label: &str,
         opt: WidgetOption,
         f: F,
-    ) -> ResourceState {
-        let res = self.begin_treenode_ex(label, opt);
+    ) -> (ResourceState, Option<Res>) {
+        let res = self.begin_treenode_ex(style, label, opt);
         if !res.is_none() {
-            f(self);
-            self.end_treenode()
+            let r = f(self, style);
+            self.end_treenode(style);
+            return (res, Some(r));
         }
-        res
+        (res, None)
     }
 
-    pub fn window<F: FnOnce(&mut Self)>(
+    pub fn window<Res, F: FnOnce(&mut Self, &Style) -> Res>(
         &mut self,
+        style: &Style,
         title: &str,
         r: Recti,
         opt: WidgetOption,
         f: F,
-    ) -> ResourceState {
-        let res = self.begin_window(title, r, opt);
+    ) -> (ResourceState, Option<Res>) {
+        let res = self.begin_window(style, title, r, opt);
         if !res.is_none() {
-            f(self);
+            let r = f(self, style);
             self.end_window();
+            return (res, Some(r));
         }
-        res
+        (res, None)
     }
 
-    pub fn panel<F: FnOnce(&mut Self)>(&mut self, name: &str, opt: WidgetOption, f: F) {
-        self.begin_panel_ex(name, opt);
-        f(self);
-        self.end_panel();
-    }
-
-    pub fn frame<F: FnOnce(&mut Self)>(&mut self, width: usize, height: usize, f: F) -> P {
-        self.begin(width, height);
-        f(self);
-        self.end()
-    }
-
-    pub fn column<F: FnOnce(&mut Self)>(&mut self, f: F) {
-        let style = self.style.clone();
-        self.top_container_mut().begin_column(&style);
-        f(self);
-        self.top_container_mut().end_column()
-    }
-
-    pub fn rows_with_line_config<F: FnOnce(&mut Self)>(
+    pub fn panel<Res, F: FnOnce(&mut Self, &Style) -> Res>(
         &mut self,
+        style: &Style,
+        name: &str,
+        opt: WidgetOption,
+        f: F,
+    ) -> Res {
+        self.begin_panel_ex(style, name, opt);
+        let r = f(self, style);
+        self.end_panel();
+        r
+    }
+
+    pub fn frame<Res, F: FnOnce(&mut Self) -> Res>(
+        &mut self,
+        width: usize,
+        height: usize,
+        f: F,
+    ) -> (P, Res) {
+        self.begin(width, height);
+        let r = f(self);
+        let p = self.end();
+        (p, r)
+    }
+
+    pub fn column<Res, F: FnOnce(&mut Self, &Style) -> Res>(&mut self, style: &Style, f: F) -> Res {
+        self.top_container_mut().begin_column(&style);
+        let r = f(self, style);
+        self.top_container_mut().end_column();
+        r
+    }
+
+    pub fn rows_with_line_config<Res, F: FnOnce(&mut Self, &Style) -> Res>(
+        &mut self,
+        style: &Style,
         widths: &[i32],
         height: i32,
         f: F,
-    ) {
+    ) -> Res {
         self.top_container_mut().row_config(widths, height);
-        f(self);
+        f(self, style)
     }
 
-    pub fn next_cell(&mut self) -> Recti {
-        // TODO: this is highly inefficient
-        let style = self.style.clone();
-        self.top_container_mut().next_cell(&style)
+    pub fn next_cell(&mut self, style: &Style) -> Recti {
+        self.top_container_mut().next_cell(style)
     }
 
     pub fn layout_mut(&mut self) -> &mut Layout {
@@ -1760,21 +1793,18 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         &mut self.containers[self.container_stack.last().unwrap().0]
     }
 
-    pub fn header<F: FnOnce(&mut Self)>(
+    pub fn header<Res, F: FnOnce(&mut Self, &Style) -> Res>(
         &mut self,
+        style: &Style,
         label: &str,
         opt: WidgetOption,
         f: F,
-    ) -> ResourceState {
-        let res = self.header_internal(self.style.bold_font, label, false, opt);
+    ) -> (ResourceState, Option<Res>) {
+        let res = self.header_internal(style, style.bold_font, label, false, opt);
         if res.is_active() && self.last_id.is_some() {
-            f(self);
+            return (res, Some(f(self, style)));
         }
-        res
-    }
-
-    fn set_atlas(atlas: &dyn Atlas) {
-        todo!()
+        (res, None)
     }
 
     pub fn render_custom<F: FnOnce(&mut P, &Recti)>(&mut self, f: F) {
@@ -1783,7 +1813,6 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 
         // get the viewport
         let clip = self.clip_stack.last().unwrap();
-
         let mut queue = P::default();
         f(&mut queue, clip);
         self.push_command(Command::DirectRenderPassCommands { pass: queue });

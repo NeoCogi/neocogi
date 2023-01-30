@@ -32,21 +32,29 @@ use std::ptr::slice_from_raw_parts;
 use super::*;
 
 pub trait ControlProvider {
-    fn text(&mut self, text: &str);
-    fn label(&mut self, text: &str);
-    fn button(&mut self, label: &str, icon: Option<usize>, opt: WidgetOption) -> ResourceState;
-    fn checkbox(&mut self, label: &str, state: &mut bool) -> ResourceState;
+    fn text(&mut self, style: &Style, text: &str);
+    fn label(&mut self, style: &Style, text: &str);
+    fn button(
+        &mut self,
+        style: &Style,
+        label: &str,
+        icon: Option<usize>,
+        opt: WidgetOption,
+    ) -> ResourceState;
+    fn checkbox(&mut self, style: &Style, label: &str, state: &mut bool) -> ResourceState;
     fn textbox_raw(
         &mut self,
+        style: &Style,
         buf: &mut String,
         id: Id,
         r: Recti,
         opt: WidgetOption,
     ) -> ResourceState;
-    fn textbox_ex(&mut self, buf: &mut String, opt: WidgetOption) -> ResourceState;
+    fn textbox_ex(&mut self, style: &Style, buf: &mut String, opt: WidgetOption) -> ResourceState;
 
     fn slider_ex(
         &mut self,
+        style: &Style,
         value: &mut Real,
         low: Real,
         high: Real,
@@ -57,6 +65,7 @@ pub trait ControlProvider {
 
     fn number_ex(
         &mut self,
+        style: &Style,
         value: &mut Real,
         step: Real,
         precision: usize,
@@ -67,6 +76,7 @@ pub trait ControlProvider {
 impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     fn number_textbox(
         &mut self,
+        style: &Style,
         precision: usize,
         value: &mut Real,
         r: Recti,
@@ -80,7 +90,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 
         if self.number_edit == Some(id) {
             let mut temp = self.number_edit_buf.clone();
-            let res: ResourceState = self.textbox_raw(&mut temp, id, r, WidgetOption::NONE);
+            let res: ResourceState = self.textbox_raw(style, &mut temp, id, r, WidgetOption::NONE);
             self.number_edit_buf = temp;
             if res.is_submitted() || self.focus != Some(id) {
                 match Real::from_decimal(self.number_edit_buf.as_str()) {
@@ -99,13 +109,13 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 }
 
 impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
-    fn text(&mut self, text: &str) {
-        let font = self.style.normal_font;
-        let color = self.style.colors[ControlColor::Text as usize];
-        self.column(|ctx| {
+    fn text(&mut self, style: &Style, text: &str) {
+        let font = style.normal_font;
+        let color = style.colors[ControlColor::Text as usize];
+        self.column(style, |ctx, style| {
             let h = ctx.renderer.get_font_height(font) as i32;
-            ctx.rows_with_line_config(&[-1], h, |ctx| {
-                let mut r = ctx.next_cell();
+            ctx.rows_with_line_config(style, &[-1], h, |ctx, style| {
+                let mut r = ctx.next_cell(style);
                 for line in text.lines() {
                     let mut rx = r.x;
                     let words = line.split_inclusive(' ');
@@ -116,20 +126,21 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
                             ctx.draw_text(font, w, vec2(rx, r.y), color);
                             rx += tw;
                         } else {
-                            r = ctx.next_cell();
+                            r = ctx.next_cell(style);
                             rx = r.x;
                         }
                     }
-                    r = ctx.next_cell();
+                    r = ctx.next_cell(style);
                 }
             });
         });
     }
 
-    fn label(&mut self, text: &str) {
-        let layout = self.next_cell();
+    fn label(&mut self, style: &Style, text: &str) {
+        let layout = self.next_cell(style);
         self.draw_control_text(
-            self.style.normal_font,
+            style,
+            style.normal_font,
             text,
             layout,
             ControlColor::Text,
@@ -137,49 +148,52 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         );
     }
 
-    fn button(&mut self, label: &str, icon: Option<usize>, opt: WidgetOption) -> ResourceState {
+    fn button(
+        &mut self,
+        style: &Style,
+        label: &str,
+        icon: Option<usize>,
+        opt: WidgetOption,
+    ) -> ResourceState {
         let mut res = ResourceState::NONE;
         let id: Id = if label.len() > 0 {
             self.get_id_from_str(label)
         } else {
             self.get_id_u32(icon.unwrap() as u32)
         };
-        let r = self.next_cell();
+        let r = self.next_cell(style);
         self.update_control(id, r, opt);
         if self.mouse_pressed.is_left() && self.focus == Some(id) {
             res |= ResourceState::SUBMIT;
         }
-        self.draw_control_frame(id, r, ControlColor::Button, opt);
+        self.draw_control_frame(style, id, r, ControlColor::Button, opt);
         if label.len() > 0 {
-            self.draw_control_text(self.style.normal_font, label, r, ControlColor::Text, opt);
+            self.draw_control_text(style, style.normal_font, label, r, ControlColor::Text, opt);
         }
         if icon.is_some() {
-            self.draw_icon(
-                icon.unwrap(),
-                r,
-                self.style.colors[ControlColor::Text as usize],
-            );
+            self.draw_icon(icon.unwrap(), r, style.colors[ControlColor::Text as usize]);
         }
         return res;
     }
 
-    fn checkbox(&mut self, label: &str, state: &mut bool) -> ResourceState {
+    fn checkbox(&mut self, style: &Style, label: &str, state: &mut bool) -> ResourceState {
         let mut res = ResourceState::NONE;
         let id: Id = self.get_id_from_ptr(state);
-        let mut r = self.next_cell();
+        let mut r = self.next_cell(style);
         let box_0 = Rect::new(r.x, r.y, r.height, r.height);
         self.update_control(id, r, WidgetOption::NONE);
         if self.mouse_pressed.is_left() && self.focus == Some(id) {
             res |= ResourceState::CHANGE;
             *state = *state == false;
         }
-        self.draw_control_frame(id, box_0, ControlColor::Base, WidgetOption::NONE);
+        self.draw_control_frame(style, id, box_0, ControlColor::Base, WidgetOption::NONE);
         if *state {
-            self.draw_icon(CHECK, box_0, self.style.colors[ControlColor::Text as usize]);
+            self.draw_icon(CHECK, box_0, style.colors[ControlColor::Text as usize]);
         }
         r = Rect::new(r.x + box_0.width, r.y, r.width - box_0.width, r.height);
         self.draw_control_text(
-            self.style.normal_font,
+            style,
+            style.normal_font,
             label,
             r,
             ControlColor::Text,
@@ -190,6 +204,7 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
 
     fn textbox_raw(
         &mut self,
+        style: &Style,
         buf: &mut String,
         id: Id,
         r: Recti,
@@ -216,18 +231,18 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
                 res |= ResourceState::SUBMIT;
             }
         }
-        self.draw_control_frame(id, r, ControlColor::Base, opt);
+        self.draw_control_frame(style, id, r, ControlColor::Base, opt);
         if self.focus == Some(id) {
-            let color = self.style.colors[ControlColor::Text as usize];
-            let font = self.style.normal_font;
+            let color = style.colors[ControlColor::Text as usize];
+            let font = style.normal_font;
             let textw = self.get_text_width(font, buf.as_str());
             let texth = self.get_text_height(font, buf.as_str());
-            let ofx = r.width - self.style.padding - textw - 1;
+            let ofx = r.width - style.padding - textw - 1;
             let textx = r.x
-                + (if ofx < self.style.padding {
+                + (if ofx < style.padding {
                     ofx
                 } else {
-                    self.style.padding
+                    style.padding
                 });
             let texty = r.y + (r.height - texth) / 2;
             self.push_clip_rect(r);
@@ -236,7 +251,8 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
             self.pop_clip_rect();
         } else {
             self.draw_control_text(
-                self.style.normal_font,
+                style,
+                style.normal_font,
                 buf.as_str(),
                 r,
                 ControlColor::Text,
@@ -246,14 +262,15 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         return res;
     }
 
-    fn textbox_ex(&mut self, buf: &mut String, opt: WidgetOption) -> ResourceState {
+    fn textbox_ex(&mut self, style: &Style, buf: &mut String, opt: WidgetOption) -> ResourceState {
         let id = self.get_id_from_ptr(buf);
-        let r = self.next_cell();
-        return self.textbox_raw(buf, id, r, opt);
+        let r = self.next_cell(style);
+        return self.textbox_raw(style, buf, id, r, opt);
     }
 
     fn slider_ex(
         &mut self,
+        style: &Style,
         value: &mut Real,
         low: Real,
         high: Real,
@@ -265,8 +282,11 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         let last = *value;
         let mut v = last;
         let id = self.get_id_from_ptr(value);
-        let base = self.next_cell();
-        if !self.number_textbox(precision, &mut v, base, id).is_none() {
+        let base = self.next_cell(style);
+        if !self
+            .number_textbox(style, precision, &mut v, base, id)
+            .is_none()
+        {
             return res;
         }
         self.update_control(id, base, opt);
@@ -287,22 +307,23 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         if last != v {
             res |= ResourceState::CHANGE;
         }
-        self.draw_control_frame(id, base, ControlColor::Base, opt);
-        let w = self.style.thumb_size;
+        self.draw_control_frame(style, id, base, ControlColor::Base, opt);
+        let w = style.thumb_size;
         let x = ((v - low) * (base.width - w) as Real / (high - low)) as i32;
         let thumb = Rect::new(base.x + x, base.y, w, base.height);
-        self.draw_control_frame(id, thumb, ControlColor::Button, opt);
+        self.draw_control_frame(style, id, thumb, ControlColor::Button, opt);
         self.slider_buff.clear();
         self.slider_buff.append_real(precision, *value);
         let txt_ptr = self.slider_buff.as_str().as_ptr();
         let txt_slice = slice_from_raw_parts(txt_ptr, self.slider_buff.as_str().len());
         let txt = unsafe { std::str::from_utf8(&*txt_slice) }.unwrap();
-        self.draw_control_text(self.style.normal_font, txt, base, ControlColor::Text, opt);
+        self.draw_control_text(style, style.normal_font, txt, base, ControlColor::Text, opt);
         return res;
     }
 
     fn number_ex(
         &mut self,
+        style: &Style,
         value: &mut Real,
         step: Real,
         precision: usize,
@@ -310,9 +331,12 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
     ) -> ResourceState {
         let mut res = ResourceState::NONE;
         let id: Id = self.get_id_from_ptr(value);
-        let base = self.next_cell();
+        let base = self.next_cell(style);
         let last: Real = *value;
-        if !self.number_textbox(precision, value, base, id).is_none() {
+        if !self
+            .number_textbox(style, precision, value, base, id)
+            .is_none()
+        {
             return res;
         }
         self.update_control(id, base, opt);
@@ -322,13 +346,13 @@ impl<P: Default, R: RendererBackEnd<P>> ControlProvider for Context<P, R> {
         if *value != last {
             res |= ResourceState::CHANGE;
         }
-        self.draw_control_frame(id, base, ControlColor::Base, opt);
+        self.draw_control_frame(style, id, base, ControlColor::Base, opt);
         self.slider_buff.clear();
         self.slider_buff.append_real(precision, *value);
         let txt_ptr = self.slider_buff.as_str().as_ptr();
         let txt_slice = slice_from_raw_parts(txt_ptr, self.slider_buff.as_str().len());
         let txt = unsafe { std::str::from_utf8(&*txt_slice) }.unwrap();
-        self.draw_control_text(self.style.normal_font, txt, base, ControlColor::Text, opt);
+        self.draw_control_text(style, style.normal_font, txt, base, ControlColor::Text, opt);
         return res;
     }
 }

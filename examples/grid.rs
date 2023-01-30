@@ -108,29 +108,48 @@ fn main() {
     let renderer = system::Renderer::new(&mut driver, width as u32, height as u32);
     let mut input = Input::new();
     let mut ctx = ui::Context::new(renderer);
-
+    let style = Style::default();
     'running: while !window.should_close() {
         let (width, height) = window.get_framebuffer_size();
 
-        let mut pass = ctx.frame(width as _, height as _, |ctx| {
+        let (mut pass_queue, _) = ctx.frame(width as _, height as _, |ctx| {
             ctx.window(
+                &style,
                 "Navigation",
                 Rect::new(100, 100, 100, 100),
                 ui::WidgetOption::NONE,
-                |ctx| {
-                    let style = ctx.style;
-                    ctx.column(|ctx| {
-                        if ctx.button("Orbit", None, WidgetOption::NONE).is_submitted() {
+                |ctx, style| {
+                    ctx.column(style, |ctx, style| {
+                        if ctx
+                            .button(style, "Orbit", None, WidgetOption::NONE)
+                            .is_submitted()
+                        {
                             state.view.set_navigation_mode(NavigationMode::Orbit)
                         }
 
-                        if ctx.button("Pan", None, WidgetOption::NONE).is_submitted() {
+                        if ctx
+                            .button(style, "Pan", None, WidgetOption::NONE)
+                            .is_submitted()
+                        {
                             state.view.set_navigation_mode(NavigationMode::Pan)
                         }
                     });
                 },
             );
         });
+
+        let mut pass = Pass::new(
+            width as usize,
+            height as usize,
+            None,
+            [
+                ColorPassAction::Clear(color4b(0x7F, 0x7F, 0x7F, 0xFF)),
+                ColorPassAction::Previous,
+                ColorPassAction::Previous,
+                ColorPassAction::Previous,
+            ],
+            DepthPassAction::Clear(1.0),
+        );
 
         let mut pass_3d = Pass::new(
             width as usize,
@@ -159,6 +178,7 @@ fn main() {
         driver.render_pass(&mut pass_3d);
 
         pass.color_actions[0] = ColorPassAction::Previous;
+        pass.queue.append(pass_queue);
         driver.render_pass(&mut pass);
         window.swap_buffers();
 

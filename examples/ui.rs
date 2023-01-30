@@ -212,6 +212,7 @@ impl<'a> State<'a> {
 
     fn tri_window(
         &mut self,
+        style: &Style,
         driver: &mut DriverPtr,
         ctx: &mut ui::Context<PassCommandQueue, system::Renderer>,
     ) {
@@ -236,11 +237,12 @@ impl<'a> State<'a> {
         }
 
         ctx.window(
+            style,
             "Triangle Window",
             Rect::new(40, 500, 300, 300),
             WidgetOption::NONE,
-            |ctx| {
-                ctx.column(|ctx| {
+            |ctx, style| {
+                ctx.column(style, |ctx, style| {
                     let mut win = ctx.get_current_container_rect();
                     let bindings = Bindings {
                         vertex_buffers: vec![self.vb.as_ref().unwrap().clone()],
@@ -292,13 +294,17 @@ impl<'a> State<'a> {
         );
     }
 
-    fn test_window(&mut self, ctx: &mut ui::Context<PassCommandQueue, system::Renderer>) {
+    fn test_window(
+        &mut self,
+        style: &Style,
+        ctx: &mut ui::Context<PassCommandQueue, system::Renderer>,
+    ) {
         ctx
-        .window(
+        .window(style,
                 "Demo Window",
                 Rect::new(40, 40, 300, 450),
                 WidgetOption::NONE,
-                |ctx|  {
+                |ctx, style|  {
             let mut win = ctx.get_current_container_rect();
             win.width = if win.width > 240 { win.width } else { 240 };
             win.height = if win.height > 300 { win.height } else { 300 };
@@ -307,66 +313,66 @@ impl<'a> State<'a> {
 
             let mut buff = String::new();
 
-            ctx.header("Window Info", WidgetOption::NONE, |ctx| {
+            ctx.header(style,"Window Info", WidgetOption::NONE, |ctx, style| {
                 let win_0 = ctx.get_current_container_rect();
-                ctx.rows_with_line_config(&[96, -1], 0, |ctx| {
-                    ctx.label("Position:");
+                ctx.rows_with_line_config(style, &[96, -1], 0, |ctx, style| {
+                    ctx.label(style,"Position:");
 
                     buff.clear();
                     buff.append_int(10, 0, win_0.x);
                     buff.push_str(", ");
                     buff.append_int(10, 0, win_0.y);
 
-                    ctx.label(buff.as_str());
+                    ctx.label(style, buff.as_str());
                     buff.clear();
-                    ctx.label("Size:");
+                    ctx.label(style, "Size:");
 
                     buff.append_int(10, 0, win_0.width);
                     buff.push_str(", ");
                     buff.append_int(10, 0, win_0.height);
 
-                    ctx.label(buff.as_str());
+                    ctx.label(style, buff.as_str());
                 });
             });
             ctx
-            .header( "Test Buttons", WidgetOption::EXPANDED, |ctx| {
-                ctx.rows_with_line_config(&[120, -110, -1], 0, |ctx| {
-                    ctx.label("Test buttons 1:");
+            .header( style, "Test Buttons", WidgetOption::EXPANDED, |ctx, style| {
+                ctx.rows_with_line_config(style,&[120, -110, -1], 0, |ctx, style| {
+                    ctx.label(style,"Test buttons 1:");
                     if !ctx
-                        .button("Button 1", None, WidgetOption::ALIGN_CENTER)
+                        .button(style,"Button 1", None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         self.write_log("Pressed button 1");
                     }
                     if !ctx
-                        .button("Button 2", None, WidgetOption::ALIGN_CENTER)
+                        .button(style,"Button 2", None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         self.write_log("Pressed button 2");
                     }
-                    ctx.label("Test buttons 2:");
+                    ctx.label(style,"Test buttons 2:");
                     if !ctx
-                        .button("Button 3", None, WidgetOption::ALIGN_CENTER)
+                        .button(style,"Button 3", None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         self.write_log("Pressed button 3");
                     }
                     if !ctx
-                        .button("Popup", None, WidgetOption::ALIGN_CENTER)
+                        .button(style,"Popup", None, WidgetOption::ALIGN_CENTER)
                         .is_none()
                     {
                         ctx.open_popup("Test Popup");
                     }
 
-                    ctx.popup("Test Popup", Recti::new(0, 0, 90, 90), |ctx| {
+                    ctx.popup(style,"Test Popup", Recti::new(0, 0, 90, 90), |ctx, style| {
                         if !ctx
-                            .button("Hello", None, WidgetOption::ALIGN_CENTER)
+                            .button(style,"Hello", None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
                             self.write_log("Hello")
                         }
                         if !ctx
-                            .button("World", None, WidgetOption::ALIGN_CENTER)
+                            .button(style,"World", None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
                             self.write_log("World")
@@ -374,79 +380,79 @@ impl<'a> State<'a> {
                     });
                 });
             });
-            ctx.header( "Tree and Text", WidgetOption::EXPANDED, |ctx| {
-                ctx.rows_with_line_config(&[140, -1], 0, |ctx| {
-                    ctx.column(|ctx| {
-                        ctx.treenode("Test 1", WidgetOption::NONE, |ctx| {
-                            ctx.treenode("Test 1a", WidgetOption::NONE, |ctx| {
-                                ctx.label("Hello");
-                                ctx.label("world");
+            ctx.header( style,"Tree and Text", WidgetOption::EXPANDED, |ctx, style| {
+                ctx.rows_with_line_config(style,&[140, -1], 0, |ctx, style| {
+                    ctx.column(style,|ctx, style| {
+                        ctx.treenode(style,"Test 1", WidgetOption::NONE, |ctx, style| {
+                            ctx.treenode(style,"Test 1a", WidgetOption::NONE, |ctx, style| {
+                                ctx.label(style,"Hello");
+                                ctx.label(style,"world");
                             });
-                            ctx.treenode("Test 1b", WidgetOption::NONE, |ctx| {
+                            ctx.treenode(style,"Test 1b", WidgetOption::NONE, |ctx, style| {
                                 if !ctx
-                                    .button("Button 1", None, WidgetOption::ALIGN_CENTER)
+                                    .button(style,"Button 1", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 1");
                                 }
                                 if !ctx
-                                    .button("Button 2", None, WidgetOption::ALIGN_CENTER)
+                                    .button(style,"Button 2", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 2");
                                 }
                             });
                         });
-                        ctx.treenode("Test 2", WidgetOption::NONE, |ctx| {
-                            ctx.rows_with_line_config(&[54, 54], 0, |ctx| {
+                        ctx.treenode(style,"Test 2", WidgetOption::NONE, |ctx, style| {
+                            ctx.rows_with_line_config(style, &[54, 54], 0, |ctx, style| {
                                 if !ctx
-                                    .button("Button 3", None, WidgetOption::ALIGN_CENTER)
+                                    .button(style,"Button 3", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 3");
                                 }
                                 if !ctx
-                                    .button("Button 4", None, WidgetOption::ALIGN_CENTER)
+                                    .button(style,"Button 4", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 4");
                                 }
                                 if !ctx
-                                    .button("Button 5", None, WidgetOption::ALIGN_CENTER)
+                                    .button(style,"Button 5", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 5");
                                 }
                                 if !ctx
-                                    .button("Button 6", None, WidgetOption::ALIGN_CENTER)
+                                    .button(style,"Button 6", None, WidgetOption::ALIGN_CENTER)
                                     .is_none()
                                 {
                                     self.write_log("Pressed button 6");
                                 }
                             });
                         });
-                        ctx.treenode("Test 3", WidgetOption::NONE, |ctx| {
-                            ctx.checkbox("Checkbox 1", &mut self.checks[0]);
-                            ctx.checkbox("Checkbox 2", &mut self.checks[1]);
-                            ctx.checkbox("Checkbox 3", &mut self.checks[2]);
+                        ctx.treenode(style,"Test 3", WidgetOption::NONE, |ctx, style| {
+                            ctx.checkbox(style,"Checkbox 1", &mut self.checks[0]);
+                            ctx.checkbox(style,"Checkbox 2", &mut self.checks[1]);
+                            ctx.checkbox(style,"Checkbox 3", &mut self.checks[2]);
                         });
                     });
-                    ctx.column(|ctx| {
-                        ctx.rows_with_line_config(&[-1], 0, |ctx| {
+                    ctx.column(style,|ctx, style| {
+                        ctx.rows_with_line_config(style,&[-1], 0, |ctx, style| {
                             ctx.text(
-                                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas lacinia, sem eu lacinia molestie, mi risus faucibus ipsum, eu varius magna felis a nulla."
+                                style,"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas lacinia, sem eu lacinia molestie, mi risus faucibus ipsum, eu varius magna felis a nulla."
                                 ,
                             );
                         });
                     });
                 });
             });
-            ctx.header("Background Color", WidgetOption::EXPANDED, |ctx| {
-                ctx.rows_with_line_config(&[-78, -1], 74, |ctx| {
-                    ctx.column(|ctx| {
-                        ctx.rows_with_line_config(&[46, -1], 0, |ctx| {
-                            ctx.label("Red:");
-                            ctx.slider_ex(
+            ctx.header(style,"Background Color", WidgetOption::EXPANDED, |ctx, style| {
+                ctx.rows_with_line_config(style,&[-78, -1], 74, |ctx, style| {
+                    ctx.column(style,|ctx, style| {
+                        ctx.rows_with_line_config(style,&[46, -1], 0, |ctx, style| {
+                            ctx.label(style,"Red:");
+                            ctx.slider_ex(style,
                                 &mut self.bg[0],
                                 0.0,
                                 255.0,
@@ -454,8 +460,8 @@ impl<'a> State<'a> {
                                 0,
                                 WidgetOption::ALIGN_CENTER,
                             );
-                            ctx.label("Green:");
-                            ctx.slider_ex(
+                            ctx.label(style,"Green:");
+                            ctx.slider_ex(style,
                                 &mut self.bg[1],
                                 0.0,
                                 255.0,
@@ -463,8 +469,8 @@ impl<'a> State<'a> {
                                 0,
                                 WidgetOption::ALIGN_CENTER,
                             );
-                            ctx.label("Blue:");
-                            ctx.slider_ex(
+                            ctx.label(style,"Blue:");
+                            ctx.slider_ex(style,
                                 &mut self.bg[2],
                                 0.0,
                                 255.0,
@@ -474,7 +480,7 @@ impl<'a> State<'a> {
                             );
                         });
                     });
-                    let r = ctx.next_cell();
+                    let r = ctx.next_cell(style);
                     ctx.draw_rect(
                         r,
                         color(self.bg[0] as u8, self.bg[1] as u8, self.bg[2] as u8, 255),
@@ -485,7 +491,7 @@ impl<'a> State<'a> {
                     buff.append_int(16, 2, self.bg[1] as _);
                     buff.append_int(16, 2, self.bg[2] as _);
                     let font = FontId(0);
-                    ctx.draw_control_text(
+                    ctx.draw_control_text(style,
                         font,
                         buff.as_str(),
                         r,
@@ -497,18 +503,23 @@ impl<'a> State<'a> {
         });
     }
 
-    fn log_window(&mut self, ctx: &mut ui::Context<PassCommandQueue, system::Renderer>) {
+    fn log_window(
+        &mut self,
+        style: &Style,
+        ctx: &mut ui::Context<PassCommandQueue, system::Renderer>,
+    ) {
         ctx.window(
+            style,
             "Log Window",
             Rect::new(350, 40, 300, 200),
             WidgetOption::NONE,
-            |ctx| {
-                ctx.rows_with_line_config(&[-1], -25, |ctx| {
-                    ctx.panel("Log Output", WidgetOption::NONE, |ctx| {
+            |ctx, style| {
+                ctx.rows_with_line_config(style, &[-1], -25, |ctx, style| {
+                    ctx.panel(style, "Log Output", WidgetOption::NONE, |ctx, style| {
                         let mut scroll = ctx.get_current_container_scroll();
                         let content_size = ctx.get_current_container_content_size();
-                        ctx.rows_with_line_config(&[-1], -1, |ctx| {
-                            ctx.text(self.logbuf.as_str());
+                        ctx.rows_with_line_config(style, &[-1], -1, |ctx, style| {
+                            ctx.text(style, self.logbuf.as_str());
                             if self.logbuf_updated {
                                 scroll.y = content_size.y;
                                 ctx.set_current_container_scroll(&scroll);
@@ -518,16 +529,16 @@ impl<'a> State<'a> {
                     });
 
                     let mut submitted = false;
-                    ctx.rows_with_line_config(&[-70, -1], 0, |ctx| {
+                    ctx.rows_with_line_config(style, &[-70, -1], 0, |ctx, style| {
                         if ctx
-                            .textbox_ex(&mut self.submit_buf, WidgetOption::NONE)
+                            .textbox_ex(style, &mut self.submit_buf, WidgetOption::NONE)
                             .is_submitted()
                         {
                             ctx.set_focus(ctx.last_id);
                             submitted = true;
                         }
                         if !ctx
-                            .button("Submit", None, WidgetOption::ALIGN_CENTER)
+                            .button(style, "Submit", None, WidgetOption::ALIGN_CENTER)
                             .is_none()
                         {
                             submitted = true;
@@ -545,6 +556,7 @@ impl<'a> State<'a> {
     }
     fn uint8_slider(
         ctx: &mut ui::Context<PassCommandQueue, system::Renderer>,
+        style: &Style,
         value: &mut u8,
         low: i32,
         high: i32,
@@ -552,6 +564,7 @@ impl<'a> State<'a> {
         let mut tmp = *value as f32;
         ctx.push_id_from_ptr(value);
         let res = ctx.slider_ex(
+            style,
             &mut tmp,
             low as Real,
             high as Real,
@@ -563,40 +576,49 @@ impl<'a> State<'a> {
         ctx.pop_id();
         return res;
     }
-    fn style_window(&mut self, ctx: &mut ui::Context<PassCommandQueue, system::Renderer>) {
-        ctx.window(
+    fn style_window(
+        &mut self,
+        style: &Style,
+        ctx: &mut ui::Context<PassCommandQueue, system::Renderer>,
+    ) -> Style {
+        let (_, s) = ctx.window(
+            style,
             "Style Editor",
             Rect::new(350, 250, 300, 240),
             WidgetOption::NONE,
-            |ctx| {
-                let mut style = ctx.style.clone();
+            |ctx, style| {
                 let sw = (ctx.get_current_container_body().width as f64 * 0.14f64) as i32;
-                ctx.rows_with_line_config(&[80, sw, sw, sw, sw, -1], 0, |ctx| {
+                ctx.rows_with_line_config(style, &[80, sw, sw, sw, sw, -1], 0, |ctx, style| {
+                    let mut new_style = style.clone();
                     for i in 0..self.label_colors.len() {
-                        ctx.label(self.label_colors[i].label);
+                        ctx.label(style, self.label_colors[i].label);
                         let color = &mut self.colors[i];
-                        Self::uint8_slider(ctx, &mut color.x, 0, 255);
-                        Self::uint8_slider(ctx, &mut color.y, 0, 255);
-                        Self::uint8_slider(ctx, &mut color.z, 0, 255);
-                        Self::uint8_slider(ctx, &mut color.w, 0, 255);
-                        ctx.style.colors[i] = *color;
-                        let r = ctx.next_cell();
-                        ctx.draw_rect(r, ctx.style.colors[i]);
+                        Self::uint8_slider(ctx, style, &mut color.x, 0, 255);
+                        Self::uint8_slider(ctx, style, &mut color.y, 0, 255);
+                        Self::uint8_slider(ctx, style, &mut color.z, 0, 255);
+                        Self::uint8_slider(ctx, style, &mut color.w, 0, 255);
+                        new_style.colors[i] = *color;
+                        let r = ctx.next_cell(style);
+                        ctx.draw_rect(r, style.colors[i]);
                     }
-                });
+                    new_style
+                })
             },
         );
+        s.unwrap()
     }
 
     fn process_frame(
         &mut self,
+        style: &Style,
         drv: &mut DriverPtr,
         ctx: &mut ui::Context<PassCommandQueue, system::Renderer>,
-    ) {
-        self.style_window(ctx);
-        self.log_window(ctx);
-        self.tri_window(drv, ctx);
-        self.test_window(ctx);
+    ) -> Style {
+        let s = self.style_window(style, ctx);
+        self.log_window(style, ctx);
+        self.tri_window(style, drv, ctx);
+        self.test_window(style, ctx);
+        s
     }
 }
 
@@ -611,7 +633,5 @@ fn main() {
         state.colors[i] = style.colors[i];
     }
 
-    app.run(|drv, ctx| {
-        state.process_frame(drv, ctx);
-    });
+    app.run(style, |drv, ctx, res| state.process_frame(&res, drv, ctx));
 }

@@ -566,17 +566,23 @@ impl App {
         }
     }
 
-    pub fn run<F: FnMut(&mut DriverPtr, &mut super::Context<PassCommandQueue, Renderer>)>(
+    pub fn run<
+        Res,
+        F: FnMut(&mut DriverPtr, &mut super::Context<PassCommandQueue, Renderer>, Res) -> Res,
+    >(
         mut self,
+        initial: Res,
         mut process_frame: F,
     ) {
+        let mut res = initial;
         'running: while !self.window.should_close() {
             let (width, height) = self.window.get_framebuffer_size();
 
             let mut driver = self.driver.clone();
-            let queue = self.context.frame(width as _, height as _, |ctx| {
-                process_frame(&mut driver, ctx)
+            let (queue, res2) = self.context.frame(width as _, height as _, |ctx| {
+                process_frame(&mut driver, ctx, res)
             });
+            res = res2;
 
             let mut pass = Pass::new(
                 width as usize,
