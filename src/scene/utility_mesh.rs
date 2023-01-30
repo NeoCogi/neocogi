@@ -890,7 +890,7 @@ impl UMRenderer {
 
     fn draw_chunks<T: Sized + Clone + Sync + Send + 'static>(
         &mut self,
-        pass: &mut Pass,
+        pass: &mut PassCommandQueue,
         pipeline: &PipelinePtr,
         pvm: &Mat4f,
         chunk_size: usize,
@@ -906,8 +906,7 @@ impl UMRenderer {
 
             let pl = elems[start_chnk_idx..start_chnk_idx + count].to_vec();
 
-            pass.queue
-                .update_device_buffer(&mut self.vb, 0, Arc::new(pl));
+            pass.update_device_buffer(&mut self.vb, 0, Arc::new(pl));
             let bindings = Bindings {
                 vertex_buffers: vec![self.vb.clone()],
                 index_buffer: None,
@@ -916,7 +915,7 @@ impl UMRenderer {
                 pixel_images: Vec::new(),
             };
 
-            pass.queue.draw(
+            pass.draw(
                 pipeline,
                 &bindings,
                 Arc::new(GenPayload::from(pvm.clone())),
@@ -928,19 +927,24 @@ impl UMRenderer {
         }
     }
 
-    pub fn draw_segments(&mut self, pass: &mut Pass, pvm: &Mat4f, lines: &Vec<Segment>) {
+    pub fn draw_segments(
+        &mut self,
+        pass: &mut PassCommandQueue,
+        pvm: &Mat4f,
+        lines: &Vec<Segment>,
+    ) {
         let chunk_size = self.max_verts / 2;
         let pipeline = self.wire_pipeline.clone();
         self.draw_chunks(pass, &pipeline, pvm, chunk_size, lines, 1);
     }
 
-    pub fn draw_tris(&mut self, pass: &mut Pass, pvm: &Mat4f, tris: &Vec<Triangle>) {
+    pub fn draw_tris(&mut self, pass: &mut PassCommandQueue, pvm: &Mat4f, tris: &Vec<Triangle>) {
         let chunk_size = self.max_verts / 3;
         let pipeline = self.solid_pipeline.clone();
         self.draw_chunks(pass, &pipeline, pvm, chunk_size, tris, 1);
     }
 
-    pub fn draw_quads(&mut self, pass: &mut Pass, pvm: &Mat4f, quads: &Vec<Quad>) {
+    pub fn draw_quads(&mut self, pass: &mut PassCommandQueue, pvm: &Mat4f, quads: &Vec<Quad>) {
         let chunk_size = self.max_verts / 6;
         let pipeline = self.solid_pipeline.clone();
         self.draw_chunks(pass, &pipeline, pvm, chunk_size, quads, 2);
@@ -950,7 +954,7 @@ impl UMRenderer {
         self.driver.clone()
     }
 
-    pub fn draw_node(&mut self, pass: &mut Pass, pvm: &Mat4f, node: &UMNode) {
+    pub fn draw_node(&mut self, pass: &mut PassCommandQueue, pvm: &Mat4f, node: &UMNode) {
         match node {
             UMNode::Empty => (),
             UMNode::Segments(segs) => self.draw_segments(pass, pvm, segs),
