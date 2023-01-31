@@ -120,7 +120,19 @@ fn main() {
                 | ui::WidgetOption::NO_CLOSE,
             |ctx, style| {
                 ctx.column(style, |ctx, style| {
+                    let mut win = ctx.get_current_container_rect();
+                    let size = ctx.frame_size();
+
                     ctx.render_custom(|queue, clip| {
+                        let width = clip.width;
+                        let height = clip.height;
+
+                        queue.set_viewport(
+                            win.x,
+                            size.1 as i32 - win.height - win.y,
+                            clip.width as _,
+                            win.height as u32,
+                        );
                         let mut pass_3d = PassCommandQueue::new();
 
                         let grid = UMNode::grid_xz(&Vec3f::new(0.0, 0.0, 0.0), 10.0, 20);
@@ -131,6 +143,9 @@ fn main() {
                             &Vec3f::new(0.0, 0.0, 2.0),
                         );
 
+                        state
+                            .view
+                            .set_dimension(Dimensioni::new(clip.width, clip.height));
                         let nodes = UMNode::Assembly(vec![grid, axis]);
                         state
                             .um_renderer
@@ -138,8 +153,9 @@ fn main() {
                         queue.append(pass_3d);
                         let (xpos, ypos) = (pos.x, pos.y);
 
-                        let rel_x = ((xpos as f32) / (width as f32)) * 2.0 - 1.0;
-                        let rel_y = -(((ypos as f32) / (height as f32)) * 2.0 - 1.0);
+                        let rel_x = ((xpos as f32 - clip.x as f32) / (width as f32)) * 2.0 - 1.0;
+                        let rel_y =
+                            -(((ypos as f32 - clip.y as f32) / (height as f32)) * 2.0 - 1.0);
 
                         let pointer_button = if button.is_left() {
                             ButtonState::Pressed(1.0)
@@ -153,6 +169,8 @@ fn main() {
                             .view
                             .set_dimension(Dimensioni::new(width as i32, height as i32));
                         state.view.set_pointer(pointer_pos, pointer_button);
+
+                        queue.set_viewport(0, 0, size.0 as _, size.1 as _);
                     });
                 });
             },
