@@ -254,6 +254,9 @@ impl Renderer {
 
     pub fn clip_rect(dst_r: Recti, src_r: Recti, clip_r: Recti) -> Option<(Recti, Recti)> {
         match dst_r.intersect(&clip_r) {
+            Some(rect) if rect.width == dst_r.width && rect.height == dst_r.height => {
+                Some((dst_r, src_r))
+            }
             Some(rect) if rect.width != 0 && rect.height != 0 => {
                 let dx = dst_r.x as f32;
                 let dy = dst_r.y as f32;
@@ -351,6 +354,7 @@ impl super::RendererBackEnd<PassCommandQueue> for Renderer {
 
         self.queue = Some(queue);
         self.draw_call_count = 0;
+        self.clip = Rect::new(0, 0, width as _, height as _);
     }
 
     fn end_frame(&mut self) -> PassCommandQueue {
@@ -393,13 +397,6 @@ impl super::RendererBackEnd<PassCommandQueue> for Renderer {
 
     fn set_clip_rect(&mut self, rect: Recti) {
         self.clip = rect;
-        // self.flush();
-        // self.pass.as_mut().unwrap().set_scissor(
-        //     rect.x as u32,
-        //     (self.canvas_height as i32 - (rect.y + rect.height)) as u32,
-        //     rect.width as u32,
-        //     rect.height as u32,
-        // );
     }
 
     fn add_render_pass_commands(&mut self, commands: PassCommandQueue) {

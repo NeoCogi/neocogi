@@ -931,7 +931,8 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 
     pub fn push_clip_rect(&mut self, rect: Recti) {
         let last = self.get_clip_rect();
-        self.clip_stack.push(intersect_rects(rect, last));
+        let isect = intersect_rects(rect, last);
+        self.clip_stack.push(isect);
     }
 
     pub fn pop_clip_rect(&mut self) {
