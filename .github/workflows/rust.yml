@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Install packages
-      run: sudo apt-get install -y libglfw3-dev libgles2-mesa-dev libegl1-mesa-dev
+      run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libgles2-mesa-dev libegl1-mesa-dev
     - name: Build
       run: cargo build --verbose
     - name: Build UI
