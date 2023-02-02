@@ -113,7 +113,7 @@ fn main() {
         ctx.window(
             &style,
             "Viewport",
-            Recti::new(200, 0, width as i32 - 200, height as _),
+            Recti::new(201, 0, width as i32 - 201, height as _),
             WidgetOption::NO_TITLE
                 | ui::WidgetOption::SET_SIZE
                 | ui::WidgetOption::NO_INTERACT
