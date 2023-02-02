@@ -1,4 +1,5 @@
 # NeoCogi's core libraries
+![rust workflow](https://github.com/neocogi/neocogi/actions/workflows/rust.yml/badge.svg)
 
 ![UI+3D Triangle Example](docs/ui-screenshot.png)
 A repo containing open source NeoCogi libraries:
