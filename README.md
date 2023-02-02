@@ -4,17 +4,29 @@
 ![UI+3D Triangle Example](docs/ui-screenshot.png)
 A repo containing open source NeoCogi libraries:
 
-- [x] Renderer
+## Features
+- 3D Renderer (GLES 3)
+  - Pass/Render Command queue 
+  - Pixel readbacks
+  - GLSL Shaders
+- 3D Helpers (3D Objects rendering: Debug Meshes)
+- Immediate Mode GUI
+  - Windows/Panels/Popups
+  - Widgets
+  - 3D Viewport
+- Very lightweight (< 250Kb for the UI example)
+
+## TODO
 - [x] Rendering Helpers
 - [x] Pass as the unit of rendering: a pass record both updates and draw commands
-- [x] Arc \<Resource\> & Arc\<Mutex\<Driver\>\>
-- [ ] Pixel uniform (example)
-- [ ] Pixel readback (example)
-- [ ] Partial texture updates: Not sure how wise it is to support it
-- [ ] Stall detection on resource update commands (guard with a mutex?)
+- [x] `Arc<Resource>` & `Arc<Mutex<Driver>>`
 - [x] Immediate mode UI
 - [x] UI Examples
 - [x] Direct bypass rendering commands
+- [ ] Pixel uniform Example
+- [ ] Pixel readback Example
+- [ ] Partial texture updates: Not sure how wise it is to support it
+- [ ] Stall detection on resource update commands (guard with a mutex?)
 
 
 ## License

@@ -108,7 +108,6 @@ const MAX_VERTEX_COUNT: usize = 65536;
 const MAX_INDEX_COUNT: usize = 65536;
 
 pub struct Renderer {
-    driver: DriverPtr,
     pipeline: PipelinePtr,
     vertex_buffer: DeviceBufferPtr,
     index_buffer: DeviceBufferPtr,
@@ -211,7 +210,6 @@ impl Renderer {
 
         let ui_texture = drv.create_texture(tex_desc).unwrap();
         Self {
-            driver: drv.clone(),
             pipeline,
             canvas_width,
             canvas_height,
@@ -519,7 +517,7 @@ pub struct App {
     driver: DriverPtr,
     context: super::Context<PassCommandQueue, Renderer>,
     input: Input<PassCommandQueue, Renderer>,
-    events: std::sync::mpsc::Receiver<(f64, glfw::WindowEvent)>,
+    events: mpsc::Receiver<(f64, glfw::WindowEvent)>,
 }
 
 impl App {
