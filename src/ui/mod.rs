@@ -538,19 +538,19 @@ pub fn expand_rect(r: Recti, n: i32) -> Recti {
     )
 }
 
-pub fn intersect_rects(r1: Recti, r2: Recti) -> Recti {
-    let x1 = i32::max(r1.x, r2.x);
-    let y1 = i32::max(r1.y, r2.y);
-    let mut x2 = i32::min(r1.x + r1.width, r2.x + r2.width);
-    let mut y2 = i32::min(r1.y + r1.height, r2.y + r2.height);
-    if x2 < x1 {
-        x2 = x1;
-    }
-    if y2 < y1 {
-        y2 = y1;
-    }
-    return Rect::new(x1, y1, x2 - x1, y2 - y1);
-}
+// pub fn intersect_rects(r1: Recti, r2: Recti) -> Recti {
+//     let x1 = i32::max(r1.x, r2.x);
+//     let y1 = i32::max(r1.y, r2.y);
+//     let mut x2 = i32::min(r1.x + r1.width, r2.x + r2.width);
+//     let mut y2 = i32::min(r1.y + r1.height, r2.y + r2.height);
+//     if x2 < x1 {
+//         x2 = x1;
+//     }
+//     if y2 < y1 {
+//         y2 = y1;
+//     }
+//     return Rect::new(x1, y1, x2 - x1, y2 - y1);
+// }
 
 pub fn rect_overlaps_vec2(r: Recti, p: Vec2i) -> bool {
     p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height
@@ -681,7 +681,6 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         self.mouse_pressed = MouseButton::NONE;
         self.scroll_delta = vec2(0, 0);
         self.last_mouse_pos = self.mouse_pos;
-        let n = self.root_list.len();
         let containers = &self.containers;
         self.root_list
             .sort_by(|a, b| containers[a.0].zindex.cmp(&containers[b.0].zindex));
@@ -741,10 +740,16 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         self.id_stack.pop();
     }
 
-    pub fn push_clip_rect(&mut self, rect: Recti) {
+    #[must_use]
+    pub fn push_clip_rect(&mut self, rect: Recti) -> Option<Recti> {
         let last = self.get_clip_rect();
-        let isect = intersect_rects(rect, last);
-        self.clip_stack.push(isect);
+        match rect.intersect(&last) {
+            Some(isect) => {
+                self.clip_stack.push(isect);
+                Some(isect)
+            }
+            _ => None,
+        }
     }
 
     pub fn pop_clip_rect(&mut self) {
@@ -896,11 +901,14 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         self.push_command(Command::Clip { rect });
     }
 
-    pub fn draw_rect(&mut self, mut rect: Recti, color: Color4b) {
-        rect = intersect_rects(rect, self.get_clip_rect());
-        if rect.width > 0 && rect.height > 0 {
-            self.push_command(Command::Rect { rect, color });
-        }
+    pub fn draw_rect(&mut self, rect: Recti, color: Color4b) {
+        let rect = rect.intersect(&self.get_clip_rect()); //intersect_rects(rect, self.get_clip_rect());
+        match rect {
+            Some(rect) => {
+                self.push_command(Command::Rect { rect, color });
+            }
+            _ => (),
+        };
     }
 
     pub fn draw_box(&mut self, r: Recti, color: Color4b) {
@@ -1005,17 +1013,21 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     ) {
         let mut pos: Vec2i = Vec2i { x: 0, y: 0 };
         let tw = self.get_text_width(font, str);
-        self.push_clip_rect(rect);
-        pos.y = rect.y + (rect.height - self.get_text_height(font, str)) / 2;
-        if opt.is_aligned_center() {
-            pos.x = rect.x + (rect.width - tw) / 2;
-        } else if opt.is_aligned_right() {
-            pos.x = rect.x + rect.width - tw - style.padding;
-        } else {
-            pos.x = rect.x + style.padding;
+        match self.push_clip_rect(rect) {
+            Some(_) => {
+                pos.y = rect.y + (rect.height - self.get_text_height(font, str)) / 2;
+                if opt.is_aligned_center() {
+                    pos.x = rect.x + (rect.width - tw) / 2;
+                } else if opt.is_aligned_right() {
+                    pos.x = rect.x + rect.width - tw - style.padding;
+                } else {
+                    pos.x = rect.x + style.padding;
+                }
+                self.draw_text(font, str, pos, style.colors[colorid as usize]);
+                self.pop_clip_rect();
+            }
+            None => (),
         }
-        self.draw_text(font, str, pos, style.colors[colorid as usize]);
-        self.pop_clip_rect();
     }
 
     pub fn mouse_over(&mut self, rect: Recti) -> bool {
@@ -1177,7 +1189,9 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
         let mut cs: Vec2i = self.containers[cnt_id].content_size;
         cs.x += style.padding * 2;
         cs.y += style.padding * 2;
-        self.push_clip_rect(body.clone());
+        if self.push_clip_rect(body.clone()).is_none() {
+            return;
+        }
         if cs.y > self.containers[cnt_id].body.height {
             body.width -= sz;
         }
@@ -1447,7 +1461,6 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
     }
 
     fn paint(&mut self) {
-        let mut cmd_id = 0;
         for cnt in &self.root_list {
             let container = &mut self.containers[cnt.0];
             let mut commands = Vec::new();

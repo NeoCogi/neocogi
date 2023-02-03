@@ -454,7 +454,7 @@ impl super::RendererBackEnd<PassCommandQueue> for Renderer {
         self.indices.clear();
     }
 
-    fn set_atlas(atlas: &Atlas) {
+    fn set_atlas(_atlas: &Atlas) {
         todo!()
     }
 }
@@ -484,7 +484,7 @@ impl<P: Sized + Default, R: super::RendererBackEnd<P>> Input<P, R> {
                 }
             }
             glfw::WindowEvent::Scroll(x, y) => ctx.input_scroll(x as i32, y as i32),
-            glfw::WindowEvent::Key(key, scancode, action, modifiers) => {
+            glfw::WindowEvent::Key(key, _, action, modifiers) => {
                 let mut keymod = KeyModifier::NONE;
                 if key == glfw::Key::Enter {
                     keymod |= KeyModifier::RETURN
