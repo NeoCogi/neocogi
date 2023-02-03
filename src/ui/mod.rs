@@ -56,7 +56,7 @@ mod atlas_data;
 pub use atlas_data::*;
 
 mod num_appender;
-use num_appender::*;
+pub use num_appender::*;
 
 mod layout;
 use layout::*;
