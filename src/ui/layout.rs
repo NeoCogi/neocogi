@@ -67,12 +67,7 @@ pub struct LayoutStack {
 impl LayoutStack {
     pub fn push_rect_scroll(&mut self, body: Recti, scroll: Vec2i) {
         let mut layout: Layout = Layout {
-            body: Rect::new(
-                body.x - scroll.x,
-                body.y - scroll.y,
-                body.width,
-                body.height,
-            ),
+            body: Rect::new(body.x - scroll.x, body.y - scroll.y, body.width, body.height),
             next: Recti {
                 x: 0,
                 y: 0,
@@ -159,7 +154,13 @@ impl LayoutStack {
         layout.next_type = position;
     }
 
+    pub fn default_cell_height(&self, style: &Style) -> i32 {
+        style.size.y + style.padding * 2
+    }
+
     pub fn next_cell(&mut self, style: &Style) -> Recti {
+        let d_height = self.default_cell_height(style);
+
         let layout = self.top_mut();
         let mut res = Recti::new(0, 0, 0, 0);
         if layout.next_type != LayoutPosition::None {
@@ -175,8 +176,7 @@ impl LayoutStack {
             let litems = layout.items;
             let lsize_y = layout.size.y;
             let mut undefined_widths = [0; 16];
-            undefined_widths[0..litems as usize]
-                .copy_from_slice(&layout.widths[0..litems as usize]);
+            undefined_widths[0..litems as usize].copy_from_slice(&layout.widths[0..litems as usize]);
             if layout.item_index == layout.items {
                 Self::row_for_layout(layout, &undefined_widths[0..litems as usize], lsize_y);
             }
@@ -198,14 +198,11 @@ impl LayoutStack {
                 // Now it's the following (expand) for the normal case, and the previous behaviour
                 // is maintained when there's no layout
                 //
-                res.width = i32::max(
-                    layout.body.width - style.padding * 2,
-                    style.size.x + style.padding * 2,
-                );
+                res.width = i32::max(layout.body.width - style.padding * 2, style.size.x + style.padding * 2);
             }
 
             if res.height == 0 {
-                res.height = style.size.y + style.padding * 2;
+                res.height = d_height;
             }
             if res.width < 0 {
                 res.width += layout.body.width - res.x + 1;
@@ -226,10 +223,7 @@ impl LayoutStack {
         res.y += layout.body.y;
 
         // update max position
-        layout.max = Vec2i::new(
-            i32::max(layout.max.x, res.x + res.width),
-            i32::max(layout.max.y, res.y + res.height),
-        );
+        layout.max = Vec2i::new(i32::max(layout.max.x, res.x + res.width), i32::max(layout.max.y, res.y + res.height));
 
         self.last_rect = res;
         self.last_rect
