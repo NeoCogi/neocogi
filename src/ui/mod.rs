@@ -420,6 +420,10 @@ impl<P: Default> Container<P> {
         self.layout_stack.row_config(widths, height)
     }
 
+    pub fn end_row(&mut self) {
+        self.layout_stack.end_row();
+    }
+
     pub fn default_cell_height(&self, style: &Style) -> i32 {
         self.layout_stack.default_cell_height(style)
     }
@@ -1466,7 +1470,9 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 
     pub fn rows_with_line_config<Res, F: FnOnce(&mut Self, &Style) -> Res>(&mut self, style: &Style, widths: &[i32], height: i32, f: F) -> Res {
         self.top_container_mut().row_config(widths, height);
-        f(self, style)
+        let res = f(self, style);
+        self.top_container_mut().end_row();
+        res
     }
 
     pub fn next_cell(&mut self, style: &Style) -> Recti {
