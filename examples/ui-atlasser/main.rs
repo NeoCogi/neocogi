@@ -6,7 +6,7 @@ use neocogi::*;
 use rectangle_pack::*;
 
 fn main() {
-    let mut app = ui::App::new();
+    let mut app = ui::App::new("atlasser example");
     let style = Style::default();
     app.run(style, |drv, ctx, style| {
         let (_, height) = ctx.frame_size();

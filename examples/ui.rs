@@ -624,7 +624,7 @@ impl<'a> State<'a> {
 
 fn main() {
     // initialize GLFW3 with OpenGL ES 3.0
-    let mut app = system::App::new();
+    let mut app = system::App::new("ui example");
     // initialize UI
     let mut state = State::new();
 

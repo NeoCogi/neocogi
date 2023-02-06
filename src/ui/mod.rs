@@ -1076,6 +1076,8 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
             if is_treenode {
                 if ctx.hover == Some(id) {
                     ctx.draw_frame(style, r, ControlColor::ButtonHover);
+                } else {
+                    ctx.draw_frame(style, r, ControlColor::Button);
                 }
             } else {
                 ctx.draw_control_frame(style, id, r, ControlColor::Button, WidgetOption::NONE);
@@ -1085,6 +1087,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
                 Rect::new(r.x, r.y, r.height, r.height),
                 style.colors[ControlColor::Text as usize],
             );
+            ctx.draw_box(expand_rect(r, -1), style.colors[ControlColor::Border as usize]);
             r.x += r.height - style.padding;
             r.width -= r.height - style.padding;
             ctx.draw_control_text(style, font, label, r, ControlColor::Text, WidgetOption::NONE);
@@ -1422,7 +1425,7 @@ impl<P: Default, R: RendererBackEnd<P>> Context<P, R> {
 
     pub fn treenode<Res, F: FnOnce(&mut Self, &Style) -> Res>(&mut self, style: &Style, label: &str, opt: WidgetOption, f: F) -> (ResourceState, Option<Res>) {
         let res = self.begin_treenode_ex(style, label, opt);
-        if !res.is_none() {
+        if res.is_active() {
             let r = f(self, style);
             self.end_treenode(style);
             return (res, Some(r));

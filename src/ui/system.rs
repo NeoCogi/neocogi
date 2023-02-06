@@ -186,23 +186,17 @@ impl Renderer {
         let pipeline = drv.create_pipeline(pipeline_desc).unwrap();
 
         let vertex_buffer = drv
-            .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(
-                MAX_VERTEX_COUNT * std::mem::size_of::<Vertex>(),
-            )))
+            .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(MAX_VERTEX_COUNT * std::mem::size_of::<Vertex>())))
             .unwrap();
 
         let index_buffer = drv
-            .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(
-                MAX_INDEX_COUNT * std::mem::size_of::<u16>(),
-            )))
+            .create_device_buffer(DeviceBufferDesc::Vertex(Usage::Dynamic(MAX_INDEX_COUNT * std::mem::size_of::<u16>())))
             .unwrap();
 
         let tex_desc = TextureDesc {
             sampler_desc: SamplerDesc::default(ATLAS.width, ATLAS.height)
                 .with_pixel_format(PixelFormat::R8(
-                    MinMagFilter::default()
-                        .with_mag_filter(Filter::Nearest)
-                        .with_min_filter(Filter::Nearest),
+                    MinMagFilter::default().with_mag_filter(Filter::Nearest).with_min_filter(Filter::Nearest),
                 ))
                 .with_wrap_mode(WrapMode::ClampToEdge),
             payload: Some(Arc::new(ATLAS.pixels.to_vec())),
@@ -230,8 +224,7 @@ impl Renderer {
     }
 
     fn push_quad_vertices(&mut self, v0: &Vertex, v1: &Vertex, v2: &Vertex, v3: &Vertex) {
-        if self.vertices.len() + 4 >= MAX_VERTEX_COUNT || self.indices.len() + 6 >= MAX_INDEX_COUNT
-        {
+        if self.vertices.len() + 4 >= MAX_VERTEX_COUNT || self.indices.len() + 6 >= MAX_INDEX_COUNT {
             //(self as &mut super::Renderer<_>).flush();
             self.flush();
         }
@@ -252,9 +245,7 @@ impl Renderer {
 
     pub fn clip_rect(dst_r: Recti, src_r: Recti, clip_r: Recti) -> Option<(Recti, Recti)> {
         match dst_r.intersect(&clip_r) {
-            Some(rect) if rect.width == dst_r.width && rect.height == dst_r.height => {
-                Some((dst_r, src_r))
-            }
+            Some(rect) if rect.width == dst_r.width && rect.height == dst_r.height => Some((dst_r, src_r)),
             Some(rect) if rect.width != 0 && rect.height != 0 => {
                 let dx = dst_r.x as f32;
                 let dy = dst_r.y as f32;
@@ -412,16 +403,14 @@ impl super::RendererBackEnd<PassCommandQueue> for Renderer {
 
     fn flush(&mut self) {
         if self.vertices.len() != 0 && self.indices.len() != 0 {
-            self.queue.as_mut().unwrap().update_device_buffer(
-                &mut self.vertex_buffer,
-                0,
-                Arc::new(self.vertices.clone()),
-            );
-            self.queue.as_mut().unwrap().update_device_buffer(
-                &mut self.index_buffer,
-                0,
-                Arc::new(self.indices.clone()),
-            );
+            self.queue
+                .as_mut()
+                .unwrap()
+                .update_device_buffer(&mut self.vertex_buffer, 0, Arc::new(self.vertices.clone()));
+            self.queue
+                .as_mut()
+                .unwrap()
+                .update_device_buffer(&mut self.index_buffer, 0, Arc::new(self.indices.clone()));
 
             let bindings = Bindings {
                 vertex_buffers: vec![self.vertex_buffer.clone()],
@@ -432,22 +421,12 @@ impl super::RendererBackEnd<PassCommandQueue> for Renderer {
             };
 
             let u = Uniforms {
-                u_transform: transforms::ortho4(
-                    0.0,
-                    self.canvas_width as f32,
-                    self.canvas_height as f32,
-                    0.0,
-                    -1.0,
-                    0.0,
-                ),
+                u_transform: transforms::ortho4(0.0, self.canvas_width as f32, self.canvas_height as f32, 0.0, -1.0, 0.0),
             };
-            self.queue.as_mut().unwrap().draw(
-                &self.pipeline,
-                &bindings,
-                Arc::new(GenPayload::from(u)),
-                (self.indices.len() / 3) as u32,
-                1,
-            );
+            self.queue
+                .as_mut()
+                .unwrap()
+                .draw(&self.pipeline, &bindings, Arc::new(GenPayload::from(u)), (self.indices.len() / 3) as u32, 1);
             self.draw_call_count += 1;
         }
         self.vertices.clear();
@@ -460,12 +439,7 @@ impl super::RendererBackEnd<PassCommandQueue> for Renderer {
 }
 
 impl<P: Sized + Default, R: super::RendererBackEnd<P>> Input<P, R> {
-    pub fn handle_event(
-        &mut self,
-        event: glfw::WindowEvent,
-        window: &mut glfw::Window,
-        ctx: &mut ui::Context<P, R>,
-    ) {
+    pub fn handle_event(&mut self, event: glfw::WindowEvent, window: &mut glfw::Window, ctx: &mut ui::Context<P, R>) {
         match event {
             glfw::WindowEvent::CursorPos(x, y) => ctx.input_mousemove(x as i32, y as i32),
             glfw::WindowEvent::Char(ch) => ctx.input_text(String::from(ch).as_str()),
@@ -521,23 +495,19 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(window_title: &str) -> Self {
         // initialize GLFW3 with OpenGL ES 3.0
         let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
-        glfw.window_hint(glfw::WindowHint::ContextCreationApi(
-            glfw::ContextCreationApi::Egl,
-        ));
+        glfw.window_hint(glfw::WindowHint::ContextCreationApi(glfw::ContextCreationApi::Egl));
         glfw.window_hint(glfw::WindowHint::ClientApi(glfw::ClientApiHint::OpenGlEs));
         glfw.window_hint(glfw::WindowHint::ContextVersion(3, 0));
-        glfw.window_hint(glfw::WindowHint::OpenGlProfile(
-            glfw::OpenGlProfileHint::Core,
-        ));
+        glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
         glfw.window_hint(glfw::WindowHint::DoubleBuffer(true));
         glfw.window_hint(glfw::WindowHint::Resizable(true));
         //glfw.window_hint(glfw::WindowHint::Floating(true));
 
         let (mut window, events) = glfw
-            .create_window(1024, 900, "ui Test", glfw::WindowMode::Windowed)
+            .create_window(1024, 900, window_title, glfw::WindowMode::Windowed)
             .expect("Failed to create GLFW window.");
 
         window.set_all_polling(true);
@@ -561,22 +531,13 @@ impl App {
         }
     }
 
-    pub fn run<
-        Res,
-        F: FnMut(&mut DriverPtr, &mut super::Context<PassCommandQueue, Renderer>, Res) -> Res,
-    >(
-        mut self,
-        initial: Res,
-        mut process_frame: F,
-    ) {
+    pub fn run<Res, F: FnMut(&mut DriverPtr, &mut super::Context<PassCommandQueue, Renderer>, Res) -> Res>(mut self, initial: Res, mut process_frame: F) {
         let mut res = initial;
         'running: while !self.window.should_close() {
             let (width, height) = self.window.get_framebuffer_size();
 
             let mut driver = self.driver.clone();
-            let (queue, res2) = self.context.frame(width as _, height as _, |ctx| {
-                process_frame(&mut driver, ctx, res)
-            });
+            let (queue, res2) = self.context.frame(width as _, height as _, |ctx| process_frame(&mut driver, ctx, res));
             res = res2;
 
             let mut pass = Pass::new(
@@ -598,13 +559,9 @@ impl App {
             self.glfw.wait_events_timeout(0.007);
             for (_, event) in glfw::flush_messages(&self.events) {
                 match event {
-                    glfw::WindowEvent::Close | glfw::WindowEvent::Key(glfw::Key::Escape, ..) => {
-                        break 'running
-                    }
+                    glfw::WindowEvent::Close | glfw::WindowEvent::Key(glfw::Key::Escape, ..) => break 'running,
 
-                    _ => self
-                        .input
-                        .handle_event(event, &mut self.window, &mut self.context),
+                    _ => self.input.handle_event(event, &mut self.window, &mut self.context),
                 }
             }
         }

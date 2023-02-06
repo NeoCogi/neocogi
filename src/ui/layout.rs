@@ -136,19 +136,11 @@ impl LayoutStack {
     }
 
     pub fn row_config(&mut self, widths: &[i32], height: i32) {
-        let old_layout = self.top();
-        self.push_layout(old_layout.clone());
         let layout = self.top_mut();
         Self::row_for_layout(layout, widths, height);
     }
 
-    pub fn end_row(&mut self) {
-        let current_layout = self.top().clone();
-        self.pop();
-        let top_layout = self.top_mut();
-        top_layout.next_row = current_layout.next_row;
-        top_layout.position.y = current_layout.next_row;
-    }
+    pub fn end_row(&mut self) {}
 
     pub fn width(&mut self, width: i32) {
         self.top_mut().size.x = width;

@@ -75,7 +75,7 @@ impl State {
 }
 
 fn main() {
-    let mut app = ui::App::new();
+    let mut app = ui::App::new("grid example");
     let style = Style::default();
     app.run(None, |drv, ctx, state| {
         let style = Style::default();
